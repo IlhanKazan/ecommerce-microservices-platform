@@ -1,0 +1,1 @@
+ALTER TABLE iyzico_transactions DROP CONSTRAINT fk_iyzico_payment;

@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: payment_service
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+  profiles:
+    active: dev
+  config:
+    import: optional:file:.env[.properties]
+
+jwt:
+  auth:
+    converter:
+      resource-id: ${KEYCLOAK_CLIENT_ID}
+      principal-attribute: preferred_username
+realm_name: ${REALM_NAME}
+client_name: ${KEYCLOAK_CLIENT_ID}
+
+iyzico:
+  base-url: ${IYZICO_BASE_URL}

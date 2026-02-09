@@ -1,0 +1,27 @@
+server:
+  port: 8082
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/${PAYMENT_DB_NAME}
+    username: ${PAYMENT_DB_USERNAME}
+    password: ${PAYMENT_DB_PASSWORD}
+  kafka:
+    producer:
+      bootstrap-servers: localhost:29092
+
+security:
+  oauth2:
+    resource server:
+      jwt:
+        issuer-uri: http://localhost:8080/realms/${REALM_NAME}
+
+iyzico:
+  api-key: ${IYZICO_API_KEY}
+  secret-key: ${IYZICO_SECRET_KEY}
+
+management:
+  endpoints:
+    web:
+      cors:
+        allowed-origins: ${ALLOWED_ORIGINS}
