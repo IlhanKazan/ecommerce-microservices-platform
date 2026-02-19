@@ -9,6 +9,8 @@ import com.example.payment_service.payment.domain.PaymentContext;
 import com.example.payment_service.payment.repository.PaymentRepository;
 import com.example.payment_service.payment.service.PaymentService;
 import com.example.payment_service.payment.strategy.PaymentStrategy;
+import com.example.payment_service.subscription.constant.TenantSubscriptionStatus;
+import com.example.payment_service.subscription.entity.TenantSubscription;
 import com.example.payment_service.subscription.service.TenantSubscriptionService;
 import com.iyzipay.Options;
 import com.iyzipay.request.CreatePaymentRequest;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +38,23 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public Payment processPayment(PaymentContext context) {
+
+        // Idompotency burada saglaniyor
+        if (context.getType() == PaymentType.SUBSCRIPTION) {
+            Optional<TenantSubscription> existingSub = tenantSubscriptionService.findLatestSubscription(context.getTenantId());
+
+            if (existingSub.isPresent() && existingSub.get().getStatus() == TenantSubscriptionStatus.ACTIVE) {
+                log.warn("DİKKAT! TenantId: {} için zaten AKTİF bir abonelik var. Iyzico'ya tekrar gidilmeyecek, süreç başarılı sayılacak.", context.getTenantId());
+
+                Payment dummyPayment = new Payment();
+                dummyPayment.setPaymentStatus(PaymentStatus.SUCCESS);
+                dummyPayment.setAmount(existingSub.get().getFeeAmount());
+                dummyPayment.setTenantId(context.getTenantId());
+                dummyPayment.setPaymentType(PaymentType.SUBSCRIPTION);
+                return dummyPayment;
+            }
+        }
+
         PaymentStrategy strategy = findStrategy(context.getType());
         BigDecimal amount = strategy.calculatePrice(context.getReferenceId());
 

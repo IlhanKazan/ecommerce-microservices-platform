@@ -18,7 +18,7 @@ public class JwtAuthConverter implements Converter<Jwt, JwtAuthenticationToken> 
     private final JwtGrantedAuthoritiesConverter defaultAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
     private final KeycloakConfig properties;
 
-    @Value("${client_name}")
+    @Value("${jwt.auth.converter.resource-id}")
     private String clientName;
 
     public JwtAuthConverter(KeycloakConfig properties){

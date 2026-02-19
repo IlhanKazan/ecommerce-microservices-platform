@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -67,5 +69,18 @@ public class TenantSubscriptionServiceImpl implements TenantSubscriptionService 
         }
 
     }
+
+    @Override
+    public TenantSubscription getSubscriptionDetails(Long tenantId){
+        log.info("tenantId: {}", tenantId);
+        return tenantSubscriptionRepository.findFirstByTenantIdOrderByCreatedAtDesc(tenantId)
+                .orElseThrow(() -> new NoSuchElementException("Abonelik bulunamadı"));
+    }
+
+    @Override
+    public Optional<TenantSubscription> findLatestSubscription(Long tenantId) {
+        return tenantSubscriptionRepository.findFirstByTenantIdOrderByCreatedAtDesc(tenantId);
+    }
+
 
 }

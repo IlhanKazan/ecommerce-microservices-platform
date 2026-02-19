@@ -19,8 +19,6 @@ jwt:
     converter:
       resource-id: ${KEYCLOAK_CLIENT_ID}
       principal-attribute: preferred_username
-realm_name: ${REALM_NAME}
-client_name: ${KEYCLOAK_CLIENT_ID}
 
 iyzico:
   base-url: ${IYZICO_BASE_URL}

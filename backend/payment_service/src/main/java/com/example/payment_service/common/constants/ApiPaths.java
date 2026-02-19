@@ -11,6 +11,7 @@ public class ApiPaths {
     @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class Payment{
         public static final String PAYMENT = BASE_PATH_V1 + "/payments";
+        public static final String PAYMENT_HISTORY = PAYMENT + "/history";
     }
 
     @NoArgsConstructor(access = AccessLevel.PRIVATE)

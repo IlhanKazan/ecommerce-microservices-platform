@@ -1,6 +1,8 @@
 package com.example.payment_service.payment.mapper;
 
+import com.example.payment_service.payment.constant.PaymentType;
 import com.example.payment_service.payment.controller.dto.request.PaymentRequest;
+import com.example.payment_service.payment.controller.dto.response.PaymentHistoryResponse;
 import com.example.payment_service.payment.controller.dto.response.PaymentResponse;
 import com.example.payment_service.payment.entity.Payment;
 import com.example.payment_service.payment.constant.PaymentStatus;
@@ -9,6 +11,9 @@ import com.example.payment_service.payment.domain.PaymentContext;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
+import org.springframework.data.domain.Page;
+
+import java.time.LocalDateTime;
 
 @Mapper(componentModel = "spring")
 public interface PaymentMapper {
@@ -36,4 +41,31 @@ public interface PaymentMapper {
     default boolean mapSuccess(PaymentStatus status) {
         return status == PaymentStatus.SUCCESS;
     }
+
+    default PaymentHistoryResponse toPaymentHistoryResponse(Payment payment) {
+        if (payment == null) {
+            return null;
+        }
+
+        LocalDateTime txDate = payment.getPaymentStatus() == PaymentStatus.SUCCESS
+                ? payment.getPaidAt()
+                : payment.getFailedAt();
+
+        String desc = payment.getPaymentType() == PaymentType.SUBSCRIPTION
+                ? "Abonelik Ödemesi"
+                : "Sipariş #" + payment.getOrderId();
+
+        return new PaymentHistoryResponse(
+                payment.getId(),
+                payment.getPaymentType(),
+                payment.getAmount(),
+                payment.getCurrency(),
+                payment.getPaymentStatus(),
+                txDate,
+                desc,
+                payment.getFailureReason(),
+                payment.getPaymentMethod()
+        );
+    }
+
 }

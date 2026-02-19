@@ -22,11 +22,8 @@ public class PaymentController {
     // TODO [29.12.2025 00:33]: Burada tokendan gelen claimler ile yani CurrentUser anotasyonuyla veri kontrolu yapicaz
     @PostMapping("/process")
     public ResponseEntity<PaymentResponse> processPayment(@RequestBody PaymentRequest request) {
-
         PaymentContext context = paymentMapper.toContext(request);
-
         Payment payment = paymentService.processPayment(context);
-
         return ResponseEntity.ok(paymentMapper.toResponse(payment));
     }
 }
