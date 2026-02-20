@@ -47,7 +47,7 @@ public class Address {
     @Column(name = "zip_code", length = 20)
     private String zipCode;
 
-    @Column(length = 3)
+    @Column(length = 15)
     private String country;
 
     @Column(name = "recipient_name", length = 100)

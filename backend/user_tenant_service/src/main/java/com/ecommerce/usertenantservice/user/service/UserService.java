@@ -1,9 +1,13 @@
 package com.ecommerce.usertenantservice.user.service;
 
+import com.ecommerce.usertenantservice.integration.payment.PaymentServiceClientAdapter;
+import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHistoryResponse;
 import com.ecommerce.usertenantservice.user.entity.User;
 import com.ecommerce.usertenantservice.user.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -13,9 +17,11 @@ import java.util.UUID;
 @Service
 public class UserService {
     private final UserRepository userRepository;
+    private final PaymentServiceClientAdapter paymentServiceClientAdapter;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, PaymentServiceClientAdapter paymentServiceClientAdapter) {
         this.userRepository = userRepository;
+        this.paymentServiceClientAdapter = paymentServiceClientAdapter;
     }
 
     @Transactional
@@ -62,6 +68,11 @@ public class UserService {
             log.error("Error while saving user {}", user, e);
             return null;
         }
+    }
+
+    public Page<PaymentHistoryResponse> getUserPaymentHistory(UUID keycloakId, Pageable pageable){
+        User user = userRepository.findByKeycloakId(keycloakId);
+        return paymentServiceClientAdapter.getUserPaymentHistory(user.getId(), pageable);
     }
 
 }

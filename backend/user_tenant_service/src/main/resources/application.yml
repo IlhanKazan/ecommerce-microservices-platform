@@ -22,6 +22,12 @@ spring:
     openfeign:
       circuit breaker:
         enabled: true
+      client:
+        config:
+          default:
+            connectTimeout: 5000
+            readTimeout: 15000
+
   config:
     import: optional:file:.env[.properties]
 
@@ -41,6 +47,10 @@ resilience4j:
       payment-service:
         maxAttempts: 3
         waitDuration: 2s
+  time limiter:
+    instances:
+      payment-service:
+        timeoutDuration: 10s
 
 jwt:
   auth:

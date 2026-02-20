@@ -92,6 +92,11 @@ public class AddressService {
                 .orElseThrow(() -> new RuntimeException("Adres bulunamadı veya bu mağazaya ait değil."));
     }
 
+    public Address getExistingTenantAddress(Long tenantId){
+        return addressRepository.findByTenantIdAndIsActiveTrue(tenantId)
+                .orElseThrow(() -> new RuntimeException("Adres bulunamadı"));
+    }
+
     @Transactional
     public void updateTenantAddress(Address address) {
         addressRepository.save(address);

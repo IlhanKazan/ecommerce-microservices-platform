@@ -1,6 +1,7 @@
 package com.ecommerce.usertenantservice.user.controller;
 
 import com.ecommerce.usertenantservice.common.constants.ApiPaths;
+import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHistoryResponse;
 import com.ecommerce.usertenantservice.user.constant.UserType;
 import com.ecommerce.usertenantservice.common.dto.AuthUser;
 import com.ecommerce.usertenantservice.common.security.global.CurrentUser;
@@ -14,6 +15,8 @@ import com.ecommerce.usertenantservice.user.service.ImageService;
 import com.ecommerce.usertenantservice.user.service.UserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -104,6 +107,11 @@ public class UserController {
         User updatedUser = userService.updateUser(existingUser);
 
         return ResponseEntity.ok(userMapper.toResponse(updatedUser));
+    }
+
+    @GetMapping("/payment-history")
+    public ResponseEntity<Page<PaymentHistoryResponse>> getUserPaymentHistory(@CurrentUser AuthUser user, Pageable pageable){
+        return ResponseEntity.ok(userService.getUserPaymentHistory(user.keycloakId(), pageable));
     }
 
 }

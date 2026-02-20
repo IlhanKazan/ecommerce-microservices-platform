@@ -13,9 +13,6 @@ public interface PaymentMapper {
 
     TenantCreationContext toContext(CreateTenantRequest request);
 
-    @Mapping(source = "holderName", target = "holderName")
-    PaymentCardInfo toCardInfo(com.ecommerce.usertenantservice.tenant.domain.PaymentCardInfo dto);
-
     @Named("formatPhone")
     default String formatPhone(String phone) {
         if (phone == null) return "+905555555555";

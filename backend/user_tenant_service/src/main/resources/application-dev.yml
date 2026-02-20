@@ -31,3 +31,7 @@ minio:
 application:
   config:
     payment-url: http://localhost:8082
+
+logging:
+  level:
+    com.ecommerce.usertenantservice.integration.payment.PaymentServiceClient: DEBUG

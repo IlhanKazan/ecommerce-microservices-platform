@@ -28,4 +28,6 @@ public interface AddressRepository extends JpaRepository<Address, Long> {
     Optional<Address> findByIdAndTenantId(Long id, Long tenantId);
 
     boolean existsAddressByTenantIdAndIsActiveIsTrue(Long tenantId);
+
+    Optional<Address> findByTenantIdAndIsActiveTrue(Long tenantId);
 }

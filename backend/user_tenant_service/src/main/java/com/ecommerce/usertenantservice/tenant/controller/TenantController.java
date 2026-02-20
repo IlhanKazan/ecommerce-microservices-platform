@@ -3,7 +3,9 @@ package com.ecommerce.usertenantservice.tenant.controller;
 import com.ecommerce.usertenantservice.common.constants.ApiPaths;
 import com.ecommerce.usertenantservice.common.dto.AuthUser;
 import com.ecommerce.usertenantservice.common.security.global.CurrentUser;
-import com.ecommerce.usertenantservice.tenant.constant.TenantRole;
+import com.ecommerce.usertenantservice.exception.ResourceNotFoundException;
+import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHistoryResponse;
+import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSubscriptionResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.request.*;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSummaryResponse;
@@ -12,8 +14,7 @@ import com.ecommerce.usertenantservice.tenant.entity.Tenant;
 import com.ecommerce.usertenantservice.tenant.entity.UserTenant;
 import com.ecommerce.usertenantservice.tenant.mapper.PaymentMapper;
 import com.ecommerce.usertenantservice.tenant.mapper.TenantMapper;
-import com.ecommerce.usertenantservice.tenant.service.TenantService;
-import com.ecommerce.usertenantservice.tenant.service.UserTenantService;
+import com.ecommerce.usertenantservice.tenant.service.*;
 import com.ecommerce.usertenantservice.user.controller.dto.request.UserAddressRequest;
 import com.ecommerce.usertenantservice.user.entity.Address;
 import com.ecommerce.usertenantservice.user.mapper.AddressMapper;
@@ -21,6 +22,8 @@ import com.ecommerce.usertenantservice.user.service.ImageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -36,11 +39,16 @@ import java.util.List;
 @Slf4j
 public class TenantController {
 
-    private final TenantService tenantService;
+    // TODO [10.02.2026 11:33]: CQRS araştırılacak, diğer mikroservisler için işe yarayabilir
     private final PaymentMapper paymentMapper;
     private final TenantMapper tenantMapper;
     private final AddressMapper addressMapper;
     private final ImageService imageService;
+    private final TenantVerificationService tenantVerificationService;
+    private final TenantAddressService tenantAddressService;
+    private final TenantProfileService tenantProfileService;
+    private final TenantMemberService tenantMemberService;
+    private final TenantLifecycleService tenantLifecycleService;
 
     @PostMapping
     public ResponseEntity<Void> createTenant(
@@ -48,7 +56,7 @@ public class TenantController {
             @CurrentUser AuthUser user) {
 
         TenantCreationContext context = paymentMapper.toContext(request);
-        boolean result = tenantService.createTenant(context, user.keycloakId());
+        boolean result = tenantLifecycleService.createTenant(context, user.keycloakId());
 
         if (result) {
             return ResponseEntity.status(HttpStatus.CREATED).build();
@@ -57,10 +65,20 @@ public class TenantController {
         }
     }
 
+    @PostMapping("/{tenantId}/retry-payment")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<Void> retryPayment(
+            @PathVariable Long tenantId,
+            @RequestBody RetrySubscriptionRequest request,
+            @CurrentUser AuthUser user){
+        tenantLifecycleService.retryTenantPayment(tenantId, request.planId(), request.newCardInfo(), user.keycloakId());
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/me")
     public ResponseEntity<List<TenantSummaryResponse>> getMyTenants(@CurrentUser AuthUser user) {
 
-        List<UserTenant> memberships = tenantService.getMyMemberships(user.keycloakId());
+        List<UserTenant> memberships = tenantMemberService.getMyMemberships(user.keycloakId());
         List<TenantSummaryResponse> response = tenantMapper.userTenantToSummaryList(memberships);
 
         return ResponseEntity.ok(response);
@@ -70,7 +88,7 @@ public class TenantController {
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
     public ResponseEntity<TenantResponse> getTenantDetail(@PathVariable Long tenantId) {
 
-        Tenant tenant = tenantService.getTenantById(tenantId);
+        Tenant tenant = tenantProfileService.getTenantById(tenantId);
         TenantResponse response = tenantMapper.toDetail(tenant);
 
         return ResponseEntity.ok(response);
@@ -81,12 +99,12 @@ public class TenantController {
     public ResponseEntity<TenantResponse> updateTenantGeneral(
             @RequestBody UpdateTenantGeneralRequest request,
             @PathVariable Long tenantId){
-        Tenant tenant = tenantService.getTenantById(tenantId);
+        Tenant tenant = tenantProfileService.getTenantById(tenantId);
         log.info("tenantGeneral Before >> {}", tenant.getBusinessName());
         tenantMapper.updateTenantGeneralFromRequest(request, tenant);
         log.info("tenantGeneral After >> {}", tenant.getBusinessName());
-        tenantService.save(tenant);
-        Tenant saved = tenantService.getTenantById(tenantId);
+        tenantProfileService.save(tenant);
+        Tenant saved = tenantProfileService.getTenantById(tenantId);
         TenantResponse response = tenantMapper.toDetail(saved);
         return ResponseEntity.ok(response);
     }
@@ -96,8 +114,8 @@ public class TenantController {
     public ResponseEntity<TenantResponse> updateTenantCritical(
             @RequestBody UpdateTenantCriticalRequest request,
             @PathVariable Long tenantId){
-        tenantService.updateTenantCritical(tenantId, request.taxId(), request.businessType());
-        Tenant saved = tenantService.getTenantById(tenantId);
+        tenantVerificationService.updateTenantCritical(tenantId, request.taxId(), request.businessType());
+        Tenant saved = tenantProfileService.getTenantById(tenantId);
         TenantResponse response = tenantMapper.toDetail(saved);
         return ResponseEntity.ok(response);
     }
@@ -109,7 +127,7 @@ public class TenantController {
             @RequestBody @Valid UserAddressRequest request) {
 
         Address addressEntity = addressMapper.addressRequestToAddress(request);
-        tenantService.addAddress(tenantId, addressEntity);
+        tenantAddressService.addAddress(tenantId, addressEntity);
 
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
@@ -124,7 +142,7 @@ public class TenantController {
         Address addressEntity = addressMapper.addressRequestToAddress(request);
         addressEntity.setId(addressId);
 
-        tenantService.updateAddress(tenantId, addressId, addressEntity);
+        tenantAddressService.updateAddress(tenantId, addressId, addressEntity);
 
         return ResponseEntity.ok().build();
     }
@@ -135,7 +153,7 @@ public class TenantController {
             @PathVariable Long tenantId,
             @PathVariable Long addressId) {
 
-        tenantService.removeAddress(tenantId, addressId);
+        tenantAddressService.removeAddress(tenantId, addressId);
         return ResponseEntity.ok().build();
     }
 
@@ -145,7 +163,7 @@ public class TenantController {
             @PathVariable Long tenantId,
             @RequestParam("file") MultipartFile file ){
         String imageUrl = imageService.uploadImage(file, "tenants");
-        Tenant tenant = tenantService.uploadLogo(tenantId, imageUrl);
+        Tenant tenant = tenantProfileService.uploadLogo(tenantId, imageUrl);
         return ResponseEntity.ok(tenantMapper.toDetail(tenant));
     }
 
@@ -153,7 +171,7 @@ public class TenantController {
     @PostMapping("/{tenantId}/members")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<Void> addMember(@PathVariable Long tenantId, @RequestBody AddMemberRequest request) {
-        tenantService.addMember(tenantId, request.email(), request.role());
+        tenantMemberService.addMember(tenantId, request.email(), request.role());
         return ResponseEntity.ok().build();
     }
 
@@ -163,7 +181,7 @@ public class TenantController {
             @PathVariable Long tenantId,
             @PathVariable Long memberId,
             @RequestBody UpdateMemberRoleRequest request){
-        tenantService.updateMemberRole(tenantId, memberId, request.newRole());
+        tenantMemberService.updateMemberRole(tenantId, memberId, request.newRole());
         return ResponseEntity.ok().build();
     }
 
@@ -172,8 +190,23 @@ public class TenantController {
     public ResponseEntity<Void> removeMember(
             @PathVariable Long tenantId,
             @PathVariable Long memberId){
-        tenantService.removeMember(tenantId, memberId);
+        tenantMemberService.removeMember(tenantId, memberId);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{tenantId}/subscription")
+    @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
+    public ResponseEntity<TenantSubscriptionResponse> getSubscriptionDetail(@PathVariable Long tenantId){
+        return tenantProfileService.getSubscriptionDetail(tenantId)
+                .map(ResponseEntity::ok)
+                .orElseThrow(() -> new ResourceNotFoundException("Bu mağazaya ait abonelik bilgisi bulunamadı"));
+    }
+
+    @GetMapping("/{tenantId}/payment-details")
+    @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
+    public ResponseEntity<Page<PaymentHistoryResponse>> getTenantPaymentHistory(@PathVariable Long tenantId, Pageable pageable){
+        Page<PaymentHistoryResponse> response = tenantProfileService.getTenantPaymentHistory(tenantId, pageable);
+        return ResponseEntity.ok(response);
     }
 
 }
