@@ -37,7 +37,7 @@ const HomePage: React.FC = () => {
                 <Box sx={{ position: 'absolute', top: -50, right: -50, width: 300, height: 300, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '50%' }} />
                 <Box sx={{ position: 'absolute', bottom: -30, left: 20, width: 150, height: 150, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '50%' }} />
 
-                <Container maxWidth="md" sx={{ textAlign: 'center' }}> {/* İçeriği ortaladık */}
+                <Container maxWidth="md" sx={{ textAlign: 'center' }}>
                     <Typography variant="overline" sx={{ letterSpacing: 3, color: 'primary.light', fontWeight: 'bold' }}>
                         YENİ SEZON
                     </Typography>

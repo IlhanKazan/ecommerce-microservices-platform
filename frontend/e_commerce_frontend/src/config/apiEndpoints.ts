@@ -31,10 +31,17 @@ export const API_ENDPOINTS = {
         ADD_MEMBER: (tenantId: number) =>`/tenants/${tenantId}/members`,
         UPDATE_MEMBER_ROLE: (tenantId: number, memberId: number) => `/tenants/${tenantId}/members/${memberId}`,
         REMOVE_MEMBER: (tenantId: number, memberId: number) => `/tenants/${tenantId}/members/${memberId}`,
+
+        SUBSCRIPTION_DETAIL: (tenantId: number) => `/tenants/${tenantId}/subscription`,
+        PAYMENT_HISTORY: (tenantId: number) => `/tenants/${tenantId}/payment-details`,
+
+        RETRY_PAYMENT: (tenantId: number) => `/tenants/${tenantId}/retry-payment`,
+
+        VERIFY_TENANT: (tenantId: number) => `/tenants/${tenantId}/verification`,
     },
     SUBSCRIPTION: {
         PLANS: '/subscriptions/plans',
-        CHANGE_PLAN: '/subscriptions/change-plan',
+        CHANGE_PLAN: '/subscriptions/change-plan'
     },
     PAYMENT: {
 

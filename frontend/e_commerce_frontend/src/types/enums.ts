@@ -12,8 +12,12 @@ export type AddressType = typeof AddressType[keyof typeof AddressType];
 
 export const TenantStatus = {
   ACTIVE: 'ACTIVE',
-  INACTIVE: 'INACTIVE',
-  PENDING: 'PENDING'
+  CLOSED: 'CLOSED',
+  PASSIVE: 'PASSIVE',
+  SUSPENDED: 'SUSPENDED',
+  PENDING_PAYMENT: 'PENDING_PAYMENT',
+  PAYMENT_FAILED: 'PAYMENT_FAILED',
+
 } as const;
 export type TenantStatus = typeof TenantStatus[keyof typeof TenantStatus];
 

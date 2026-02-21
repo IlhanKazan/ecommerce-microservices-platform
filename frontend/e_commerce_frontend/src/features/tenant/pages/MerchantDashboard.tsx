@@ -52,8 +52,10 @@ const MerchantDashboard: React.FC = () => {
     const getStatusColor = (status: string): ChipColor => {
         switch (status) {
             case 'ACTIVE': return 'success';
-            case 'PENDING': return 'warning';
+            case 'PASSIVE': return 'warning';
+            case 'PENDING_PAYMENT': return 'warning';
             case 'SUSPENDED': return 'error';
+            case 'PAYMENT_FAILED': return 'error';
             default: return 'default';
         }
     };

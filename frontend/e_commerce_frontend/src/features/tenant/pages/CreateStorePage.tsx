@@ -26,6 +26,8 @@ import AddressForm from '../../../components/shared/address/AddressForm';
 import AddressSelectionGrid from '../../../components/shared/address/AddressSelectionGrid';
 import { AddressType, BusinessType } from '../../../types/enums';
 import type { CreateAddressRequest } from '../../../types/user';
+import type {ApiErrorResponse} from "../../../types/common.ts";
+import {useMerchantStore} from "../../../store/useMerchantStore.ts";
 
 const steps = ['Plan Seçimi', 'Mağaza Bilgileri', 'Adres Bilgileri', 'Ödeme & Onay'];
 
@@ -42,6 +44,7 @@ interface StoreDataState {
 
 const CreateStorePage: React.FC = () => {
     const navigate = useNavigate();
+    const { fetchMyTenants, setActiveTenant } = useMerchantStore();
     const [activeStep, setActiveStep] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [myAddresses, setMyAddresses] = useState<Address[]>([]);
@@ -127,10 +130,41 @@ const CreateStorePage: React.FC = () => {
             await tenantService.createTenant(payload);
 
             alert("Tebrikler! Mağazanız başarıyla oluşturuldu.");
-            navigate(AppRoutes.MERCHANT_DASHBOARD);
-        } catch (error) {
+
+            await fetchMyTenants();
+            navigate(AppRoutes.MERCHANT_SELECT);
+
+        } catch (error: any) {
             console.error(error);
-            alert("Mağaza oluşturulurken bir hata oluştu. Lütfen bilgileri kontrol ediniz.");
+
+            if (error.response && error.response.data) {
+                const apiError = error.response.data as ApiErrorResponse;
+
+                if (apiError.errorCode === 'PAYMENT_FAILED') {
+                    const createdTenantId = apiError.details?.tenantId;
+                    console.log("Ödeme başarısız ama mağaza açıldı. ID:", createdTenantId);
+
+                    alert("Mağazanız oluşturuldu ancak ödeme işlemi başarısız oldu. Kontrol panelinize yönlendiriliyorsunuz.");
+
+                    if (createdTenantId) {
+                        await fetchMyTenants();
+
+                        const freshTenants = useMerchantStore.getState().myTenants;
+                        const newTenant = freshTenants.find(t => t.id === createdTenantId);
+
+                        if (newTenant) {
+                            setActiveTenant(newTenant);
+                        }
+                    }
+
+                    navigate(AppRoutes.MERCHANT_DASHBOARD);
+                    return;
+                }
+
+                alert(`Hata: ${apiError.message}`);
+            } else {
+                alert("Beklenmeyen bir hata oluştu. Lütfen bağlantınızı kontrol ediniz.");
+            }
         } finally {
             setIsLoading(false);
         }

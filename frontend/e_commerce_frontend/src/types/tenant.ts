@@ -55,6 +55,43 @@ export interface SubscriptionPlan {
     features: string;
 }
 
+export type SubscriptionStatus = 'ACTIVE' | 'PAYMENT_FAILED' | 'CANCELED' | 'TRIALING';
+
+export interface SubscriptionDetail {
+    planName: string;
+    feeAmount: number;
+    cycleUnit: 'MONTHLY' | 'YEARLY';
+    nextBillingDate: string;
+    status: SubscriptionStatus;
+    startedAt: string;
+    canceledAt: string | null;
+    lastSuccessfulPaymentDate: string;
+    failedPaymentCount: number;
+    autoRenew: boolean;
+    cancellationReason: string | null;
+}
+
+export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILURE' | 'REFUNDED';
+export type PaymentType = 'SUBSCRIPTION' | 'PRODUCT_ORDER';
+
+export interface PaymentHistoryResponse {
+    paymentId: number;
+    paymentType: PaymentType;
+    amount: number;
+    currency: string;
+    paymentStatus: PaymentStatus;
+    transactionDate: string;
+    description: string;
+}
+
+export interface PageResponse<T> {
+    content: T[];
+    totalElements: number;
+    totalPages: number;
+    size: number;
+    number: number;
+}
+
 export interface TenantSummary {
     id: number;
     name: string;
@@ -102,9 +139,11 @@ export interface TenantDetail {
     websiteUrl: string | null;
     isVerified: boolean;
     createdAt: string;
-
     members: TenantMember[];
     addresses: TenantAddress[];
+    iban: string | null;
+    taxOffice: string | null;
+    legalCompanyTitle: string | null;
 }
 
 export interface UpdateTenantRequest {
@@ -127,6 +166,9 @@ export interface UpdateTenantGeneralRequest {
 export interface UpdateTenantCriticalRequest {
     businessType: BusinessType;
     taxId: string;
+    iban: string;
+    taxOffice: string;
+    legalCompanyTitle: string;
 }
 
 export interface UpdateTenantAddressRequest {

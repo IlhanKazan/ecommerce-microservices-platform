@@ -3,7 +3,8 @@ import { API_ENDPOINTS } from '../config/apiEndpoints';
 import type {
     CreateTenantRequest, SubscriptionPlan, TenantDetail, TenantSummary,
     UpdateTenantCriticalRequest,
-    UpdateTenantGeneralRequest, TenantAddress, TenantRole
+    UpdateTenantGeneralRequest, TenantAddress, TenantRole, PaymentCardInfo, SubscriptionDetail, PaymentHistoryResponse,
+    PageResponse
 } from '../types/tenant';
 import type {CreateAddressRequest, Address} from "../types/user";
 import { asRecord, getString, getNumber, getBoolean } from '../utils/normalizers';
@@ -57,7 +58,10 @@ const normalizeTenantDetail = (raw: unknown): TenantDetail => {
                 joinedAt: getString(mm, 'joinedAt', 'joined_at') ?? new Date().toISOString()
             };
         }),
-        addresses: Array.isArray(r['addresses']) ? (r['addresses'] as unknown[]).map(normalizeTenantAddress) : []
+        addresses: Array.isArray(r['addresses']) ? (r['addresses'] as unknown[]).map(normalizeTenantAddress) : [],
+        iban: (getString(r, 'iban') ?? null),
+        taxOffice: (getString(r, 'taxOffice') ?? null),
+        legalCompanyTitle: (getString(r, 'legalCompanyTitle') ?? null)
     } as TenantDetail;
 };
 
@@ -155,6 +159,33 @@ export const tenantService = {
 
     removeMember: async (tenantId: number, memberId: number): Promise<void> => {
         await userApi.delete(API_ENDPOINTS.TENANT.REMOVE_MEMBER(tenantId, memberId));
+    },
+
+    getSubscriptionDetails: async (tenantId: number): Promise<SubscriptionDetail> => {
+        const response = await userApi.get<SubscriptionDetail>(API_ENDPOINTS.TENANT.SUBSCRIPTION_DETAIL(tenantId));
+        return response.data;
+    },
+
+    retryPayment: async (tenantId: number, planId: number, newCardInfo: PaymentCardInfo): Promise<void> => {
+        const payload = {
+            planId: planId,
+            newCardInfo: newCardInfo
+        };
+        await userApi.post(API_ENDPOINTS.TENANT.RETRY_PAYMENT(tenantId), payload);
+    },
+
+    getPaymentHistory: async (tenantId: number, page: number, size: number): Promise<PageResponse<PaymentHistoryResponse>> => {
+        const response = await userApi.get<PageResponse<PaymentHistoryResponse>>(API_ENDPOINTS.TENANT.PAYMENT_HISTORY(tenantId), {
+            params: { page, size }
+        });
+        return response.data;
+    },
+
+    verifyTenant: async (tenantId: number, data: { legalCompanyTitle: string; taxOffice: string; iban: string }) => {
+        await userApi.put(API_ENDPOINTS.TENANT.VERIFY_TENANT(tenantId), data);
     }
 
+   /* changeSubscriptionPlan: async (tenantId: number, planId: number): Promise<void> => {
+        await userApi.put(`/tenants/${tenantId}/subscription/plan`, { planId });
+    }*/
 };
