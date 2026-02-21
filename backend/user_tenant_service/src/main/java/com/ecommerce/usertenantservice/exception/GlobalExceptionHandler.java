@@ -141,4 +141,17 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    @ExceptionHandler(VerificationException.class)
+    public ResponseEntity<GlobalErrorResponse> handleVerificationException(VerificationException exception, WebRequest request){
+
+        GlobalErrorResponse errorResponse = new GlobalErrorResponse(
+                exception.getMessage(),
+                request.getDescription(false),
+                HttpStatus.NOT_ACCEPTABLE.value(),
+                LocalDateTime.now()
+        );
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_ACCEPTABLE);
+    }
+
 }

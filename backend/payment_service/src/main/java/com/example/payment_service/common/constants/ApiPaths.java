@@ -19,5 +19,10 @@ public class ApiPaths {
         public static final String SUBSCRIPTION = BASE_PATH_V1 + "/subscriptions";
     }
 
+    @NoArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class SubMerchant{
+        public static final String SUBMERCHANT = BASE_PATH_V1 + "/submerchant";
+    }
+
 }
 

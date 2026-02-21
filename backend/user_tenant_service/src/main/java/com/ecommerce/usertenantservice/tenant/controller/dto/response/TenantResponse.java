@@ -22,6 +22,9 @@ public record TenantResponse(
         boolean isVerified,
         LocalDateTime createdAt,
         Set<TenantMemberResponse> members,
-        Set<TenantAddressResponse> addresses
+        Set<TenantAddressResponse> addresses,
+        String iban,
+        String taxOffice,
+        String legalCompanyTitle
 ) {
 }

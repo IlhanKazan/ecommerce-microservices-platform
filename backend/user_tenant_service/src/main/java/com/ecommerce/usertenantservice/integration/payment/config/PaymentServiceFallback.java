@@ -1,8 +1,12 @@
+/*
 package com.ecommerce.usertenantservice.integration.payment.config;
 
 import com.ecommerce.usertenantservice.integration.payment.PaymentServiceClient;
+import com.ecommerce.usertenantservice.tenant.controller.dto.request.SubMerchantCreateRequest;
+import com.ecommerce.usertenantservice.tenant.controller.dto.request.SubMerchantUpdateRequest;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHistoryResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentResponse;
+import com.ecommerce.usertenantservice.tenant.controller.dto.response.SubMerchantResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSubscriptionResponse;
 import com.ecommerce.usertenantservice.tenant.domain.PaymentProcessRequest;
 import org.springframework.data.domain.Page;
@@ -34,5 +38,16 @@ public class PaymentServiceFallback implements PaymentServiceClient {
         return null;
     }
 
+    @Override
+    public SubMerchantResponse createSubMerchant(SubMerchantCreateRequest request) {
+        return "";
+    }
+
+    @Override
+    public SubMerchantResponse updateSubMerchant(SubMerchantUpdateRequest request) {
+        return "";
+    }
+
 
 }
+*/

@@ -2,8 +2,12 @@ package com.ecommerce.usertenantservice.integration.payment;
 
 import com.ecommerce.usertenantservice.exception.PaymentServiceUnreachableException;
 import com.ecommerce.usertenantservice.exception.UnexpectedErrorException;
+import com.ecommerce.usertenantservice.exception.VerificationException;
 import com.ecommerce.usertenantservice.integration.payment.dto.PaymentResult;
+import com.ecommerce.usertenantservice.tenant.controller.dto.request.SubMerchantCreateRequest;
+import com.ecommerce.usertenantservice.tenant.controller.dto.request.SubMerchantUpdateRequest;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHistoryResponse;
+import com.ecommerce.usertenantservice.tenant.controller.dto.response.SubMerchantResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSubscriptionResponse;
 import com.ecommerce.usertenantservice.tenant.domain.PaymentProcessRequest;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentResponse;
@@ -91,6 +95,33 @@ public class PaymentServiceClientAdapter {
         } catch (FeignException.NotFound e) {
             log.info("Mağaza ödeme geçmişi bulunamadı");
             return null;
+        }
+    }
+
+    public String createSubMerchant(SubMerchantCreateRequest request){
+        try{
+            SubMerchantResponse response = paymentServiceClient.createSubMerchant(request);
+            return response.subMerchantKey();
+
+        } catch (FeignException e) {
+            log.error("Iyzico SubMerchant hatası. Status: {}, Body: {}", e.status(), e.contentUTF8());
+            throw new VerificationException("Iyzico işlemi başarısız: " + e.contentUTF8());
+        } catch (Exception e) {
+            log.error("SubMerchant oluşturulurken sistemsel hata", e);
+            throw new VerificationException("Beklenmedik bir hata oluştu.");
+        }
+    }
+
+    public void updateSubMerchant(SubMerchantUpdateRequest request){
+        try{
+            paymentServiceClient.updateSubMerchant(request);
+
+        } catch (FeignException e) {
+            log.error("Iyzico SubMerchant hatası. Status: {}, Body: {}", e.status(), e.contentUTF8());
+            throw new VerificationException("Iyzico işlemi başarısız: " + e.contentUTF8());
+        } catch (Exception e) {
+            log.error("SubMerchant güncellenirken sistemsel hata", e);
+            throw new VerificationException("Beklenmedik bir hata oluştu.");
         }
     }
 

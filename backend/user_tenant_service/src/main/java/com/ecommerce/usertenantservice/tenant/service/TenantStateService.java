@@ -70,4 +70,11 @@ public class TenantStateService {
         tenantRepository.save(tenant);
     }
 
+    @Transactional
+    public void verifyTenant(Tenant tenant, String subMerchantKey){
+        tenant.setIyzicoSubMerchantKey(subMerchantKey);
+        tenant.setIsVerified(true);
+        tenantRepository.save(tenant);
+    }
+
 }

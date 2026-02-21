@@ -75,6 +75,17 @@ public class TenantController {
         return ResponseEntity.ok().build();
     }
 
+    @PutMapping("/{tenantId}/verification")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<Void> verifyTenant(
+            @PathVariable Long tenantId,
+            @RequestBody @Valid TenantVerificationRequest request,
+            @CurrentUser AuthUser user){
+        tenantVerificationService.verifyTenant(tenantId, request, user.keycloakId());
+        return ResponseEntity.ok().build();
+    }
+
+
     @GetMapping("/me")
     public ResponseEntity<List<TenantSummaryResponse>> getMyTenants(@CurrentUser AuthUser user) {
 
@@ -113,8 +124,16 @@ public class TenantController {
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<TenantResponse> updateTenantCritical(
             @RequestBody UpdateTenantCriticalRequest request,
-            @PathVariable Long tenantId){
-        tenantVerificationService.updateTenantCritical(tenantId, request.taxId(), request.businessType());
+            @PathVariable Long tenantId,
+            @CurrentUser AuthUser user){
+        tenantVerificationService.updateTenantCritical(
+                tenantId,
+                request.taxId(),
+                request.businessType(),
+                request.legalCompanyTitle(),
+                request.taxOffice(),
+                request.iban(),
+                user.keycloakId());
         Tenant saved = tenantProfileService.getTenantById(tenantId);
         TenantResponse response = tenantMapper.toDetail(saved);
         return ResponseEntity.ok(response);
