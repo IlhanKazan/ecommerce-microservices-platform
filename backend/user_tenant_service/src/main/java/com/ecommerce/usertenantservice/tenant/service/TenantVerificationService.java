@@ -1,6 +1,6 @@
 package com.ecommerce.usertenantservice.tenant.service;
 
-import com.ecommerce.usertenantservice.exception.ResourceNotFoundException;
+import com.ecommerce.common.exception.ResourceNotFoundException;
 import com.ecommerce.usertenantservice.exception.VerificationException;
 import com.ecommerce.usertenantservice.integration.payment.PaymentServiceClientAdapter;
 import com.ecommerce.usertenantservice.tenant.constant.BusinessType;
@@ -38,7 +38,7 @@ public class TenantVerificationService {
     public void updateTenantCritical(Long tenantId, String newTaxId, BusinessType newBusinessType, String legalCompanyTitle, String taxOffice, String iban, UUID keycloakId) {
 
         Tenant tenant = tenantRepository.findByIdWithDetails(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException(NO_MERCHANT_DESCRIPTION));
+                .orElseThrow(() -> new ResourceNotFoundException(NO_MERCHANT_DESCRIPTION, "404"));
 
         boolean changed = !tenant.getTaxId().equals(newTaxId) ||
                 !tenant.getBusinessType().equals(newBusinessType) ||

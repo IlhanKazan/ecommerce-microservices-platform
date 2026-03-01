@@ -1,7 +1,9 @@
 package com.ecommerce.usertenantservice.exception;
 
-public class MemberNotFoundException extends RuntimeException {
+import com.ecommerce.common.exception.ResourceNotFoundException;
+
+public class MemberNotFoundException extends ResourceNotFoundException {
     public MemberNotFoundException(String message) {
-        super(message);
+        super(message, "MEMBER_NOT_FOUND");
     }
 }

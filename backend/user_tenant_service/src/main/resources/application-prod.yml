@@ -16,12 +16,6 @@ security:
       jwt:
         issuer-uri: http://keycloak:8080/realms/${REALM_NAME}
 
-management:
-  endpoints:
-    web:
-      cors:
-        allowed-origins: "*"
-
 minio:
   url: http://minio:9000
   access-key: ${MINIO_ACCESS_KEY}

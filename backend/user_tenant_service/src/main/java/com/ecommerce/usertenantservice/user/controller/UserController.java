@@ -1,11 +1,11 @@
 package com.ecommerce.usertenantservice.user.controller;
 
+import com.ecommerce.common.security.annotation.CurrentUser;
+import com.ecommerce.common.security.dto.AuthUser;
 import com.ecommerce.usertenantservice.common.constants.ApiPaths;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHistoryResponse;
-import com.ecommerce.usertenantservice.user.constant.UserType;
-import com.ecommerce.usertenantservice.common.dto.AuthUser;
-import com.ecommerce.usertenantservice.common.security.global.CurrentUser;
 import com.ecommerce.usertenantservice.tenant.service.UserTenantService;
+import com.ecommerce.usertenantservice.user.constant.UserType;
 import com.ecommerce.usertenantservice.user.controller.dto.request.KeycloakSyncRequest;
 import com.ecommerce.usertenantservice.user.controller.dto.request.UserRequest;
 import com.ecommerce.usertenantservice.user.controller.dto.response.UserResponse;

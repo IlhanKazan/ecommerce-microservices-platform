@@ -1,12 +1,10 @@
 package com.ecommerce.usertenantservice.user.entity;
 
+import com.ecommerce.common.entity.BaseEntity;
 import com.ecommerce.usertenantservice.common.constants.AddressType;
 import com.ecommerce.usertenantservice.tenant.entity.Tenant;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "addresses")
@@ -15,11 +13,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Address {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class Address extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
@@ -69,18 +63,19 @@ public class Address {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @Override
+    protected void onCreate() {
+        super.onCreate();
+        validateOwnership();
+    }
 
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    @Override
+    protected void onUpdate() {
+        super.onUpdate();
+        validateOwnership();
+    }
 
-
-    @PrePersist
-    @PreUpdate
-    public void validateOwnership() {
+    private void validateOwnership() {
         if (user != null && tenant != null) {
             throw new IllegalStateException("Bir adres aynı anda hem User'a hem Tenant'a ait olamaz.");
         }

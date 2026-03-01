@@ -1,14 +1,12 @@
 package com.ecommerce.usertenantservice.tenant.entity;
 
+import com.ecommerce.common.entity.BaseEntity;
 import com.ecommerce.usertenantservice.tenant.constant.BusinessType;
 import com.ecommerce.usertenantservice.tenant.constant.TenantStatus;
+import com.ecommerce.usertenantservice.user.entity.Address;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLRestriction;
-import org.hibernate.annotations.UpdateTimestamp;
-import com.ecommerce.usertenantservice.user.entity.Address;
-import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -19,11 +17,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Tenant {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class Tenant extends BaseEntity {
 
     @Column(nullable = false)
     private String name;
@@ -72,14 +66,6 @@ public class Tenant {
     @Builder.Default
     @Column(name = "is_verified")
     private Boolean isVerified = false;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
 
     @SQLRestriction("is_active = true")
     @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL)

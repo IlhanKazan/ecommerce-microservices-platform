@@ -1,8 +1,8 @@
 package com.ecommerce.usertenantservice.user.controller;
 
+import com.ecommerce.common.security.annotation.CurrentUser;
+import com.ecommerce.common.security.dto.AuthUser;
 import com.ecommerce.usertenantservice.common.constants.ApiPaths;
-import com.ecommerce.usertenantservice.common.dto.AuthUser;
-import com.ecommerce.usertenantservice.common.security.global.CurrentUser;
 import com.ecommerce.usertenantservice.user.controller.dto.request.UserAddressRequest;
 import com.ecommerce.usertenantservice.user.controller.dto.response.AddressResponse;
 import com.ecommerce.usertenantservice.user.entity.Address;
@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController

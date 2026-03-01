@@ -6,8 +6,8 @@ import com.ecommerce.usertenantservice.user.repository.AddressRepository;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j

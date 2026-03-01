@@ -1,13 +1,10 @@
 package com.ecommerce.usertenantservice.user.entity;
 
-import com.ecommerce.usertenantservice.user.constant.UserType;
+import com.ecommerce.common.entity.BaseEntity;
 import com.ecommerce.usertenantservice.tenant.entity.UserTenant;
+import com.ecommerce.usertenantservice.user.constant.UserType;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
-import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -19,11 +16,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class User {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public class User extends BaseEntity {
 
     @Column(name = "keycloak_id", nullable = false, unique = true, updatable = false)
     private UUID keycloakId;
@@ -59,14 +52,6 @@ public class User {
     private String profileImageUrl;
 
     private String language;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<UserTenant> memberships = new HashSet<>();

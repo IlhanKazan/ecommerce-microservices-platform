@@ -1,13 +1,13 @@
 package com.ecommerce.usertenantservice.tenant.controller;
 
+import com.ecommerce.common.exception.ResourceNotFoundException;
+import com.ecommerce.common.security.annotation.CurrentUser;
+import com.ecommerce.common.security.dto.AuthUser;
 import com.ecommerce.usertenantservice.common.constants.ApiPaths;
-import com.ecommerce.usertenantservice.common.dto.AuthUser;
-import com.ecommerce.usertenantservice.common.security.global.CurrentUser;
-import com.ecommerce.usertenantservice.exception.ResourceNotFoundException;
-import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHistoryResponse;
-import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSubscriptionResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.request.*;
+import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHistoryResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantResponse;
+import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSubscriptionResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSummaryResponse;
 import com.ecommerce.usertenantservice.tenant.domain.TenantCreationContext;
 import com.ecommerce.usertenantservice.tenant.entity.Tenant;
@@ -218,7 +218,7 @@ public class TenantController {
     public ResponseEntity<TenantSubscriptionResponse> getSubscriptionDetail(@PathVariable Long tenantId){
         return tenantProfileService.getSubscriptionDetail(tenantId)
                 .map(ResponseEntity::ok)
-                .orElseThrow(() -> new ResourceNotFoundException("Bu mağazaya ait abonelik bilgisi bulunamadı"));
+                .orElseThrow(() -> new ResourceNotFoundException("Bu mağazaya ait abonelik bilgisi bulunamadı", "404"));
     }
 
     @GetMapping("/{tenantId}/payment-details")

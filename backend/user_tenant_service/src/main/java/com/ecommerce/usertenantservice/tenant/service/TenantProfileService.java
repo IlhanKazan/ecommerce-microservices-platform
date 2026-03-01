@@ -1,6 +1,6 @@
 package com.ecommerce.usertenantservice.tenant.service;
 
-import com.ecommerce.usertenantservice.exception.ResourceNotFoundException;
+import com.ecommerce.common.exception.ResourceNotFoundException;
 import com.ecommerce.usertenantservice.integration.payment.PaymentServiceClientAdapter;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHistoryResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSubscriptionResponse;
@@ -24,7 +24,7 @@ public class TenantProfileService {
 
     public Tenant getTenantById(Long tenantId) {
         return tenantRepository.findByIdWithDetails(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException(NO_MERCHANT_DESCRIPTION));
+                .orElseThrow(() -> new ResourceNotFoundException(NO_MERCHANT_DESCRIPTION, "404"));
     }
 
     @Transactional

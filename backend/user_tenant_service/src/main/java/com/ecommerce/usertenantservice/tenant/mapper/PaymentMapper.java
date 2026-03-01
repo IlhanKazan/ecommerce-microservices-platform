@@ -1,10 +1,8 @@
 package com.ecommerce.usertenantservice.tenant.mapper;
 
-import com.ecommerce.usertenantservice.tenant.domain.PaymentCardInfo;
 import com.ecommerce.usertenantservice.tenant.controller.dto.request.CreateTenantRequest;
 import com.ecommerce.usertenantservice.tenant.domain.TenantCreationContext;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 import org.mapstruct.ReportingPolicy;
 

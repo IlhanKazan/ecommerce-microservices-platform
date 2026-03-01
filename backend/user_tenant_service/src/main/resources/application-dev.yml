@@ -16,12 +16,6 @@ security:
       jwt:
         issuer-uri: http://localhost:8080/realms/${REALM_NAME}
 
-management:
-  endpoints:
-    web:
-      cors:
-        allowed-origins: http://localhost:5173, http://localhost:3000
-
 minio:
   url: http://localhost:9005
   access-key: ${MINIO_ACCESS_KEY}

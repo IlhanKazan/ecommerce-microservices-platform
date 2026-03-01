@@ -1,7 +1,9 @@
 package com.ecommerce.usertenantservice.exception;
 
-public class PaymentServiceUnreachableException extends RuntimeException {
+import com.ecommerce.common.exception.ExternalServiceException;
+
+public class PaymentServiceUnreachableException extends ExternalServiceException {
     public PaymentServiceUnreachableException(String message) {
-        super(message);
+        super(message, "PAYMENT_SERVICE_DOWN");
     }
 }

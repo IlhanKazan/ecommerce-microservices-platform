@@ -1,15 +1,7 @@
 package com.ecommerce.usertenantservice.tenant.service;
 
-import com.ecommerce.usertenantservice.exception.MemberNotFoundException;
-import com.ecommerce.usertenantservice.exception.OwnerTenantException;
-import com.ecommerce.usertenantservice.exception.ResourceNotFoundException;
-import com.ecommerce.usertenantservice.tenant.constant.TenantRole;
-import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantMemberResponse;
-import com.ecommerce.usertenantservice.tenant.entity.Tenant;
 import com.ecommerce.usertenantservice.tenant.entity.UserTenant;
 import com.ecommerce.usertenantservice.tenant.repository.UserTenantRepository;
-import com.ecommerce.usertenantservice.user.entity.User;
-import com.ecommerce.usertenantservice.user.service.UserService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;

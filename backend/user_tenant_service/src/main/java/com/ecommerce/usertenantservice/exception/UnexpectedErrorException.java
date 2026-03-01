@@ -1,7 +1,9 @@
 package com.ecommerce.usertenantservice.exception;
 
-public class UnexpectedErrorException extends RuntimeException {
+import com.ecommerce.common.exception.SystemException;
+
+public class UnexpectedErrorException extends SystemException {
     public UnexpectedErrorException(String message) {
-        super(message);
+        super(message, "UNEXPECTED_ERROR");
     }
 }

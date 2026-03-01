@@ -4,7 +4,10 @@ import com.ecommerce.usertenantservice.user.controller.dto.request.KeycloakSyncR
 import com.ecommerce.usertenantservice.user.controller.dto.request.UserRequest;
 import com.ecommerce.usertenantservice.user.controller.dto.response.UserResponse;
 import com.ecommerce.usertenantservice.user.entity.User;
-import org.mapstruct.*;
+import org.mapstruct.BeanMapping;
+import org.mapstruct.Mapper;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
 
 @Mapper(componentModel = "spring")
 public interface UserMapper {

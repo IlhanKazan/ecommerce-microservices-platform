@@ -1,14 +1,11 @@
 package com.ecommerce.usertenantservice.tenant.service;
 
-import com.ecommerce.usertenantservice.exception.VerificationException;
 import com.ecommerce.usertenantservice.exception.PaymentFailedException;
 import com.ecommerce.usertenantservice.exception.TenantCreationException;
 import com.ecommerce.usertenantservice.integration.payment.PaymentServiceClientAdapter;
 import com.ecommerce.usertenantservice.integration.payment.dto.PaymentResult;
 import com.ecommerce.usertenantservice.tenant.constant.PaymentType;
 import com.ecommerce.usertenantservice.tenant.constant.TenantStatus;
-import com.ecommerce.usertenantservice.tenant.controller.dto.request.SubMerchantCreateRequest;
-import com.ecommerce.usertenantservice.tenant.controller.dto.request.TenantVerificationRequest;
 import com.ecommerce.usertenantservice.tenant.domain.*;
 import com.ecommerce.usertenantservice.tenant.entity.Tenant;
 import com.ecommerce.usertenantservice.user.entity.Address;

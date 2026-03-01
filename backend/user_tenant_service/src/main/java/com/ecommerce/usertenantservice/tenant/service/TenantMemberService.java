@@ -1,8 +1,8 @@
 package com.ecommerce.usertenantservice.tenant.service;
 
+import com.ecommerce.common.exception.ResourceNotFoundException;
 import com.ecommerce.usertenantservice.exception.MemberNotFoundException;
 import com.ecommerce.usertenantservice.exception.OwnerTenantException;
-import com.ecommerce.usertenantservice.exception.ResourceNotFoundException;
 import com.ecommerce.usertenantservice.tenant.constant.TenantRole;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantMemberResponse;
 import com.ecommerce.usertenantservice.tenant.entity.Tenant;
@@ -29,6 +29,7 @@ public class TenantMemberService {
     private static final String NO_USER_DESCRIPTION = "Kullanıcı bulunamadı. Önce sisteme kayıt olmalı";
     private static final String ALREADY_MEMBER_DESCRIPTION = "Bu kullanıcı zaten ekibinizde";
     private final TenantMapper tenantMapper;
+    private final AuthzCacheService authzCacheService;
 
     public Page<TenantMemberResponse> getTenantMembers(Long tenantId, Pageable pageable){
         return userTenantService.findByTenantId(tenantId, pageable).map(tenantMapper::toMemberResponse);
@@ -41,7 +42,7 @@ public class TenantMemberService {
     @Transactional
     public void addMember(Long tenantId, String email, TenantRole role) {
         User user = userService.getByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException(NO_USER_DESCRIPTION));
+                .orElseThrow(() -> new ResourceNotFoundException(NO_USER_DESCRIPTION, "404"));
 
         boolean exists = userTenantService.existsByUserIdAndTenantId(user.getId(), tenantId);
         if (exists) {
@@ -76,6 +77,7 @@ public class TenantMemberService {
 
         membership.setRole(newRole);
         userTenantService.save(membership);
+        authzCacheService.evictUserCache(membership.getUser().getKeycloakId());
     }
 
     @Transactional
@@ -90,6 +92,7 @@ public class TenantMemberService {
 
         membership.setIsActive(false);
         userTenantService.delete(membership);
+        authzCacheService.evictUserCache(membership.getUser().getKeycloakId());
     }
 
 }

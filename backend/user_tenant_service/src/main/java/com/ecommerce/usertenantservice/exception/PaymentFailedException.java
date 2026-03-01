@@ -1,14 +1,13 @@
 package com.ecommerce.usertenantservice.exception;
 
-public class PaymentFailedException extends RuntimeException {
-    private final Long tenantId;
+import com.ecommerce.common.exception.BusinessException;
+
+import java.util.Map;
+
+public class PaymentFailedException extends BusinessException {
 
     public PaymentFailedException(String message, Long tenantId) {
-        super(message);
-        this.tenantId = tenantId;
+        super(message, "PAYMENT_FAILED", Map.of("tenantId", tenantId));
     }
 
-    public Long getTenantId(){
-        return tenantId;
-    }
 }

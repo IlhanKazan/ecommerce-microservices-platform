@@ -1,7 +1,6 @@
 package com.ecommerce.usertenantservice.tenant.service;
 
 import com.ecommerce.usertenantservice.tenant.entity.Tenant;
-import com.ecommerce.usertenantservice.tenant.repository.TenantRepository;
 import com.ecommerce.usertenantservice.user.entity.Address;
 import com.ecommerce.usertenantservice.user.service.AddressService;
 import lombok.RequiredArgsConstructor;

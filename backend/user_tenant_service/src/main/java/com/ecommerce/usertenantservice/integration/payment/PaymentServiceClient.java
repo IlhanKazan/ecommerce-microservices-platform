@@ -1,13 +1,13 @@
 package com.ecommerce.usertenantservice.integration.payment;
 
-import com.ecommerce.usertenantservice.integration.config.FeignClientInterceptor;
+import com.ecommerce.common.interceptor.FeignClientInterceptor;
 import com.ecommerce.usertenantservice.tenant.controller.dto.request.SubMerchantCreateRequest;
 import com.ecommerce.usertenantservice.tenant.controller.dto.request.SubMerchantUpdateRequest;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHistoryResponse;
+import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.SubMerchantResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSubscriptionResponse;
 import com.ecommerce.usertenantservice.tenant.domain.PaymentProcessRequest;
-import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

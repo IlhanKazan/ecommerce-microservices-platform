@@ -1,7 +1,9 @@
 package com.ecommerce.usertenantservice.exception;
 
-public class OwnerTenantException extends RuntimeException {
+import com.ecommerce.common.exception.BusinessException;
+
+public class OwnerTenantException extends BusinessException {
     public OwnerTenantException(String message) {
-        super(message);
+        super(message, "NOT_OWNER");
     }
 }

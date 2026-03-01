@@ -1,7 +1,8 @@
 package com.ecommerce.usertenantservice.user.controller.dto.request;
 
-import com.ecommerce.usertenantservice.user.entity.Address;
 import com.ecommerce.usertenantservice.tenant.entity.UserTenant;
+import com.ecommerce.usertenantservice.user.entity.Address;
+
 import java.util.Set;
 
 public record UserRequest(
