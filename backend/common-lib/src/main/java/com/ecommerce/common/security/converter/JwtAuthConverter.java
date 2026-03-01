@@ -1,14 +1,16 @@
-package com.example.payment_service.common.security;
+package com.ecommerce.common.security.converter;
 
+import com.ecommerce.common.security.config.KeycloakConfig;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimNames;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
-import org.springframework.core.convert.converter.Converter;
 import org.springframework.stereotype.Component;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -68,4 +70,3 @@ public class JwtAuthConverter implements Converter<Jwt, JwtAuthenticationToken> 
         return jwt.getClaim(claimName);
     }
 }
-

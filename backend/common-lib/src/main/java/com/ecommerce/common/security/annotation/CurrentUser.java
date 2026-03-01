@@ -1,4 +1,4 @@
-package com.example.payment_service.common.security;
+package com.ecommerce.common.security.annotation;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
@@ -12,4 +12,3 @@ import java.lang.annotation.Target;
 @AuthenticationPrincipal
 public @interface CurrentUser {
 }
-

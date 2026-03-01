@@ -1,4 +1,4 @@
-package com.example.payment_service.common.security;
+package com.ecommerce.common.security.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -27,5 +27,4 @@ public class KeycloakConfig {
     }
 
 }
-
 

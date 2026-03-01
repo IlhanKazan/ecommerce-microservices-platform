@@ -1,4 +1,4 @@
-package com.example.payment_service.common.dto;
+package com.ecommerce.common.security.dto;
 
 import java.util.UUID;
 

@@ -1,7 +1,7 @@
-package com.example.payment_service.common.security;
+package com.ecommerce.common.security.resolver;
 
-
-import com.example.payment_service.common.dto.AuthUser;
+import com.ecommerce.common.security.annotation.CurrentUser;
+import com.ecommerce.common.security.dto.AuthUser;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;

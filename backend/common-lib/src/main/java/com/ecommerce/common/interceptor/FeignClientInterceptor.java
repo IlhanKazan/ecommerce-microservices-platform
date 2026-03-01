@@ -1,4 +1,4 @@
-package com.ecommerce.usertenantservice.integration.config;
+package com.ecommerce.common.interceptor;
 
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
@@ -24,14 +24,12 @@ public class FeignClientInterceptor implements RequestInterceptor {
             return;
         }
 
-        log.info("FEIGN INTERCEPTOR: Auth Class Type: {}", authentication.getClass().getName());
+        log.debug("FEIGN INTERCEPTOR: Auth Class Type: {}", authentication.getClass().getName());
 
-        if (authentication instanceof JwtAuthenticationToken) {
-            JwtAuthenticationToken jwtToken = (JwtAuthenticationToken) authentication;
+        if (authentication instanceof JwtAuthenticationToken jwtToken) {
             String tokenValue = jwtToken.getToken().getTokenValue();
-
             template.header(AUTHORIZATION_HEADER, String.format("%s %s", TOKEN_TYPE, tokenValue));
-            log.info("FEIGN INTERCEPTOR: Token eklendi! (Başlangıç: {}...)", tokenValue.substring(0, 10));
+            log.debug("FEIGN INTERCEPTOR: Token eklendi! (Başlangıç: {}...)", tokenValue.substring(0, 10));
         } else {
             log.error("FEIGN INTERCEPTOR: Authentication nesnesi JwtAuthenticationToken tipinde değil! Token eklenmedi.");
         }
