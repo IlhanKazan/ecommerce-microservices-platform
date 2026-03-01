@@ -1,0 +1,17 @@
+server:
+  port: 9050
+
+spring:
+  security:
+    oauth2:
+      resource-server:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/${REALM_NAME}
+
+  cloud:
+    gateway:
+      routes:
+        - id: user-tenant-service
+          uri: http://user-tenant-service:8081
+          predicates:
+            - Path=/api/v1/users/**, /api/v1/tenants/**, /api/v1/addresses/**
