@@ -1,13 +1,11 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
-import { USER_SERVICE_BASE_URL, PAYMENT_SERVICE_BASE_URL } from '../config/apiEndpoints';
+import { API_BASE_URL } from '../config/apiEndpoints';
 import { useAuthStore } from '../store/useAuthStore';
 
 const addAuthInterceptor = (instance: AxiosInstance) => {
-
     instance.interceptors.request.use(
         (config: InternalAxiosRequestConfig) => {
             const token = useAuthStore.getState().token;
-
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;
             }
@@ -28,19 +26,11 @@ const addAuthInterceptor = (instance: AxiosInstance) => {
     );
 };
 
-export const userApi = axios.create({
-    baseURL: USER_SERVICE_BASE_URL,
+export const api = axios.create({
+    baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
     },
 });
-addAuthInterceptor(userApi);
 
-
-export const paymentApi = axios.create({
-    baseURL: PAYMENT_SERVICE_BASE_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
-addAuthInterceptor(paymentApi);
+addAuthInterceptor(api);

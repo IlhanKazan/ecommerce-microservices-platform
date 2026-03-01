@@ -1,4 +1,4 @@
-import { userApi, paymentApi } from '../lib/axios';
+import { api } from '../lib/axios';
 import { API_ENDPOINTS } from '../config/apiEndpoints';
 import type {
     CreateTenantRequest, SubscriptionPlan, TenantDetail, TenantSummary,
@@ -67,21 +67,21 @@ const normalizeTenantDetail = (raw: unknown): TenantDetail => {
 
 export const tenantService = {
     createTenant: async (data: CreateTenantRequest): Promise<void> => {
-        await userApi.post(API_ENDPOINTS.TENANT.CREATE, data);
+        await api.post(API_ENDPOINTS.TENANT.CREATE, data);
     },
 
     getSubscriptionPlans: async (): Promise<SubscriptionPlan[]> => {
-        const response = await paymentApi.get<SubscriptionPlan[]>(API_ENDPOINTS.SUBSCRIPTION.PLANS);
+        const response = await api.get<SubscriptionPlan[]>(API_ENDPOINTS.SUBSCRIPTION.PLANS);
         return response.data;
     },
 
     getMyTenants: async (): Promise<TenantSummary[]> => {
-        const response = await userApi.get<TenantSummary[]>(API_ENDPOINTS.TENANT.ME);
+        const response = await api.get<TenantSummary[]>(API_ENDPOINTS.TENANT.ME);
         return response.data;
     },
 
     getTenantById: async (id: number): Promise<TenantDetail> => {
-        const response = await userApi.get<unknown>(API_ENDPOINTS.TENANT.BY_ID(id));
+        const response = await api.get<unknown>(API_ENDPOINTS.TENANT.BY_ID(id));
         return normalizeTenantDetail(response.data);
     },
 
@@ -89,26 +89,26 @@ export const tenantService = {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await userApi.post<unknown>(API_ENDPOINTS.TENANT.UPLOAD_LOGO(id), formData, {
+        const response = await api.post<unknown>(API_ENDPOINTS.TENANT.UPLOAD_LOGO(id), formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         return normalizeTenantDetail(response.data);
     },
 
     changeSubscriptionPlan: async (tenantId: number, planId: number): Promise<void> => {
-        await paymentApi.post(API_ENDPOINTS.SUBSCRIPTION.CHANGE_PLAN, { tenantId, planId });
+        await api.post(API_ENDPOINTS.SUBSCRIPTION.CHANGE_PLAN, { tenantId, planId });
     },
 
     updateGeneralInfo: async (id: number, data: UpdateTenantGeneralRequest): Promise<void> => {
-        await userApi.put(API_ENDPOINTS.TENANT.UPDATE_GENERAL(id), data);
+        await api.put(API_ENDPOINTS.TENANT.UPDATE_GENERAL(id), data);
     },
 
     updateCriticalInfo: async (id: number, data: UpdateTenantCriticalRequest): Promise<void> => {
-        await userApi.put(API_ENDPOINTS.TENANT.UPDATE_CRITICAL(id), data);
+        await api.put(API_ENDPOINTS.TENANT.UPDATE_CRITICAL(id), data);
     },
 
     addAddress: async (tenantId: number, data: CreateAddressRequest): Promise<Address> => {
-        const response = await userApi.post<unknown>(API_ENDPOINTS.TENANT.ADDRESSES(tenantId), data);
+        const response = await api.post<unknown>(API_ENDPOINTS.TENANT.ADDRESSES(tenantId), data);
         const raw = asRecord(response.data);
         return {
             id: getNumber(raw, 'id') ?? 0,
@@ -127,7 +127,7 @@ export const tenantService = {
     },
 
     updateAddress: async (tenantId: number, addressId: number, data: CreateAddressRequest): Promise<Address> => {
-        const response = await userApi.put<unknown>(API_ENDPOINTS.TENANT.ADDRESS_BY_ID(tenantId, addressId), data);
+        const response = await api.put<unknown>(API_ENDPOINTS.TENANT.ADDRESS_BY_ID(tenantId, addressId), data);
         const raw = asRecord(response.data);
         return {
             id: getNumber(raw, 'id') ?? 0,
@@ -146,23 +146,23 @@ export const tenantService = {
     },
 
     deleteAddress: async (tenantId: number, addressId: number): Promise<void> => {
-        await userApi.delete(API_ENDPOINTS.TENANT.ADDRESS_BY_ID(tenantId, addressId));
+        await api.delete(API_ENDPOINTS.TENANT.ADDRESS_BY_ID(tenantId, addressId));
     },
 
     addMember: async (tenantId: number, data: AddMemberRequest): Promise<void> => {
-        await userApi.post(API_ENDPOINTS.TENANT.ADD_MEMBER(tenantId), data);
+        await api.post(API_ENDPOINTS.TENANT.ADD_MEMBER(tenantId), data);
     },
 
     updateMemberRole: async (tenantId: number, memberId: number, newRole: TenantRole): Promise<void> => {
-        await userApi.put(API_ENDPOINTS.TENANT.UPDATE_MEMBER_ROLE(tenantId, memberId), { newRole: newRole });
+        await api.put(API_ENDPOINTS.TENANT.UPDATE_MEMBER_ROLE(tenantId, memberId), { newRole: newRole });
     },
 
     removeMember: async (tenantId: number, memberId: number): Promise<void> => {
-        await userApi.delete(API_ENDPOINTS.TENANT.REMOVE_MEMBER(tenantId, memberId));
+        await api.delete(API_ENDPOINTS.TENANT.REMOVE_MEMBER(tenantId, memberId));
     },
 
     getSubscriptionDetails: async (tenantId: number): Promise<SubscriptionDetail> => {
-        const response = await userApi.get<SubscriptionDetail>(API_ENDPOINTS.TENANT.SUBSCRIPTION_DETAIL(tenantId));
+        const response = await api.get<SubscriptionDetail>(API_ENDPOINTS.TENANT.SUBSCRIPTION_DETAIL(tenantId));
         return response.data;
     },
 
@@ -171,21 +171,21 @@ export const tenantService = {
             planId: planId,
             newCardInfo: newCardInfo
         };
-        await userApi.post(API_ENDPOINTS.TENANT.RETRY_PAYMENT(tenantId), payload);
+        await api.post(API_ENDPOINTS.TENANT.RETRY_PAYMENT(tenantId), payload);
     },
 
     getPaymentHistory: async (tenantId: number, page: number, size: number): Promise<PageResponse<PaymentHistoryResponse>> => {
-        const response = await userApi.get<PageResponse<PaymentHistoryResponse>>(API_ENDPOINTS.TENANT.PAYMENT_HISTORY(tenantId), {
+        const response = await api.get<PageResponse<PaymentHistoryResponse>>(API_ENDPOINTS.TENANT.PAYMENT_HISTORY(tenantId), {
             params: { page, size }
         });
         return response.data;
     },
 
     verifyTenant: async (tenantId: number, data: { legalCompanyTitle: string; taxOffice: string; iban: string }) => {
-        await userApi.put(API_ENDPOINTS.TENANT.VERIFY_TENANT(tenantId), data);
+        await api.put(API_ENDPOINTS.TENANT.VERIFY_TENANT(tenantId), data);
     }
 
    /* changeSubscriptionPlan: async (tenantId: number, planId: number): Promise<void> => {
-        await userApi.put(`/tenants/${tenantId}/subscription/plan`, { planId });
+        await api.put(`/tenants/${tenantId}/subscription/plan`, { planId });
     }*/
 };
