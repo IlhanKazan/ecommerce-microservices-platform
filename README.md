@@ -11,8 +11,10 @@
 > A scalable, event-driven, and highly available microservices ecosystem designed for multi-tenant e-commerce operations. An application has been submitted to **TÜBİTAK 2209-A**.
 
 ## High-Level Architecture
-
 ![High Level Architecture](./images/architecture-diagram.png)
+
+## Basic Order Flow Diagram
+![Basic Order Diagram](./images/basic-order-diagram.png)
 
 ## Key Technical Achievements
 
