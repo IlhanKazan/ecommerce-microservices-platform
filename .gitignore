@@ -60,6 +60,7 @@ infrastructure/zookeeper_data/
 infrastructure/postgres_data/
 infrastructure/minio_data/
 infrastructure/redis_data/
+infrastructure/elasticsearch_data/
 infrastructure/keycloak/providers
 
 *.jar

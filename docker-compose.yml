@@ -136,7 +136,8 @@ services:
       connect:
         condition: service_healthy
     volumes:
-      - ./infrastructure/debezium/connector.json:/connector.json
+      - ./infrastructure/debezium/user-tenant-connector.json:/user-tenant-connector.json
+      - ./infrastructure/debezium/product-connector.json:/product-connector.json
     command: >
       /bin/sh -c "
       echo 'Waiting for Debezium...';
@@ -214,6 +215,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.1
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - ./infrastructure/elasticsearch_data:/usr/share/elasticsearch/data
     deploy:
       resources:
         limits:

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [ -f .env ]; then
-  source .env
+if [ -f ../../.env ]; then
+  source ../../.env
 else
   echo "UYARI: .env dosyası bulunamadı! Değişkenler boş gidebilir."
 fi
@@ -13,7 +13,7 @@ until curl -s -f -o /dev/null "http://localhost:8083/"; do
   sleep 5
 done
 
-echo "Debezium uyandı! Connector yükleniyor..."
+echo "Debezium uyandı! User Tenant Connector yükleniyor..."
 
 curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @- <<EOF
 {
@@ -46,5 +46,37 @@ curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" 
 }
 EOF
 
+echo "Product Service Connector yükleniyor..."
+curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @- <<EOF
+{
+  "name": "product-service-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "${POSTGRES_USER}",
+    "database.password": "${POSTGRES_PASSWORD}",
+    "database.dbname": "product_catalog_db",
+    "topic.prefix": "product-service",
+    "plugin.name": "pgoutput",
+    "table.include.list": "public.outbox",
+    "publication.autocreate.mode": "filtered",
+    "slot.name": "product_service_debezium_slot",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false",
+    "transforms": "outbox",
+    "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
+    "transforms.outbox.route.topic.replacement": "\${routedByValue}",
+    "transforms.outbox.table.field.event.key": "aggregate_id",
+    "transforms.outbox.table.field.event.payload": "message_payload",
+    "transforms.outbox.table.field.event.timestamp": "created_at",
+    "transforms.outbox.route.by.field": "aggregate_type"
+  }
+}
+EOF
+
 echo ""
-echo "Connector yüklendi!"
+echo "Tüm Connector'lar yüklendi!"
