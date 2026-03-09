@@ -1,0 +1,15 @@
+server:
+  port: 8085
+
+security:
+  oauth2:
+    resource server:
+      jwt:
+        issuer-uri: http://localhost:8080/realms/${REALM_NAME}
+
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ${REDIS_PASSWORD}
