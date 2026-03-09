@@ -11,6 +11,11 @@ spring:
   cloud:
     gateway:
       routes:
+        - id: search-service
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/v1/public/search/**
+
         - id: user-tenant-service
           uri: http://localhost:8081
           predicates:
@@ -20,3 +25,8 @@ spring:
           uri: http://localhost:8082
           predicates:
             - Path=/api/v1/subscriptions/**
+
+        - id: product-service
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/v1/products/**, /api/v1/public/products/**
