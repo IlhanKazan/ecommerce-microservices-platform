@@ -30,3 +30,13 @@ spring:
           uri: http://localhost:8084
           predicates:
             - Path=/api/v1/products/**, /api/v1/public/products/**
+
+        - id: basket-service
+          uri: http://localhost:8086
+          predicates:
+            - Path=/api/v1/baskets/**
+
+        - id: stock-service
+          uri: http://localhost:8087
+          predicates:
+            - Path=/api/v1/stocks/**
