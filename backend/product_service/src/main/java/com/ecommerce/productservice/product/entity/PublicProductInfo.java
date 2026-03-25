@@ -1,20 +1,25 @@
-package com.ecommerce.productservice.outbox.payload;
+package com.ecommerce.productservice.product.entity;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
-public record ProductCreatedEventPayload(
+public record PublicProductInfo(
         Long id,
         Long tenantId,
-        Long categoryId,
-        String sku,
         String name,
         String description,
+        String sku,
         String brand,
         BigDecimal price,
+        BigDecimal discountedPrice,
         String currency,
         String mainImageUrl,
+        List<String> imageUrls,
         Map<String, String> attributes,
-        List<String> tags
-) {}
+        BigDecimal ratingAverage,
+        Integer reviewCount,
+        Integer minOrderQty,
+        Integer maxOrderQty
+) {
+}

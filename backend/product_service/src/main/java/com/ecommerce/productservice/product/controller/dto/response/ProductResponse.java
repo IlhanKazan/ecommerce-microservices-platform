@@ -1,21 +1,24 @@
 package com.ecommerce.productservice.product.controller.dto.response;
 
-import com.ecommerce.productservice.product.constant.ProductStatus;
-import com.ecommerce.productservice.product.constant.SalesStatus;
-
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 public record ProductResponse(
         Long id,
+        Long tenantId,
         Long categoryId,
         Long parentProductId,
         String name,
+        String description,
         String sku,
+        String brand,
         BigDecimal price,
+        BigDecimal discountedPrice,
         String currency,
         String mainImageUrl,
-        ProductStatus status,
-        SalesStatus salesStatus,
-        Map<String, String> attributes
+        List<String> imageUrls,
+        Map<String, String> attributes,
+        BigDecimal ratingAverage,
+        Integer reviewCount
 ) {}

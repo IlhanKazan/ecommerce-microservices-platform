@@ -36,7 +36,7 @@ public class ProductReview extends BaseEntity {
     private String title;
 
     @Column(length = 20)
-    private String sentimentLabel; // AI Sentiment
+    private String sentimentLabel;
 
     private Float sentimentScore;
 

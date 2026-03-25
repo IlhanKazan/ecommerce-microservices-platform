@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
-public record ProductCreatedEventPayload(
+public record ProductUpdatedEventPayload(
         Long id,
         Long tenantId,
         Long categoryId,
@@ -16,5 +16,8 @@ public record ProductCreatedEventPayload(
         String currency,
         String mainImageUrl,
         Map<String, String> attributes,
-        List<String> tags
-) {}
+        List<String> tags,
+        String status,
+        String salesStatus
+) {
+}
