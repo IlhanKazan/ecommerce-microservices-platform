@@ -1,4 +1,4 @@
-package com.ecommerce.common.security.annotation;
+package com.ecommerce.common.annotation;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 

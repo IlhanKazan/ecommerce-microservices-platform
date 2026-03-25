@@ -1,4 +1,4 @@
-package com.ecommerce.common.logging;
+package com.ecommerce.common.aop;
 
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -13,8 +13,7 @@ public class GeneralLoggerAspect {
 
     private final Logger log = LoggerFactory.getLogger(this.getClass());
 
-    // SİHİR BURADA: usertenantservice kelimesini sildik, yerine .. koyduk.
-    // Artık tüm mikroservislerin service katmanını dinleyecek!
+    // tüm mikroservislerin service katmanını dinleyecek
     @Around("execution(* com.ecommerce..*.service..*(..))")
     public Object logAround(ProceedingJoinPoint joinPoint) throws Throwable {
         long start = System.currentTimeMillis();

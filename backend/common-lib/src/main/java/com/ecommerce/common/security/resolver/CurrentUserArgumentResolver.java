@@ -1,6 +1,6 @@
 package com.ecommerce.common.security.resolver;
 
-import com.ecommerce.common.security.annotation.CurrentUser;
+import com.ecommerce.common.annotation.CurrentUser;
 import com.ecommerce.common.security.dto.AuthUser;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.core.Authentication;
