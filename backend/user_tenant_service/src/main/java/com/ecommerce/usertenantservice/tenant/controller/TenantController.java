@@ -1,7 +1,7 @@
 package com.ecommerce.usertenantservice.tenant.controller;
 
 import com.ecommerce.common.exception.ResourceNotFoundException;
-import com.ecommerce.common.security.annotation.CurrentUser;
+import com.ecommerce.common.annotation.CurrentUser;
 import com.ecommerce.common.security.dto.AuthUser;
 import com.ecommerce.usertenantservice.common.constants.ApiPaths;
 import com.ecommerce.usertenantservice.tenant.controller.dto.request.*;

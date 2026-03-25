@@ -1,6 +1,6 @@
 package com.ecommerce.usertenantservice.user.controller;
 
-import com.ecommerce.common.security.annotation.CurrentUser;
+import com.ecommerce.common.annotation.CurrentUser;
 import com.ecommerce.common.security.dto.AuthUser;
 import com.ecommerce.usertenantservice.common.constants.ApiPaths;
 import com.ecommerce.usertenantservice.user.controller.dto.request.UserAddressRequest;
