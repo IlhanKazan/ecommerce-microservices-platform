@@ -45,14 +45,24 @@ export const API_ENDPOINTS = {
     PAYMENT: {
 
     },
-    PRODUCT: {
-        BASE: '/products',
-        SEARCH: '/products/search',
-        BY_ID: (id: number) => `/products/${id}`,
-        CATEGORIES: '/products/categories',
-    },
     ORDER: {
         BASE: '/orders',
         CREATE: '/orders/create',
+    },
+    SEARCH: {
+        PUBLIC: '/public/search/products',
+    },
+    PRODUCT: {
+        BASE: '/products',
+        BY_ID_PUBLIC: (id: number) => `/public/products/${id}`,
+    },
+    STOCK: {
+        WAREHOUSES: (tenantId: number) => `/stocks/tenant/${tenantId}/warehouses`,
+        MANUAL_ADD: (tenantId: number) => `/stocks/tenant/${tenantId}/manual-add`,
+    },
+    BASKET: {
+        ADD: '/basket/add',
+        UPDATE: '/basket/update',
+        REMOVE: (productId: number) => `/basket/remove/${productId}`,
     }
 } as const;

@@ -16,4 +16,16 @@ export default defineConfig({
     ],
     exclude: ['@chakra-ui/icons'],
   },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+                    'mui-vendor': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+                    'tanstack-vendor': ['@tanstack/react-query'],
+                    'auth-vendor': ['keycloakify', 'react-oidc-context', 'oidc-client-ts']
+                }
+            }
+        }
+    }
 })

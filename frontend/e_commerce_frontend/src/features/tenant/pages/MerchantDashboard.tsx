@@ -14,7 +14,7 @@ import {
     DateRange as DateIcon
 } from '@mui/icons-material';
 import { useMerchantStore } from '../../../store/useMerchantStore';
-import { tenantService } from '../../../service/tenantService';
+import { tenantService } from '../api/tenantService.ts';
 import type { TenantDetail } from '../../../types/tenant';
 import { AddressType, BusinessType } from '../../../types/enums';
 import TenantAddressCard from "../../../components/shared/address/TenantAddressCard.tsx";

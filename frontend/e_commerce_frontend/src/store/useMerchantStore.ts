@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { tenantService } from '../service/tenantService';
+import { tenantService } from '../features/tenant/api/tenantService.ts';
 import type { TenantSummary } from '../types/tenant';
 
 interface MerchantState {

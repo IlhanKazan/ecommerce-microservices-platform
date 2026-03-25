@@ -4,7 +4,7 @@ import {
     Pagination, Select, MenuItem, FormControl, InputLabel,
     Container, Grid, Stack, type SelectChangeEvent
 } from '@mui/material';
-import { useProducts } from '../../../query/useProductQueries';
+import { useSearchProducts } from '../../../query/useProductQueries';
 import ProductCard from '../../../components/customer/ProductCard';
 import FilterListIcon from '@mui/icons-material/FilterList';
 
@@ -12,17 +12,21 @@ const ITEMS_PER_PAGE = 12;
 
 const ProductListPage: React.FC = () => {
     const [page, setPage] = useState(1);
-    const [selectedCategory, setSelectedCategory] = useState<string>('');
+    const [selectedCategoryId, setSelectedCategoryId] = useState<number | ''>('');
 
-    const { data, isLoading, isError, isFetching } = useProducts(page, ITEMS_PER_PAGE, selectedCategory);
+    const { data, isLoading, isError, isFetching } = useSearchProducts({
+        page: page - 1,
+        size: ITEMS_PER_PAGE,
+        categoryId: selectedCategoryId === '' ? undefined : selectedCategoryId
+    });
 
     const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
         setPage(value);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleCategoryChange = (event: SelectChangeEvent) => {
-        setSelectedCategory(event.target.value as string);
+    const handleCategoryChange = (event: SelectChangeEvent<number | ''>) => {
+        setSelectedCategoryId(event.target.value as number | '');
         setPage(1);
     };
 
@@ -31,7 +35,6 @@ const ProductListPage: React.FC = () => {
     return (
         <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 4 }}>
             <Container maxWidth="lg">
-
                 <Stack
                     direction={{ xs: 'column', sm: 'row' }}
                     justifyContent="space-between"
@@ -54,21 +57,22 @@ const ProductListPage: React.FC = () => {
                         </InputLabel>
                         <Select
                             labelId="category-select-label"
-                            value={selectedCategory}
+                            value={selectedCategoryId}
                             label="Kategori Filtrele"
                             onChange={handleCategoryChange}
                             sx={{ borderRadius: 2 }}
                         >
                             <MenuItem value="">Tümü</MenuItem>
-                            <MenuItem value="Giyim">Giyim</MenuItem>
-                            <MenuItem value="Aksesuar">Aksesuar</MenuItem>
-                            <MenuItem value="Elektronik">Elektronik</MenuItem>
+                            {/* TODO: İleride bu kategorileri de backend'den (Category Service) çekeceğiz */}
+                            <MenuItem value={1}>Giyim</MenuItem>
+                            <MenuItem value={2}>Aksesuar</MenuItem>
+                            <MenuItem value={3}>Elektronik</MenuItem>
                         </Select>
                     </FormControl>
                 </Stack>
 
                 {isError && (
-                    <Alert severity="error" sx={{ mb: 4 }}>Ürünler listelenirken bir sorun oluştu.</Alert>
+                    <Alert severity="error" sx={{ mb: 4 }}>Ürünler listelenirken bir sorun oluştu. Servis şu an yanıt vermiyor olabilir.</Alert>
                 )}
 
                 {showLoading ? (
@@ -76,7 +80,7 @@ const ProductListPage: React.FC = () => {
                 ) : (
                     <>
                         <Grid container spacing={3}>
-                            {data?.data.map(product => (
+                            {data?.content?.map((product: any) => (
                                 <Grid size={{ xs: 6, sm: 4, md: 3 }} key={product.id}>
                                     <ProductCard product={product} />
                                 </Grid>

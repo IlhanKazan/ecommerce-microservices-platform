@@ -12,7 +12,7 @@ import {
     Person as PersonIcon
 } from '@mui/icons-material';
 import { userService } from '../../../service/userService';
-import { tenantService } from "../../../service/tenantService";
+import { tenantService } from "../api/tenantService.ts";
 import type { Address } from '../../../types/user';
 import type {
     CreateTenantRequest,

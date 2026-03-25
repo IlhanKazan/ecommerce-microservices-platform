@@ -1,12 +1,12 @@
 import React from 'react';
 import { Typography, Box, Button, CircularProgress, Alert, Container, Grid, Paper, Stack, Avatar, useTheme } from '@mui/material';
-import { useProducts } from '../../../query/useProductQueries';
+import { useSearchProducts } from '../../../query/useProductQueries';
 import { Link as RouterLink } from 'react-router-dom';
 import ProductCard from '../../../components/customer/ProductCard';
 import { ArrowForward, LocalOffer } from '@mui/icons-material';
 
 const HomePage: React.FC = () => {
-    const { data, isLoading, isError } = useProducts(1, 8);
+    const { data, isLoading, isError } = useSearchProducts({ page: 0, size: 8 });
     const theme = useTheme();
 
     const categories = [
@@ -107,7 +107,7 @@ const HomePage: React.FC = () => {
                             Öne Çıkan Fırsatlar
                         </Typography>
                     </Stack>
-                    <Button component={RouterLink} to="/productlist" endIcon={<ArrowForward />} color="primary" fontWeight="bold">
+                    <Button component={RouterLink} to="/productlist" endIcon={<ArrowForward />} color="primary" sx={{ fontWeight: 'bold' }}>
                         Tüm Ürünler
                     </Button>
                 </Box>
@@ -122,9 +122,9 @@ const HomePage: React.FC = () => {
                     <Alert severity="error" sx={{ mb: 3 }}>Ürünler yüklenirken bir hata oluştu.</Alert>
                 )}
 
-                {data?.data && (
+                {data?.content && (
                     <Grid container spacing={3}>
-                        {data.data.map(product => (
+                        {data.content.map((product: any) => (
                             <Grid size={{ xs: 6, sm: 4, md: 3 }} key={product.id}>
                                 <ProductCard product={product} />
                             </Grid>

@@ -48,7 +48,6 @@ const AddressCard: React.FC<AddressCardProps> = ({ address, onEdit, onDelete, on
                     }
                 }}
             >
-                {/* HEADER */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                     <Box sx={{ p: 1, borderRadius: 2, bgcolor: address.isDefault ? 'white' : 'action.hover', flexShrink: 0 }}>
                         {getIcon(address.label)}
@@ -68,7 +67,6 @@ const AddressCard: React.FC<AddressCardProps> = ({ address, onEdit, onDelete, on
 
                 <Divider sx={{ mb: 2, borderStyle: 'dashed' }} />
 
-                {/* CONTENT */}
                 <Stack spacing={0.5} sx={{ color: 'text.secondary', mb: 2, flexGrow: 1 }}>
                     <Typography variant="body2" fontWeight="600" color="text.primary">
                         {address.recipientName}
@@ -101,7 +99,6 @@ const AddressCard: React.FC<AddressCardProps> = ({ address, onEdit, onDelete, on
                     </Typography>
                 </Stack>
 
-                {/* FOOTER ACTIONS */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 'auto' }}>
                     {!address.isDefault ? (
                         <Button

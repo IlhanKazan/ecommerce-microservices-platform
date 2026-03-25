@@ -1,15 +1,15 @@
-import { api } from '../lib/axios';
-import { API_ENDPOINTS } from '../config/apiEndpoints';
+import { api } from '../../../lib/axios.ts';
+import { API_ENDPOINTS } from '../../../config/apiEndpoints.ts';
 import type {
     CreateTenantRequest, SubscriptionPlan, TenantDetail, TenantSummary,
     UpdateTenantCriticalRequest,
     UpdateTenantGeneralRequest, TenantAddress, TenantRole, PaymentCardInfo, SubscriptionDetail, PaymentHistoryResponse,
     PageResponse
-} from '../types/tenant';
-import type {CreateAddressRequest, Address} from "../types/user";
-import { asRecord, getString, getNumber, getBoolean } from '../utils/normalizers';
-import type { AddressType as EnumAddressType } from '../types/enums';
-import type { AddMemberRequest} from "../types/tenant";
+} from '../../../types/tenant.ts';
+import type {CreateAddressRequest, Address} from "../../../types/user.ts";
+import { asRecord, getString, getNumber, getBoolean } from '../../../utils/normalizers.ts';
+import type { AddressType as EnumAddressType } from '../../../types/enums.ts';
+import type { AddMemberRequest} from "../../../types/tenant.ts";
 
 const normalizeTenantAddress = (raw: unknown): TenantAddress => {
     const r = asRecord(raw);
@@ -183,9 +183,22 @@ export const tenantService = {
 
     verifyTenant: async (tenantId: number, data: { legalCompanyTitle: string; taxOffice: string; iban: string }) => {
         await api.put(API_ENDPOINTS.TENANT.VERIFY_TENANT(tenantId), data);
-    }
-
+    },
    /* changeSubscriptionPlan: async (tenantId: number, planId: number): Promise<void> => {
         await api.put(`/tenants/${tenantId}/subscription/plan`, { planId });
     }*/
+    getWarehouses: async (tenantId: number) => {
+        const response = await api.get(API_ENDPOINTS.STOCK.WAREHOUSES(tenantId));
+        return response.data;
+    },
+
+    createWarehouse: async (tenantId: number, payload: { code: string; name: string; locationDetails: string }) => {
+        const response = await api.post(API_ENDPOINTS.STOCK.WAREHOUSES(tenantId), payload);
+        return response.data;
+    },
+
+    addManualStock: async (tenantId: number, payload: { warehouseId: number; productId: number; amount: number }) => {
+        const response = await api.post(API_ENDPOINTS.STOCK.MANUAL_ADD(tenantId), payload);
+        return response.data;
+    }
 };

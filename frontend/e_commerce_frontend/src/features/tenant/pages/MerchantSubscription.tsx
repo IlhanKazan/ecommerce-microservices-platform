@@ -17,7 +17,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMerchantStore } from '../../../store/useMerchantStore';
-import { tenantService } from '../../../service/tenantService';
+import { tenantService } from '../api/tenantService.ts';
 import type { SubscriptionPlan, PaymentCardInfo, PaymentStatus, PaymentType } from '../../../types/tenant';
 
 const MerchantSubscription: React.FC = () => {

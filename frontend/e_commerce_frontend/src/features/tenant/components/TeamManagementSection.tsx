@@ -15,7 +15,7 @@ import {
 } from '@mui/icons-material';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { tenantService } from '../../../service/tenantService';
+import { tenantService } from '../api/tenantService.ts';
 import { TENANT_ROLES, type TenantMember, type AddMemberRequest, type TenantRole } from '../../../types/tenant';
 
 interface TeamManagementSectionProps {

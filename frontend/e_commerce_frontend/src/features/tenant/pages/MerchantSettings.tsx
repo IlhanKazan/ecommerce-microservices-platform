@@ -17,7 +17,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useMerchantStore } from '../../../store/useMerchantStore';
-import { tenantService } from '../../../service/tenantService';
+import { tenantService } from '../api/tenantService.ts';
 import { userService } from '../../../service/userService';
 import AddressSelectionGrid from '../../../components/shared/address/AddressSelectionGrid';
 import AddressForm, { type AddressFormData } from '../../../components/shared/address/AddressForm';
