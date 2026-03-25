@@ -1,0 +1,35 @@
+server:
+  port: 8087
+
+security:
+  oauth2:
+    resource-server:
+      jwt:
+        issuer-uri: http://localhost:8080/realms/${REALM_NAME}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/${STOCK_DB_NAME}
+    username: ${STOCK_DB_USERNAME}
+    password: ${STOCK_DB_PASSWORD}
+  kafka:
+    bootstrap-servers: localhost:29092
+    consumer:
+      group-id: stock-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ${REDIS_PASSWORD}
+
+app:
+  scheduling:
+    enabled: true
+
+application:
+  clients:
+    product:
+      url: http://localhost:8084

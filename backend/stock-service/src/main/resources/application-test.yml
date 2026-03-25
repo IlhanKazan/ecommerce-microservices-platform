@@ -1,0 +1,29 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9999/dummy-auth
+
+security:
+  oauth2:
+    resourceserver:
+      jwt:
+        issuer-uri: http://localhost:9999/dummy-auth
+
+jwt:
+  auth:
+    converter:
+      resource-id: "test-client"
+
+KEYCLOAK_CLIENT_ID: "test-client"
+REALM_NAME: "test-realm"
+
+app:
+  scheduling:
+    enabled: false
