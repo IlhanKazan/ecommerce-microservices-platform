@@ -78,5 +78,37 @@ curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" 
 }
 EOF
 
+echo "Stock Service Connector yükleniyor..."
+curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @- <<EOF
+{
+  "name": "stock-service-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "${POSTGRES_USER}",
+    "database.password": "${POSTGRES_PASSWORD}",
+    "database.dbname": "stock_db",
+    "topic.prefix": "stock-service",
+    "plugin.name": "pgoutput",
+    "table.include.list": "public.outbox",
+    "publication.autocreate.mode": "filtered",
+    "slot.name": "stock_service_debezium_slot",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false",
+    "transforms": "outbox",
+    "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
+    "transforms.outbox.route.topic.replacement": "\${routedByValue}",
+    "transforms.outbox.table.field.event.key": "aggregate_id",
+    "transforms.outbox.table.field.event.payload": "message_payload",
+    "transforms.outbox.table.field.event.timestamp": "created_at",
+    "transforms.outbox.route.by.field": "aggregate_type"
+  }
+}
+EOF
+
 echo ""
 echo "Tüm Connector'lar yüklendi!"

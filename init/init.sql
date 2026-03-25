@@ -5,3 +5,4 @@ CREATE DATABASE saga_orchestrator_db;
 CREATE DATABASE order_db;
 CREATE DATABASE notification_shipment_db;
 CREATE DATABASE keycloak_db;
+CREATE DATABASE stock_db;
