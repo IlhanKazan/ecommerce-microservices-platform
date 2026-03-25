@@ -34,6 +34,9 @@ public class ProductSearchServiceImpl implements ProductSearchService {
 
         BoolQuery.Builder boolQueryBuilder = QueryBuilders.bool();
 
+        // Müşteriye sadece stokta olan ürünleri gösterir
+        boolQueryBuilder.filter(QueryBuilders.term(t -> t.field("inStock").value(true)));
+
         if (request.keyword() != null && !request.keyword().isBlank()) {
             Query multiMatchQuery = QueryBuilders.multiMatch(m -> m
                     .fields("name^3", "description", "tags^2")

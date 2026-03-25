@@ -1,4 +1,4 @@
-package com.ecommerce.searchservice.product.controller.dto;
+package com.ecommerce.searchservice.product.consumer.dto;
 
 import java.math.BigDecimal;
 import java.util.List;

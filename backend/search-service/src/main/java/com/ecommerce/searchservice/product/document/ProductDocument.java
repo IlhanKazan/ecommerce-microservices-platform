@@ -55,4 +55,7 @@ public class ProductDocument {
 
     @Field(type = FieldType.Keyword)
     private List<String> tags;
+
+    @Field(type = FieldType.Boolean)
+    private boolean inStock;
 }

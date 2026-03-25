@@ -3,7 +3,7 @@ package com.ecommerce.searchservice.product.mapper;
 import org.mapstruct.Mapper;
 
 import com.ecommerce.searchservice.product.document.ProductDocument;
-import com.ecommerce.searchservice.product.controller.dto.ProductCreatedEventPayload;
+import com.ecommerce.searchservice.product.consumer.dto.ProductCreatedEventPayload;
 import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
