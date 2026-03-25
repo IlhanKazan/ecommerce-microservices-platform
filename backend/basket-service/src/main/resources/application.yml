@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: basket-service
+  profiles:
+    active: dev
+  config:
+    import: optional:file:.env[.properties]
+
+
+jwt:
+  auth:
+    converter:
+      resource-id: ${KEYCLOAK_CLIENT_ID}
+      principal-attribute: preferred_username
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, metrics
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
