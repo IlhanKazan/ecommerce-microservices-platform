@@ -9,6 +9,8 @@ services:
       - ./infrastructure/zookeeper_data:/var/lib/zookeeper/data
     ports:
       - "2181:2181"
+    networks:
+      - e-commerce-network
     healthcheck:
       test: echo ruok | nc 127.0.0.1 2181 || exit 1
       interval: 10s
@@ -38,6 +40,8 @@ services:
       - ./infrastructure/kafka_data:/var/lib/kafka/data
     ports:
       - "29092:29092"
+    networks:
+      - e-commerce-network
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka:9092", "--list"]
       interval: 10s
@@ -59,6 +63,8 @@ services:
       JVM_OPTS: "-Xms128M -Xmx256M"
     ports:
       - "9000:9000"
+    networks:
+      - e-commerce-network
     deploy:
       resources:
         limits:
@@ -77,6 +83,8 @@ services:
       - ./infrastructure/postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - e-commerce-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
@@ -93,6 +101,8 @@ services:
     command: redis-server --requirepass "${REDIS_PASSWORD}"
     ports:
       - "127.0.0.1:6379:6379"
+    networks:
+      - e-commerce-network
     deploy:
       resources:
         limits:
@@ -108,6 +118,8 @@ services:
         condition: service_healthy
     ports:
       - "8083:8083"
+    networks:
+      - e-commerce-network
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
       GROUP_ID: 1
@@ -135,6 +147,8 @@ services:
     depends_on:
       connect:
         condition: service_healthy
+    networks:
+      - e-commerce-network
     volumes:
       - ./infrastructure/debezium/user-tenant-connector.json:/user-tenant-connector.json
       - ./infrastructure/debezium/product-connector.json:/product-connector.json
@@ -152,6 +166,8 @@ services:
     ports:
       - "9005:9000"
       - "9001:9001"
+    networks:
+      - e-commerce-network
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -173,6 +189,8 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
+    networks:
+      - e-commerce-network
     deploy:
       resources:
         limits:
@@ -205,6 +223,8 @@ services:
       MY_SPI_USER_SERVICE_HEALTH_URL: ${MY_SPI_USER_SERVICE_HEALTH_URL}
     ports:
       - "8080:8080"
+    networks:
+      - e-commerce-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -229,6 +249,8 @@ services:
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:
       - "9200:9200"
+    networks:
+      - e-commerce-network
     volumes:
       - ./infrastructure/elasticsearch_data:/usr/share/elasticsearch/data
     deploy:
@@ -238,9 +260,9 @@ services:
 
   user-tenant-service:
     build:
-      context: ./backend/user_tenant_service
+      context: ./backend/user-tenant-service
       dockerfile: Dockerfile
-    container_name: user_tenant_service
+    container_name: user-tenant-service
     depends_on:
       postgres:
         condition: service_healthy
@@ -253,5 +275,12 @@ services:
       PAYMENT_SERVICE_URL: http://host.docker.internal:8082
     ports:
       - "8081:8081"
+    networks:
+      - e-commerce-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+networks:
+  e-commerce-network:
+    driver: bridge
+    name: e-commerce-network

@@ -1,5 +1,5 @@
 {
-  "name": "product-service-connector",
+  "name": "payment-service-connector",
   "config": {
     "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
     "tasks.max": "1",
@@ -7,12 +7,12 @@
     "database.port": "5432",
     "database.user": "${POSTGRES_USER}",
     "database.password": "${POSTGRES_PASSWORD}",
-    "database.dbname": "product_catalog_db",
-    "topic.prefix": "product-service",
+    "database.dbname": "payment_db",
+    "topic.prefix": "payment-service",
     "plugin.name": "pgoutput",
     "table.include.list": "public.outbox",
     "publication.autocreate.mode": "filtered",
-    "slot.name": "product_service_debezium_slot",
+    "slot.name": "payment_service_debezium_slot",
     "key.converter": "org.apache.kafka.connect.json.JsonConverter",
     "value.converter": "org.apache.kafka.connect.json.JsonConverter",
     "key.converter.schemas.enable": "false",

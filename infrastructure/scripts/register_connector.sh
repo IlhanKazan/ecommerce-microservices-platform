@@ -1,9 +1,20 @@
 #!/bin/bash
 
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONNECTOR_DIR="$(cd "${SCRIPT_DIR}/../debezium" && pwd)"
+
 if [ -f ../../.env ]; then
   source ../../.env
+  export POSTGRES_USER POSTGRES_PASSWORD
 else
   echo "UYARI: .env dosyası bulunamadı! Değişkenler boş gidebilir."
+fi
+
+if [ ! -d "${CONNECTOR_DIR}" ]; then
+  echo "HATA: ${CONNECTOR_DIR} klasörü bulunamadı."
+  exit 1
 fi
 
 echo "Debezium Connect servisinin hazır olması bekleniyor..."
@@ -13,102 +24,36 @@ until curl -s -f -o /dev/null "http://localhost:8083/"; do
   sleep 5
 done
 
-echo "Debezium uyandı! User Tenant Connector yükleniyor..."
+echo "Debezium uyandı!"
 
-curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @- <<EOF
-{
-  "name": "user-tenant-service-connector",
-  "config": {
-    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
-    "tasks.max": "1",
-    "database.hostname": "postgres",
-    "database.port": "5432",
-    "database.user": "${POSTGRES_USER}",
-    "database.password": "${POSTGRES_PASSWORD}",
-    "database.dbname": "user_tenant_db",
-    "topic.prefix": "user-tenant-service",
-    "plugin.name": "pgoutput",
-    "table.include.list": "public.outbox",
-    "publication.autocreate.mode": "filtered",
-    "slot.name": "user_tenant_service_debezium_slot",
-    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
-    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
-    "key.converter.schemas.enable": "false",
-    "value.converter.schemas.enable": "false",
-    "transforms": "outbox",
-    "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
-    "transforms.outbox.route.topic.replacement": "\${routedByValue}",
-    "transforms.outbox.table.field.event.key": "aggregate_id",
-    "transforms.outbox.table.field.event.payload": "message_payload",
-    "transforms.outbox.table.field.event.timestamp": "created_at",
-    "transforms.outbox.route.by.field": "aggregate_type"
-  }
-}
-EOF
+register_connector() {
+  local file="$1"
+  local name="$2"
 
-echo "Product Service Connector yükleniyor..."
-curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @- <<EOF
-{
-  "name": "product-service-connector",
-  "config": {
-    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
-    "tasks.max": "1",
-    "database.hostname": "postgres",
-    "database.port": "5432",
-    "database.user": "${POSTGRES_USER}",
-    "database.password": "${POSTGRES_PASSWORD}",
-    "database.dbname": "product_catalog_db",
-    "topic.prefix": "product-service",
-    "plugin.name": "pgoutput",
-    "table.include.list": "public.outbox",
-    "publication.autocreate.mode": "filtered",
-    "slot.name": "product_service_debezium_slot",
-    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
-    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
-    "key.converter.schemas.enable": "false",
-    "value.converter.schemas.enable": "false",
-    "transforms": "outbox",
-    "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
-    "transforms.outbox.route.topic.replacement": "\${routedByValue}",
-    "transforms.outbox.table.field.event.key": "aggregate_id",
-    "transforms.outbox.table.field.event.payload": "message_payload",
-    "transforms.outbox.table.field.event.timestamp": "created_at",
-    "transforms.outbox.route.by.field": "aggregate_type"
-  }
-}
-EOF
+  if [ ! -f "${CONNECTOR_DIR}/${file}" ]; then
+    echo "HATA: ${CONNECTOR_DIR}/${file} bulunamadı, atlıyorum."
+    return 1
+  fi
 
-echo "Stock Service Connector yükleniyor..."
-curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @- <<EOF
-{
-  "name": "stock-service-connector",
-  "config": {
-    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
-    "tasks.max": "1",
-    "database.hostname": "postgres",
-    "database.port": "5432",
-    "database.user": "${POSTGRES_USER}",
-    "database.password": "${POSTGRES_PASSWORD}",
-    "database.dbname": "stock_db",
-    "topic.prefix": "stock-service",
-    "plugin.name": "pgoutput",
-    "table.include.list": "public.outbox",
-    "publication.autocreate.mode": "filtered",
-    "slot.name": "stock_service_debezium_slot",
-    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
-    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
-    "key.converter.schemas.enable": "false",
-    "value.converter.schemas.enable": "false",
-    "transforms": "outbox",
-    "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
-    "transforms.outbox.route.topic.replacement": "\${routedByValue}",
-    "transforms.outbox.table.field.event.key": "aggregate_id",
-    "transforms.outbox.table.field.event.payload": "message_payload",
-    "transforms.outbox.table.field.event.timestamp": "created_at",
-    "transforms.outbox.route.by.field": "aggregate_type"
-  }
+  echo ""
+  echo "==> ${name} varsa siliniyor..."
+  curl -s -X DELETE "http://localhost:8083/connectors/${name}" > /dev/null || true
+  sleep 2
+
+  echo "==> ${name} yükleniyor..."
+  envsubst '${POSTGRES_USER} ${POSTGRES_PASSWORD}' < "${CONNECTOR_DIR}/${file}" \
+    | curl -i -X POST \
+        -H "Accept:application/json" \
+        -H "Content-Type:application/json" \
+        http://localhost:8083/connectors/ \
+        -d @-
+  echo ""
 }
-EOF
+
+register_connector "user-tenant-connector.json" "user-tenant-service-connector"
+register_connector "product-connector.json"     "product-service-connector"
+register_connector "stock-connector.json"       "stock-service-connector"
+register_connector "payment-connector.json"     "payment-service-connector"
 
 echo ""
 echo "Tüm Connector'lar yüklendi!"
