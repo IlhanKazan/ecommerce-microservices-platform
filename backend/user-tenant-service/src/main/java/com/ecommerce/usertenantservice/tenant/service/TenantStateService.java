@@ -1,6 +1,7 @@
 package com.ecommerce.usertenantservice.tenant.service;
 
 import com.ecommerce.usertenantservice.common.constants.AddressType;
+import com.ecommerce.usertenantservice.outbox.service.OutboxService;
 import com.ecommerce.usertenantservice.tenant.constant.TenantRole;
 import com.ecommerce.usertenantservice.tenant.constant.TenantStatus;
 import com.ecommerce.usertenantservice.tenant.command.TenantCreationContext;
@@ -21,6 +22,7 @@ public class TenantStateService {
     private final TenantRepository tenantRepository;
     private final AddressService addressService;
     private final UserTenantService userTenantService;
+    private final OutboxService outboxService;
 
     @Transactional
     public Tenant saveInitialTenant(TenantCreationContext context, User user, Address addressToUse){
@@ -55,6 +57,7 @@ public class TenantStateService {
                 .build();
         userTenantService.save(userTenant);
 
+        outboxService.publishTenantCreatedEvent(tenant);
         return tenant;
     }
 
@@ -62,12 +65,14 @@ public class TenantStateService {
     public void markTenantAsPaymentFailed(Tenant tenant){
         tenant.setStatus(TenantStatus.PAYMENT_FAILED);
         tenantRepository.save(tenant);
+        outboxService.publishTenantPaymentFailedEvent(tenant);
     }
 
     @Transactional
     public void activateTenant(Tenant tenant){
         tenant.setStatus(TenantStatus.ACTIVE);
         tenantRepository.save(tenant);
+        outboxService.publishTenantActivatedEvent(tenant);
     }
 
     @Transactional

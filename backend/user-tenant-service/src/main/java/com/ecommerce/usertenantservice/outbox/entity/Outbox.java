@@ -1,47 +1,21 @@
 package com.ecommerce.usertenantservice.outbox.entity;
 
+import com.ecommerce.common.entity.BaseOutbox;
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
-import java.time.LocalDateTime;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "outbox")
 @Getter
 @Setter
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class Outbox {
+public class Outbox extends BaseOutbox {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "aggregate_type", nullable = false)
-    private String aggregateType;
-
-    @Column(name = "aggregate_id", nullable = false)
-    private String aggregateId;
-
-    @Column(name = "message_type", nullable = false)
-    private String messageType;
-
-    @Column(name = "message_payload", columnDefinition = "jsonb", nullable = false)
-    @JdbcTypeCode(SqlTypes.JSON)
-    private String messagePayload;
-
-    @Builder.Default
-    @Column(nullable = false)
-    private Boolean processed = false;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "sent_at")
-    private LocalDateTime sentAt;
 }
