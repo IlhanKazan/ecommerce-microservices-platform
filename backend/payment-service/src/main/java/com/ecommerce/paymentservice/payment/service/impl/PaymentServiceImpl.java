@@ -2,6 +2,7 @@ package com.ecommerce.paymentservice.payment.service.impl;
 
 import com.ecommerce.paymentservice.iyzico.entity.IyzicoTransaction;
 import com.ecommerce.paymentservice.iyzico.service.IyzicoTransactionService;
+import com.ecommerce.paymentservice.outbox.service.OutboxService;
 import com.ecommerce.paymentservice.payment.constant.PaymentStatus;
 import com.ecommerce.paymentservice.payment.constant.PaymentType;
 import com.ecommerce.paymentservice.payment.entity.Payment;
@@ -34,6 +35,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final TenantSubscriptionService tenantSubscriptionService;
     private final Options iyzicoOptions;
     private final IyzicoTransactionService iyzicoTransactionService;
+    private final OutboxService outboxService;
 
     @Override
     @Transactional
@@ -119,15 +121,18 @@ public class PaymentServiceImpl implements PaymentService {
             payment.setPaidAt(LocalDateTime.now());
 
             if (context != null && context.getType() == PaymentType.SUBSCRIPTION) {
-                tenantSubscriptionService.createActiveSubscription(
+                TenantSubscription sub = tenantSubscriptionService.createActiveSubscription(
                         context.getTenantId(),
                         context.getReferenceId(),
                         iyzicoResponse.getCardToken(),
                         payment.getAmount()
                 );
+                outboxService.publishSubscriptionActivatedEvent(sub);
             }
 
-            return paymentRepository.save(payment);
+            Payment saved = paymentRepository.save(payment);
+            outboxService.publishPaymentSuccessEvent(saved);
+            return saved;
 
         } else {
             payment.setPaymentStatus(PaymentStatus.FAILURE);
@@ -135,11 +140,9 @@ public class PaymentServiceImpl implements PaymentService {
             payment.setFailureCode(iyzicoResponse.getErrorCode());
             payment.setFailedAt(LocalDateTime.now());
 
-            paymentRepository.save(payment);
-
-            // Burada try-catch ile özel exception da fırlatılabilir, ya da enum döndürüp çağıran metotta kontrol sağlarız
-
-            return payment;
+            Payment saved = paymentRepository.save(payment);
+            outboxService.publishPaymentFailedEvent(saved);
+            return saved;
         }
     }
 
@@ -173,7 +176,6 @@ public class PaymentServiceImpl implements PaymentService {
 
     // Tek bir yerden yönetildiği için loglama unutulmuyor
     private com.iyzipay.model.Payment callIyzico(Payment payment, CreatePaymentRequest request) {
-        // Iyzıcoya isteği burada geçiyoruz
         com.iyzipay.model.Payment response = com.iyzipay.model.Payment.create(request, iyzicoOptions);
         saveTransactionLogs(payment, request, response);
 

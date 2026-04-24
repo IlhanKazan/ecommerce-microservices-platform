@@ -1,43 +1,25 @@
 package com.ecommerce.paymentservice.outbox.entity;
 
-import jakarta.persistence.Column;
+import com.ecommerce.common.entity.BaseOutbox;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
-import jakarta.persistence.Table;
 import jakarta.persistence.Id;
-import lombok.AllArgsConstructor;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.Builder;
-import java.time.LocalDateTime;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "outbox")
 @Getter
 @Setter
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class Outbox {
+public class Outbox extends BaseOutbox {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(nullable = false)
-    private String aggregateType;
-
-    @Column(nullable = false)
-    private String aggregateId;
-
-    @Column(nullable = false)
-    private String messageType;
-
-    @Column(columnDefinition = "jsonb", nullable = false)
-    private String messagePayload;
-
-    private boolean processed;
-    private LocalDateTime createdAt;
-    private LocalDateTime sentAt;
 }
