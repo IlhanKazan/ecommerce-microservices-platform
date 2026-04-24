@@ -5,7 +5,7 @@ import com.ecommerce.common.exception.ResourceNotFoundException;
 import com.ecommerce.productservice.product.constant.ProductStatus;
 import com.ecommerce.productservice.product.constant.SalesStatus;
 import com.ecommerce.productservice.product.entity.Product;
-import com.ecommerce.productservice.product.entity.PublicProductInfo;
+import com.ecommerce.productservice.product.query.PublicProductInfo;
 import com.ecommerce.productservice.product.repository.ProductRepository;
 import com.ecommerce.productservice.product.service.QueryProductService;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +37,10 @@ public class QueryProductServiceImpl implements QueryProductService {
         return new PublicProductInfo(
                 product.getId(),
                 product.getTenantId(),
+                product.getCategory().getId(),
+                product.getCategory().getName(),
+                product.getParentProduct() != null
+                        ? product.getParentProduct().getId() : null,
                 product.getName(),
                 product.getDescription(),
                 product.getSku(),
@@ -50,7 +54,9 @@ public class QueryProductServiceImpl implements QueryProductService {
                 product.getRatingAverage(),
                 product.getReviewCount(),
                 product.getMinOrderQty(),
-                product.getMaxOrderQty()
+                product.getMaxOrderQty(),
+                product.getStatus().toString(),
+                product.getSalesStatus().toString()
         );
     }
 

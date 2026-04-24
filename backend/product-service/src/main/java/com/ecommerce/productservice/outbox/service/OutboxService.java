@@ -4,6 +4,6 @@ import com.ecommerce.productservice.product.entity.Product;
 
 public interface OutboxService {
     void publishProductCreatedEvent(Product product);
-    void publishProductDeletedEvent(Long productId, Long tenantId);
+    void publishProductDeletedEvent(Product product);
     void publishProductUpdatedEvent(Product product);
 }

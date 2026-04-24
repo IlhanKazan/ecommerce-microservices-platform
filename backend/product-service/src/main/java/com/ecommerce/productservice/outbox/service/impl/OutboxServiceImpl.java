@@ -2,10 +2,10 @@ package com.ecommerce.productservice.outbox.service.impl;
 
 import com.ecommerce.common.event.constants.EventConstants;
 import com.ecommerce.common.exception.SystemException;
+import com.ecommerce.contracts.event.product.ProductCreatedEventPayload;
+import com.ecommerce.contracts.event.product.ProductDeletedEventPayload;
+import com.ecommerce.contracts.event.product.ProductUpdatedEventPayload;
 import com.ecommerce.productservice.outbox.entity.Outbox;
-import com.ecommerce.productservice.outbox.payload.ProductCreatedEventPayload;
-import com.ecommerce.productservice.outbox.payload.ProductDeletedEventPayload;
-import com.ecommerce.productservice.outbox.payload.ProductUpdatedEventPayload;
 import com.ecommerce.productservice.outbox.repository.OutboxRepository;
 import com.ecommerce.productservice.outbox.service.OutboxService;
 import com.ecommerce.productservice.product.entity.Product;
@@ -17,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -26,7 +25,6 @@ public class OutboxServiceImpl implements OutboxService {
     private final OutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
 
-    // Mevcut transaction'a dahil olmak zorundayız, ürün kaydı rollback olursa bu da olmalı.
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void publishProductCreatedEvent(Product product) {
@@ -46,14 +44,11 @@ public class OutboxServiceImpl implements OutboxService {
                     product.getTags()
             );
 
-            String jsonPayload = objectMapper.writeValueAsString(payload);
-
             Outbox outbox = Outbox.builder()
                     .aggregateType(EventConstants.AGGREGATE_PRODUCT)
                     .aggregateId(product.getId().toString())
                     .messageType(EventConstants.EVENT_PRODUCT_CREATED)
-                    .messagePayload(jsonPayload)
-                    .processed(false)
+                    .messagePayload(objectMapper.writeValueAsString(payload))
                     .build();
 
             outboxRepository.save(outbox);
@@ -61,7 +56,7 @@ public class OutboxServiceImpl implements OutboxService {
 
         } catch (JsonProcessingException e) {
             log.error("Outbox payload JSON çevrim hatası: {}", e.getMessage());
-            throw new SystemException("Event JSON parse hatası", "JSON_PROCCESSING_ERROR");
+            throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");
         }
     }
 
@@ -86,47 +81,44 @@ public class OutboxServiceImpl implements OutboxService {
                     product.getSalesStatus().name()
             );
 
-            String jsonPayload = objectMapper.writeValueAsString(payload);
-
             Outbox outbox = Outbox.builder()
                     .aggregateType(EventConstants.AGGREGATE_PRODUCT)
                     .aggregateId(product.getId().toString())
                     .messageType(EventConstants.EVENT_PRODUCT_UPDATED)
-                    .messagePayload(jsonPayload)
-                    .processed(false)
+                    .messagePayload(objectMapper.writeValueAsString(payload))
                     .build();
 
             outboxRepository.save(outbox);
-            log.info("Outbox güncellendi kaydı oluşturuldu: Ürün ID {}", product.getId());
+            log.info("Outbox güncelleme kaydı oluşturuldu: Ürün ID {}", product.getId());
 
         } catch (JsonProcessingException e) {
-            log.error("Outbox payload JSON çevrim hatası (Update): {}", e.getMessage());
-            throw new SystemException("Event JSON parse hatası", "JSON_PROCCESSING_ERROR");
+            log.error("Outbox payload JSON çevrim hatası: {}", e.getMessage());
+            throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");
         }
     }
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public void publishProductDeletedEvent(Long productId, Long tenantId) {
+    public void publishProductDeletedEvent(Product product) {
         try {
-            var payload = new ProductDeletedEventPayload(productId, tenantId);
-            String jsonPayload = objectMapper.writeValueAsString(payload);
+            var payload = new ProductDeletedEventPayload(
+                    product.getId(),
+                    product.getTenantId()
+            );
 
             Outbox outbox = Outbox.builder()
                     .aggregateType(EventConstants.AGGREGATE_PRODUCT)
-                    .aggregateId(productId.toString())
+                    .aggregateId(product.getId().toString())
                     .messageType(EventConstants.EVENT_PRODUCT_DELETED)
-                    .messagePayload(jsonPayload)
-                    .processed(false)
+                    .messagePayload(objectMapper.writeValueAsString(payload))
                     .build();
 
             outboxRepository.save(outbox);
-            log.info("Outbox silindi kaydı oluşturuldu: Ürün ID {}", productId);
+            log.info("Outbox silme kaydı oluşturuldu: Ürün ID {}", product.getId());
 
         } catch (JsonProcessingException e) {
-            log.error("Outbox payload JSON çevrim hatası (Delete): {}", e.getMessage());
-            throw new SystemException("Event JSON parse hatası", "JSON_PROCCESSING_ERROR");
+            log.error("Outbox payload JSON çevrim hatası: {}", e.getMessage());
+            throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");
         }
     }
-
 }

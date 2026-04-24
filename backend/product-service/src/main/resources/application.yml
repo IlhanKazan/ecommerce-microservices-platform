@@ -13,6 +13,8 @@ spring:
     active: dev
   config:
     import: optional:file:.env[.properties]
+  cache:
+    type: redis
 
 jwt:
   auth:

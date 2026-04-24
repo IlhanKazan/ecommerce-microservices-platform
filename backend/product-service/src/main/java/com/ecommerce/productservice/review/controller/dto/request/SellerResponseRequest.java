@@ -1,4 +1,8 @@
 package com.ecommerce.productservice.review.controller.dto.request;
 
-public record SellerResponseRequest() {
-}
+import jakarta.validation.constraints.NotBlank;
+
+public record SellerResponseRequest(
+        @NotBlank(message = "Yanıt boş olamaz")
+        String response
+) {}

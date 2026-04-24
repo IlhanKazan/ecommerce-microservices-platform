@@ -8,6 +8,7 @@ public record ProductResponse(
         Long id,
         Long tenantId,
         Long categoryId,
+        String categoryName,
         Long parentProductId,
         String name,
         String description,
@@ -20,5 +21,7 @@ public record ProductResponse(
         List<String> imageUrls,
         Map<String, String> attributes,
         BigDecimal ratingAverage,
-        Integer reviewCount
+        Integer reviewCount,
+        String status,
+        String salesStatus
 ) {}

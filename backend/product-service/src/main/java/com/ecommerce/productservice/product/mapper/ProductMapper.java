@@ -1,9 +1,13 @@
 package com.ecommerce.productservice.product.mapper;
 
+import com.ecommerce.productservice.product.command.ProductCreateContext;
+import com.ecommerce.productservice.product.command.ProductUpdateContext;
 import com.ecommerce.productservice.product.controller.dto.request.ProductUpdateRequest;
 import com.ecommerce.productservice.product.entity.*;
 import com.ecommerce.productservice.product.controller.dto.request.ProductCreateRequest;
 import com.ecommerce.productservice.product.controller.dto.response.ProductResponse;
+import com.ecommerce.productservice.product.query.ProductInfo;
+import com.ecommerce.productservice.product.query.PublicProductInfo;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

@@ -1,4 +1,4 @@
-package com.ecommerce.productservice.product.entity;
+package com.ecommerce.productservice.product.command;
 
 import java.math.BigDecimal;
 import java.util.List;

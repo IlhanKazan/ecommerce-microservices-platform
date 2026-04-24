@@ -1,4 +1,4 @@
-package com.ecommerce.productservice.product.entity;
+package com.ecommerce.productservice.product.query;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -24,6 +24,8 @@ public record PublicProductInfo(
         BigDecimal ratingAverage,
         Integer reviewCount,
         Integer minOrderQty,
-        Integer maxOrderQty
+        Integer maxOrderQty,
+        String status,
+        String salesStatus
 ) implements Serializable {
 }

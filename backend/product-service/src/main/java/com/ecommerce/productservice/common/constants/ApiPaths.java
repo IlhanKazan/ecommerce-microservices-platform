@@ -22,4 +22,13 @@ public class ApiPaths {
     public static class Category {
         public static final String CATEGORIES = BASE_PATH_V1 + "/categories";
     }
+
+    @NoArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class Review {
+    }
+
+    @NoArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class Internal {
+        public static final String INTERNAL_PRODUCTS = BASE_PATH_V1 + "/internal/products";
+    }
 }
