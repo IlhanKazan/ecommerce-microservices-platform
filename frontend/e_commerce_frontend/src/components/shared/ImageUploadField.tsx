@@ -1,302 +1,191 @@
-import React, { useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    Box, Typography, IconButton, Stack,
-    Tooltip, Paper, CircularProgress,
+    Box, Typography, IconButton, CircularProgress,
+    Paper, Stack,
 } from '@mui/material';
-import {
-    CloudUpload as UploadIcon,
-    Delete as DeleteIcon,
-    AddPhotoAlternate as AddPhotoIcon,
-} from '@mui/icons-material';
+import { CloudUpload, Delete, AddPhotoAlternate } from '@mui/icons-material';
 import {
     type ImagePreview,
-    readFileAsDataUrl,
-    readFilesAsDataUrls,
-    formatFileSize,
-    ACCEPTED_IMAGE_TYPES,
-    MAX_IMAGE_SIZE_BYTES,
+    createImagePreviewFromUrl,
+    createImagePreviewPlaceholder,
     isValidImageType,
     isValidImageSize,
+    ACCEPTED_IMAGE_TYPES,
 } from '../../utils/imageUploadUtils';
+import { productService } from '../../features/catalog/api/productService';
 
-// ─── Single Image ─────────────────────────────────────────────────────────────
+// ─── Single ───────────────────────────────────────────────────────────────────
 
 interface SingleImageUploadProps {
-    label?: string;
+    label: string;
     value: ImagePreview | null;
-    onChange: (image: ImagePreview | null) => void;
-    onError?: (msg: string) => void;
+    onChange: (img: ImagePreview | null) => void;
+    onError: (msg: string) => void;
 }
 
-export const SingleImageUpload: React.FC<SingleImageUploadProps> = ({
-                                                                        label = 'Ana Görsel',
-                                                                        value,
-                                                                        onChange,
-                                                                        onError,
-                                                                    }) => {
+export function SingleImageUpload({ label, value, onChange, onError }: SingleImageUploadProps) {
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const handleFile = async (file: File) => {
-        if (!isValidImageType(file)) {
-            onError?.('Geçersiz dosya türü. JPEG, PNG, WebP veya GIF yükleyin.');
-            return;
-        }
-        if (!isValidImageSize(file)) {
-            onError?.(`Dosya boyutu ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024} MB'ı geçemez.`);
-            return;
-        }
+    const handleFile = useCallback(async (file: File) => {
+        if (!isValidImageType(file)) { onError('Geçersiz dosya türü. JPEG, PNG veya WebP yükleyin.'); return; }
+        if (!isValidImageSize(file)) { onError('Dosya 5 MB sınırını aşıyor.'); return; }
+
+        const placeholder = createImagePreviewPlaceholder(file);
+        onChange(placeholder);
+
         try {
-            const preview = await readFileAsDataUrl(file);
-            onChange(preview);
+            const url = await productService.uploadProductImage(file);
+            URL.revokeObjectURL(placeholder.previewUrl);
+            onChange(createImagePreviewFromUrl(url));
         } catch {
-            onError?.('Dosya okunurken hata oluştu.');
+            URL.revokeObjectURL(placeholder.previewUrl);
+            onChange(null);
+            onError('Görsel yüklenemedi. Tekrar deneyin.');
         }
-    };
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) handleFile(file);
-        e.target.value = '';
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        const file = e.dataTransfer.files?.[0];
-        if (file) handleFile(file);
-    };
+    }, [onChange, onError]);
 
     return (
         <Box>
-            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={1}>
-                {label}
-            </Typography>
-
-            {value ? (
-                <Box sx={{ position: 'relative', display: 'inline-block' }}>
-                    <Box
-                        component="img"
-                        src={value.dataUrl}
-                        alt="Ana görsel önizleme"
-                        sx={{
-                            width: 140, height: 140,
-                            objectFit: 'cover',
-                            borderRadius: 2,
-                            border: '2px solid',
-                            borderColor: 'primary.main',
-                            display: 'block',
-                        }}
-                    />
-                    <Stack
-                        direction="row"
-                        spacing={0.5}
-                        sx={{ position: 'absolute', top: 4, right: 4 }}
-                    >
-                        <Tooltip title="Değiştir">
-                            <IconButton
-                                size="small"
-                                sx={{ bgcolor: 'rgba(255,255,255,0.9)', '&:hover': { bgcolor: 'white' } }}
-                                onClick={() => inputRef.current?.click()}
-                            >
-                                <UploadIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Kaldır">
-                            <IconButton
-                                size="small"
-                                sx={{ bgcolor: 'rgba(255,255,255,0.9)', '&:hover': { bgcolor: 'white', color: 'error.main' } }}
-                                onClick={() => onChange(null)}
-                            >
-                                <DeleteIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
+            <Typography variant="caption" color="text.secondary" fontWeight={500}>{label}</Typography>
+            <Paper
+                variant="outlined"
+                onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+                onDragOver={(e) => e.preventDefault()}
+                onClick={() => !value && inputRef.current?.click()}
+                sx={{
+                    mt: 0.5, height: 160,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: value ? 'default' : 'pointer',
+                    overflow: 'hidden', position: 'relative',
+                    borderStyle: 'dashed',
+                    transition: 'border-color .2s',
+                    '&:hover': { borderColor: 'primary.main' },
+                }}
+            >
+                {value ? (
+                    <>
+                        <Box component="img" src={value.previewUrl}
+                             sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {value.uploading ? (
+                            <Box sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <CircularProgress size={32} sx={{ color: 'white' }} />
+                            </Box>
+                        ) : (
+                            <Stack direction="row" spacing={0.5} sx={{ position: 'absolute', top: 6, right: 6 }}>
+                                <IconButton size="small" sx={{ bgcolor: 'rgba(0,0,0,.5)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,.7)' } }}
+                                            onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}>
+                                    <AddPhotoAlternate fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" sx={{ bgcolor: 'rgba(0,0,0,.5)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,.7)' } }}
+                                            onClick={(e) => { e.stopPropagation(); onChange(null); }}>
+                                    <Delete fontSize="small" />
+                                </IconButton>
+                            </Stack>
+                        )}
+                    </>
+                ) : (
+                    <Stack alignItems="center" spacing={1} color="text.disabled">
+                        <CloudUpload sx={{ fontSize: 40 }} />
+                        <Typography variant="caption">Sürükle bırak veya tıkla</Typography>
                     </Stack>
-                    <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-                        {value.fileName} · {formatFileSize(value.size)}
-                    </Typography>
-                </Box>
-            ) : (
-                <Paper
-                    variant="outlined"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={handleDrop}
-                    onClick={() => inputRef.current?.click()}
-                    sx={{
-                        width: 140, height: 140,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 1,
-                        cursor: 'pointer',
-                        borderRadius: 2,
-                        borderStyle: 'dashed',
-                        transition: 'border-color 0.2s, background 0.2s',
-                        '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' },
-                    }}
-                >
-                    <UploadIcon color="disabled" />
-                    <Typography variant="caption" color="text.secondary" textAlign="center" px={1}>
-                        Tıkla veya sürükle
-                    </Typography>
-                </Paper>
-            )}
-
-            <input
-                ref={inputRef}
-                type="file"
-                accept={ACCEPTED_IMAGE_TYPES}
-                style={{ display: 'none' }}
-                onChange={handleChange}
-            />
+                )}
+            </Paper>
+            <input ref={inputRef} type="file" hidden accept={ACCEPTED_IMAGE_TYPES}
+                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
         </Box>
     );
-};
+}
 
-// ─── Multi Image ──────────────────────────────────────────────────────────────
+// ─── Multi ────────────────────────────────────────────────────────────────────
 
 interface MultiImageUploadProps {
-    label?: string;
+    label: string;
     values: ImagePreview[];
-    onChange: (images: ImagePreview[]) => void;
-    onError?: (msg: string) => void;
+    onChange: (imgs: ImagePreview[]) => void;
+    onError: (msg: string) => void;
     max?: number;
 }
 
-export const MultiImageUpload: React.FC<MultiImageUploadProps> = ({
-                                                                      label = 'Ek Görseller',
-                                                                      values,
-                                                                      onChange,
-                                                                      onError,
-                                                                      max = 8,
-                                                                  }) => {
+export function MultiImageUpload({ label, values, onChange, onError, max = 8 }: MultiImageUploadProps) {
+    // Internal state — upload süresince parent closure stale kalmaması için
+    const [items, setItems] = useState<ImagePreview[]>(values);
     const inputRef = useRef<HTMLInputElement>(null);
-    const [loading, setLoading] = React.useState(false);
 
-    const handleFiles = async (files: FileList) => {
-        const available = max - values.length;
-        if (available <= 0) {
-            onError?.(`En fazla ${max} ek görsel yükleyebilirsiniz.`);
-            return;
-        }
+    // Edit mode açılışında ya da parent reset'te sync et
+    useEffect(() => { setItems(values); }, [values]);
 
-        const fileArray = Array.from(files).slice(0, available);
+    // Uploading olmayan hazır URL'leri parent'a bildir
+    useEffect(() => {
+        onChange(items.filter((i) => !i.uploading && !!i.url));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [items]);
 
-        for (const file of fileArray) {
-            if (!isValidImageType(file)) {
-                onError?.(`"${file.name}" geçersiz dosya türü.`);
-                return;
+    const handleFiles = useCallback(async (files: File[]) => {
+        const remaining = max - items.length;
+        if (remaining <= 0) { onError(`En fazla ${max} görsel eklenebilir.`); return; }
+
+        const toProcess = files.slice(0, remaining).filter((f) => {
+            if (!isValidImageType(f)) { onError('Geçersiz dosya türü.'); return false; }
+            if (!isValidImageSize(f)) { onError('Dosya 5 MB sınırını aşıyor.'); return false; }
+            return true;
+        });
+        if (!toProcess.length) return;
+
+        const placeholders = toProcess.map(createImagePreviewPlaceholder);
+        setItems((prev) => [...prev, ...placeholders]);
+
+        toProcess.forEach(async (file, i) => {
+            const ph = placeholders[i];
+            try {
+                const url = await productService.uploadProductImage(file);
+                URL.revokeObjectURL(ph.previewUrl);
+                setItems((prev) => prev.map((item) =>
+                    item.id === ph.id ? createImagePreviewFromUrl(url) : item,
+                ));
+            } catch {
+                URL.revokeObjectURL(ph.previewUrl);
+                onError(`"${file.name}" yüklenemedi.`);
+                setItems((prev) => prev.filter((item) => item.id !== ph.id));
             }
-            if (!isValidImageSize(file)) {
-                onError?.(`"${file.name}" boyutu ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024} MB'ı geçiyor.`);
-                return;
-            }
-        }
+        });
+    }, [items, max, onError]);
 
-        setLoading(true);
-        try {
-            const previews = await readFilesAsDataUrls(
-                // DataTransfer hack — native FileList oluşturamayız, bu yüzden FileList cast
-                files,
-            );
-            onChange([...values, ...previews.slice(0, available)]);
-        } catch {
-            onError?.('Dosyalar okunurken hata oluştu.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.length) handleFiles(e.target.files);
-        e.target.value = '';
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files);
-    };
-
-    const remove = (idx: number) =>
-        onChange(values.filter((_, i) => i !== idx));
+    const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
 
     return (
         <Box>
-            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={1}>
-                {label} ({values.length}/{max})
-            </Typography>
-
-            <Stack direction="row" flexWrap="wrap" gap={1.5}>
-                {values.map((img, idx) => (
-                    <Box key={idx} sx={{ position: 'relative' }}>
-                        <Box
-                            component="img"
-                            src={img.dataUrl}
-                            alt={`Görsel ${idx + 1}`}
-                            sx={{
-                                width: 90, height: 90,
-                                objectFit: 'cover',
-                                borderRadius: 1.5,
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                display: 'block',
-                            }}
-                        />
-                        <IconButton
-                            size="small"
-                            onClick={() => remove(idx)}
-                            sx={{
-                                position: 'absolute', top: -6, right: -6,
-                                bgcolor: 'error.main', color: 'white',
-                                width: 20, height: 20, fontSize: 12,
-                                '&:hover': { bgcolor: 'error.dark' },
-                            }}
-                        >
-                            ×
-                        </IconButton>
-                    </Box>
+            <Typography variant="caption" color="text.secondary" fontWeight={500}>{label}</Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, mt: 0.5 }}>
+                {items.map((img) => (
+                    <Paper key={img.id} variant="outlined"
+                           sx={{ aspectRatio: '1', position: 'relative', overflow: 'hidden' }}>
+                        <Box component="img" src={img.previewUrl}
+                             sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {img.uploading ? (
+                            <Box sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <CircularProgress size={22} sx={{ color: 'white' }} />
+                            </Box>
+                        ) : (
+                            <IconButton size="small"
+                                        sx={{ position: 'absolute', top: 4, right: 4, bgcolor: 'rgba(0,0,0,.5)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,.7)' } }}
+                                        onClick={() => removeItem(img.id)}>
+                                <Delete sx={{ fontSize: 16 }} />
+                            </IconButton>
+                        )}
+                    </Paper>
                 ))}
-
-                {/* Ekle butonu — max dolmadıysa göster */}
-                {values.length < max && (
-                    <Paper
-                        variant="outlined"
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={handleDrop}
-                        onClick={() => !loading && inputRef.current?.click()}
-                        sx={{
-                            width: 90, height: 90,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 0.5,
-                            cursor: loading ? 'wait' : 'pointer',
-                            borderRadius: 1.5,
-                            borderStyle: 'dashed',
-                            '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' },
-                        }}
-                    >
-                        {loading
-                            ? <CircularProgress size={20} />
-                            : <>
-                                <AddPhotoIcon color="disabled" fontSize="small" />
-                                <Typography variant="caption" color="text.secondary" fontSize="0.65rem">
-                                    Ekle
-                                </Typography>
-                            </>
-                        }
+                {items.length < max && (
+                    <Paper variant="outlined" onClick={() => inputRef.current?.click()}
+                           sx={{ aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderStyle: 'dashed', '&:hover': { borderColor: 'primary.main' } }}>
+                        <Stack alignItems="center" color="text.disabled" spacing={0.5}>
+                            <AddPhotoAlternate />
+                            <Typography variant="caption">{items.length}/{max}</Typography>
+                        </Stack>
                     </Paper>
                 )}
-            </Stack>
-
-            <input
-                ref={inputRef}
-                type="file"
-                accept={ACCEPTED_IMAGE_TYPES}
-                multiple
-                style={{ display: 'none' }}
-                onChange={handleChange}
-            />
+            </Box>
+            <input ref={inputRef} type="file" hidden multiple accept={ACCEPTED_IMAGE_TYPES}
+                   onChange={(e) => { if (e.target.files) handleFiles(Array.from(e.target.files)); e.target.value = ''; }} />
         </Box>
     );
-};
+}

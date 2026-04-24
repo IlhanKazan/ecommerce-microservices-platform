@@ -1,5 +1,6 @@
 import { api } from '../../../lib/axios';
 import { API_ENDPOINTS } from '../../../config/apiEndpoints';
+import { IDEMPOTENCY_KEY_HEADER } from '../../../utils/idempotencyUtils';
 import type {
     ProductSearchPayload,
     ProductDetail,
@@ -16,43 +17,53 @@ import type { BasketResponse, AddItemRequest } from '../../../types';
 
 export type SearchPayload = ProductSearchPayload;
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Idempotency key varsa header objesi döner, yoksa boş obje */
+function idempotencyHeader(key?: string): Record<string, string> {
+    return key ? { [IDEMPOTENCY_KEY_HEADER]: key } : {};
+}
+
+// ─── Product Service ──────────────────────────────────────────────────────────
+
 export const productService = {
+
     searchProducts: async (body: ProductSearchPayload): Promise<PageResponse<ProductSummary>> => {
         const response = await api.post<PageResponse<ProductSummary>>(
             API_ENDPOINTS.SEARCH.PRODUCTS,
-            body
+            body,
         );
         return response.data;
     },
 
     getProductDetail: async (id: number): Promise<ProductDetail> => {
-        const response = await api.get<ProductDetail>(
-            API_ENDPOINTS.PRODUCT.BY_ID_PUBLIC(id)
-        );
+        const response = await api.get<ProductDetail>(API_ENDPOINTS.PRODUCT.BY_ID_PUBLIC(id));
         return response.data;
     },
 
-    // ─── Reviews ───────────────────────────────────────────────────────────────
+    // ─── Reviews ─────────────────────────────────────────────────────────────
 
     getProductReviews: async (
         id: number,
         page = 0,
-        size = 10
+        size = 10,
     ): Promise<PageResponse<ProductReviewDTO>> => {
         const response = await api.get<PageResponse<ProductReviewDTO>>(
             API_ENDPOINTS.PRODUCT.REVIEWS(id),
-            { params: { page, size } }
+            { params: { page, size } },
         );
         return response.data;
     },
 
     createReview: async (
         productId: number,
-        body: ReviewCreateRequest
+        body: ReviewCreateRequest,
+        idempotencyKey: string,
     ): Promise<ProductReviewDTO> => {
         const response = await api.post<ProductReviewDTO>(
             API_ENDPOINTS.PRODUCT.REVIEWS(productId),
-            body
+            body,
+            { headers: idempotencyHeader(idempotencyKey) },
         );
         return response.data;
     },
@@ -60,12 +71,12 @@ export const productService = {
     markReviewHelpful: async (
         productId: number,
         reviewId: number,
-        helpful: boolean
+        helpful: boolean,
     ): Promise<void> => {
         await api.patch(
             API_ENDPOINTS.PRODUCT.REVIEW_HELPFUL(productId, reviewId),
             null,
-            { params: { helpful } }
+            { params: { helpful } },
         );
     },
 
@@ -73,7 +84,7 @@ export const productService = {
         await api.delete(API_ENDPOINTS.PRODUCT.REVIEW_DELETE(productId, reviewId));
     },
 
-    // ─── Categories ────────────────────────────────────────────────────────────
+    // ─── Categories ───────────────────────────────────────────────────────────
 
     getCategories: async (): Promise<CategoryResponse[]> => {
         const response = await api.get<CategoryResponse[]>(API_ENDPOINTS.CATEGORY.ALL);
@@ -85,27 +96,29 @@ export const productService = {
         return response.data;
     },
 
-    // ─── Tenant Product Management ─────────────────────────────────────────────
+    // ─── Tenant Product Management ────────────────────────────────────────────
 
     getTenantProducts: async (
         tenantId: number,
         page = 0,
-        size = 20
+        size = 20,
     ): Promise<PageResponse<TenantProductResponse>> => {
         const response = await api.get<PageResponse<TenantProductResponse>>(
             API_ENDPOINTS.PRODUCT.TENANT_LIST(tenantId),
-            { params: { page, size } }
+            { params: { page, size } },
         );
         return response.data;
     },
 
     createTenantProduct: async (
         tenantId: number,
-        body: ProductCreateRequest
+        body: ProductCreateRequest,
+        idempotencyKey: string,
     ): Promise<TenantProductResponse> => {
         const response = await api.post<TenantProductResponse>(
             API_ENDPOINTS.PRODUCT.TENANT_CREATE(tenantId),
-            body
+            body,
+            { headers: idempotencyHeader(idempotencyKey) },
         );
         return response.data;
     },
@@ -113,11 +126,13 @@ export const productService = {
     updateTenantProduct: async (
         tenantId: number,
         productId: number,
-        body: ProductUpdateRequest
+        body: ProductUpdateRequest,
+        idempotencyKey: string,
     ): Promise<TenantProductResponse> => {
         const response = await api.put<TenantProductResponse>(
             API_ENDPOINTS.PRODUCT.TENANT_UPDATE(tenantId, productId),
-            body
+            body,
+            { headers: idempotencyHeader(idempotencyKey) },
         );
         return response.data;
     },
@@ -129,12 +144,12 @@ export const productService = {
     updateSalesStatus: async (
         tenantId: number,
         productId: number,
-        status: 'ON_SALE' | 'OUT_OF_STOCK' | 'COMING_SOON'
+        status: 'ON_SALE' | 'OUT_OF_STOCK' | 'COMING_SOON',
     ): Promise<void> => {
         await api.patch(
             API_ENDPOINTS.PRODUCT.TENANT_SALES_STATUS(tenantId, productId),
             null,
-            { params: { status } }
+            { params: { status } },
         );
     },
 
@@ -142,25 +157,52 @@ export const productService = {
         tenantId: number,
         productId: number,
         reviewId: number,
-        response: string
+        response: string,
     ): Promise<void> => {
         await api.post(
             API_ENDPOINTS.PRODUCT.SELLER_RESPONSE(tenantId, productId, reviewId),
-            { response }
+            { response },
         );
+    },
+
+    uploadProductImage: async (file: File): Promise<string> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await api.post<{ url: string }>(
+            '/api/v1/products/images/upload',
+            formData,
+            // axios multipart header'ı FormData ile otomatik set eder
+        );
+        return response.data.url;
+    },
+
+    getTenantProductById: async (
+        tenantId: number,
+        productId: number,
+    ): Promise<TenantProductResponse> => {
+        const response = await api.get<TenantProductResponse>(
+            API_ENDPOINTS.PRODUCT.TENANT_BY_ID(tenantId, productId),
+        );
+        return response.data;
     },
 };
 
-// ─── Basket Service (unchanged) ───────────────────────────────────────────────
+// ─── Basket Service ───────────────────────────────────────────────────────────
 
 export const basketService = {
+
     getCart: async (): Promise<BasketResponse> => {
         const response = await api.get<BasketResponse>(API_ENDPOINTS.BASKET.GET);
         return response.data;
     },
 
-    addToCart: async (payload: AddItemRequest): Promise<void> => {
-        await api.post(API_ENDPOINTS.BASKET.ADD, payload);
+    /** idempotencyKey — useAddToBasket hook'undan geliyor */
+    addToCart: async (payload: AddItemRequest, idempotencyKey: string): Promise<void> => {
+        await api.post(
+            API_ENDPOINTS.BASKET.ADD,
+            payload,
+            { headers: idempotencyHeader(idempotencyKey) },
+        );
     },
 
     removeItem: async (productId: number): Promise<void> => {
@@ -172,7 +214,6 @@ export const basketService = {
     },
 
     updateCartItem: async (_payload: { productId: number; quantity: number }): Promise<void> => {
-        // TODO: Backend'e PUT /baskets/me/items/{productId} endpoint'i eklenince burası doldurulacak
         console.warn('updateCartItem: Backend endpoint henüz yok');
     },
 

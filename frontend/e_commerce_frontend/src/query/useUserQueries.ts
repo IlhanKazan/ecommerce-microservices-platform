@@ -1,6 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { userService } from '../features/user/api/userService.ts';
-import type { User as AppUser } from '../types/user';
 
 export const USER_QUERY_KEYS = {
     me: ['user', 'me'] as const,

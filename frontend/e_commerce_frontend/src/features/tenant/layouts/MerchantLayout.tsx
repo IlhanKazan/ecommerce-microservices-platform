@@ -61,7 +61,6 @@ const MerchantLayout: React.FC = () => {
     // ─── Drawer içeriği ───────────────────────────────────────────────────────
     const drawerContent = (
         <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#1e293b', color: '#fff' }}>
-            {/* Mağaza başlığı */}
             <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Avatar
                     variant="rounded"
@@ -139,7 +138,6 @@ const MerchantLayout: React.FC = () => {
 
     // ─── Render ───────────────────────────────────────────────────────────────
     return (
-        // display:flex — AppBar fixed, drawer permanent, main offset
         <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f8fafc' }}>
             <CssBaseline />
 
@@ -148,16 +146,18 @@ const MerchantLayout: React.FC = () => {
                 position="fixed"
                 elevation={0}
                 sx={{
-                    // md ve üstünde drawer genişliği kadar sağa kaydır
+                    // Desktop: drawer genişliği kadar daralt ve sağa kaydır
                     width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
                     ml:    { md: `${DRAWER_WIDTH}px` },
                     bgcolor: '#fff',
                     color: '#334155',
                     borderBottom: '1px solid #e2e8f0',
+                    // AppBar'ı drawer'ın ÜSTünde TUT — her iki modda da
                     zIndex: (theme) => theme.zIndex.drawer + 1,
                 }}
             >
                 <Toolbar>
+                    {/* Hamburger — sadece mobile */}
                     <IconButton
                         edge="start"
                         onClick={() => setMobileOpen((v) => !v)}
@@ -178,7 +178,8 @@ const MerchantLayout: React.FC = () => {
                         <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small">
                             <Avatar
                                 sx={{
-                                    width: 36, height: 36,
+                                    width: 36,
+                                    height: 36,
                                     bgcolor: 'primary.main',
                                     fontSize: '0.9rem',
                                 }}
@@ -236,7 +237,6 @@ const MerchantLayout: React.FC = () => {
                     '& .MuiDrawer-paper': {
                         width: DRAWER_WIDTH,
                         boxSizing: 'border-box',
-                        // Overflow ile içerik taşmasını önle
                         overflowX: 'hidden',
                     },
                 }}
@@ -250,13 +250,28 @@ const MerchantLayout: React.FC = () => {
                 sx={{
                     flexGrow: 1,
                     minWidth: 0,
-                    mt: '64px',
                     p: { xs: 2, md: 4 },
-                    minHeight: 'calc(100vh - 64px)',
+                    minHeight: '100vh',
                     overflowX: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
                 }}
             >
-                <Outlet />
+                {/*
+                 * KEY FIX — Toolbar spacer
+                 *
+                 * Hardcoded `mt: '64px'` yerine boş bir <Toolbar /> koyuyoruz.
+                 * MUI, Toolbar'ın yüksekliğini breakpoint'e göre otomatik hesaplar:
+                 *   - Mobile (xs): 56px
+                 *   - Desktop (sm+): 64px
+                 * Bu sayede AppBar her zaman içeriğin üstünde, içerik hiçbir zaman
+                 * AppBar'ın altına gömülmez.
+                 */}
+                <Toolbar />
+
+                <Box sx={{ flexGrow: 1 }}>
+                    <Outlet />
+                </Box>
             </Box>
         </Box>
     );

@@ -4,12 +4,12 @@ import type {
     CreateTenantRequest, SubscriptionPlan, TenantDetail, TenantSummary,
     UpdateTenantCriticalRequest,
     UpdateTenantGeneralRequest, TenantAddress, TenantRole, PaymentCardInfo, SubscriptionDetail, PaymentHistoryResponse,
-    PageResponse
+    PageResponse,  AddMemberRequest
 } from '../../../types/tenant.ts';
 import type {CreateAddressRequest, Address} from "../../../types/user.ts";
 import { asRecord, getString, getNumber, getBoolean } from '../../../utils/normalizers.ts';
 import type { AddressType as EnumAddressType } from '../../../types/enums.ts';
-import type { AddMemberRequest} from "../../../types/tenant.ts";
+import { IDEMPOTENCY_KEY_HEADER } from '../../../utils/idempotencyUtils';
 
 const normalizeTenantAddress = (raw: unknown): TenantAddress => {
     const r = asRecord(raw);
@@ -192,13 +192,27 @@ export const tenantService = {
         return response.data;
     },
 
-    createWarehouse: async (tenantId: number, payload: { code: string; name: string; locationDetails: string }) => {
-        const response = await api.post(API_ENDPOINTS.STOCK.WAREHOUSES(tenantId), payload);
-        return response.data;
+    createWarehouse: async (
+        tenantId: number,
+        payload: { code: string; name: string; locationDetails: string },
+        idempotencyKey: string,
+    ): Promise<void> => {
+        await api.post(
+            API_ENDPOINTS.STOCK.WAREHOUSES(tenantId),
+            payload,
+            { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+        );
     },
 
-    addManualStock: async (tenantId: number, payload: { warehouseId: number; productId: number; amount: number }) => {
-        const response = await api.post(API_ENDPOINTS.STOCK.MANUAL_ADD(tenantId), payload);
-        return response.data;
-    }
+    addManualStock: async (
+        tenantId: number,
+        payload: { warehouseId: number; productId: number; amount: number },
+        idempotencyKey: string,
+    ): Promise<void> => {
+        await api.post(
+            API_ENDPOINTS.STOCK.MANUAL_ADD(tenantId),
+            payload,
+            { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+        );
+    },
 };

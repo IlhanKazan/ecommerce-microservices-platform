@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     productService,
@@ -6,6 +7,7 @@ import {
 } from '../features/catalog/api/productService';
 import { tenantService } from '../features/tenant/api/tenantService';
 import { QueryKeys } from './queryKeys';
+import { generateIdempotencyKey, IDEMPOTENCY_KEY_HEADER } from '../utils/idempotencyUtils';
 import type { ReviewCreateRequest } from '../types/product';
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────
@@ -28,34 +30,39 @@ export const useGetProductDetail = (productId: number) => {
 
 // ─── Reviews ──────────────────────────────────────────────────────────────────
 
-export const useGetProductReviews = (
-    productId: number,
-    page = 0,
-    size = 10
-) => {
+export const useGetProductReviews = (productId: number, page = 0, size = 10) => {
     return useQuery({
         queryKey: QueryKeys.PRODUCT_REVIEWS(productId, page, size),
-        // page ve size artık service'e doğru geçiyor
         queryFn: () => productService.getProductReviews(productId, page, size),
         enabled: !!productId,
     });
 };
 
+/**
+ * Yorum oluşturma — idempotency key ile.
+ *
+ * Kullanıcı "Gönder"e bastı → ağ koptu → tekrar bastı senaryosunda
+ * backend aynı key'i görünce ikinci isteği işlemez (Redis dedupe).
+ *
+ * Key lifecycle:
+ *   - Hook mount'ta bir kez üretilir
+ *   - onSuccess'te yenilenir (bir sonraki yorum için farklı key hazır)
+ *   - retry'da aynı key kalır → Redis dedupe çalışır
+ */
 export const useCreateReview = (productId: number) => {
     const queryClient = useQueryClient();
+    const idempotencyKey = useRef(generateIdempotencyKey());
+
     return useMutation({
         mutationFn: (body: ReviewCreateRequest) =>
-            productService.createReview(productId, body),
+            productService.createReview(productId, body, idempotencyKey.current),
         onSuccess: () => {
-            // Tüm sayfa cache'lerini geçersiz kıl
-            queryClient.invalidateQueries({
-                queryKey: ['product-reviews', productId],
-            });
-            // Detay sayfasındaki reviewCount güncellensin
-            queryClient.invalidateQueries({
-                queryKey: QueryKeys.PRODUCT_DETAIL(productId),
-            });
+            // Başarılı → bir sonraki işlem için yeni key
+            idempotencyKey.current = generateIdempotencyKey();
+            queryClient.invalidateQueries({ queryKey: ['product-reviews', productId] });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.PRODUCT_DETAIL(productId) });
         },
+        retry: 2,
     });
 };
 
@@ -73,8 +80,7 @@ export const useMarkReviewHelpful = (productId: number) => {
 export const useDeleteReview = (productId: number) => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (reviewId: number) =>
-            productService.deleteReview(productId, reviewId),
+        mutationFn: (reviewId: number) => productService.deleteReview(productId, reviewId),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['product-reviews', productId] });
             queryClient.invalidateQueries({ queryKey: QueryKeys.PRODUCT_DETAIL(productId) });
@@ -88,11 +94,11 @@ export const useGetCategories = () => {
     return useQuery({
         queryKey: QueryKeys.CATEGORIES,
         queryFn: productService.getCategories,
-        staleTime: 1000 * 60 * 30, // 30 dakika — kategori ağacı nadiren değişir
+        staleTime: 1000 * 60 * 30,
     });
 };
 
-// ─── Tenant Product Management ─────────────────────────────────────────────────
+// ─── Tenant Product Management ────────────────────────────────────────────────
 
 export const useGetTenantProducts = (tenantId: number, page = 0, size = 20) => {
     return useQuery({
@@ -104,22 +110,31 @@ export const useGetTenantProducts = (tenantId: number, page = 0, size = 20) => {
 
 export const useCreateTenantProduct = (tenantId: number) => {
     const queryClient = useQueryClient();
+    const idempotencyKey = useRef(generateIdempotencyKey());
+
     return useMutation({
-        mutationFn: productService.createTenantProduct.bind(null, tenantId),
+        mutationFn: (body: any) =>
+            productService.createTenantProduct(tenantId, body, idempotencyKey.current),
         onSuccess: () => {
+            idempotencyKey.current = generateIdempotencyKey();
             queryClient.invalidateQueries({ queryKey: ['tenant-products', tenantId] });
         },
+        retry: 1,
     });
 };
 
 export const useUpdateTenantProduct = (tenantId: number) => {
     const queryClient = useQueryClient();
+    const idempotencyKey = useRef(generateIdempotencyKey());
+
     return useMutation({
         mutationFn: ({ productId, body }: { productId: number; body: any }) =>
-            productService.updateTenantProduct(tenantId, productId, body),
+            productService.updateTenantProduct(tenantId, productId, body, idempotencyKey.current),
         onSuccess: () => {
+            idempotencyKey.current = generateIdempotencyKey();
             queryClient.invalidateQueries({ queryKey: ['tenant-products', tenantId] });
         },
+        retry: 1,
     });
 };
 
@@ -150,7 +165,20 @@ export const useUpdateSalesStatus = (tenantId: number) => {
     });
 };
 
-// ─── Warehouse (var olan hooklar — dokunmadık) ─────────────────────────────────
+export function useGetTenantProductById(
+    tenantId: number,
+    productId: number | null,
+    enabled: boolean,
+) {
+    return useQuery({
+        queryKey: ['tenant-product-detail', tenantId, productId],
+        queryFn: () => productService.getTenantProductById(tenantId, productId!),
+        enabled: !!tenantId && !!productId && enabled,
+        staleTime: 0, // edit her açılışta taze data
+    });
+}
+
+// ─── Warehouse ────────────────────────────────────────────────────────────────
 
 export const useGetWarehouses = (tenantId: number) => {
     return useQuery({
@@ -162,29 +190,42 @@ export const useGetWarehouses = (tenantId: number) => {
 
 export const useCreateWarehouse = (tenantId: number) => {
     const queryClient = useQueryClient();
+    const idempotencyKey = useRef(generateIdempotencyKey());
+
     return useMutation({
         mutationFn: (payload: { code: string; name: string; locationDetails: string }) =>
-            tenantService.createWarehouse(tenantId, payload),
+            tenantService.createWarehouse(tenantId, payload, idempotencyKey.current),
         onSuccess: () => {
+            idempotencyKey.current = generateIdempotencyKey();
             queryClient.invalidateQueries({ queryKey: QueryKeys.WAREHOUSES(tenantId) });
         },
+        retry: 1,
     });
 };
 
+/**
+ * Stok ekleme — en kritik idempotency noktası.
+ * Duplicate stok girişi direkt envanter hatasına yol açar.
+ */
 export const useAddManualStock = (tenantId: number) => {
     const queryClient = useQueryClient();
+    const idempotencyKey = useRef(generateIdempotencyKey());
+
     return useMutation({
         mutationFn: (payload: { warehouseId: number; productId: number; amount: number }) =>
-            tenantService.addManualStock(tenantId, payload),
+            tenantService.addManualStock(tenantId, payload, idempotencyKey.current),
         onSuccess: () => {
+            idempotencyKey.current = generateIdempotencyKey();
             queryClient.invalidateQueries({ queryKey: QueryKeys.WAREHOUSES(tenantId) });
             queryClient.invalidateQueries({ queryKey: ['searchProducts'] });
             queryClient.invalidateQueries({ queryKey: ['productDetail'] });
         },
+        // Stok için retry — ağ hatası olursa aynı key ile tekrar dene
+        retry: 2,
     });
 };
 
-// ─── Basket (var olan hooklar — dokunmadık) ────────────────────────────────────
+// ─── Cart (basket) ────────────────────────────────────────────────────────────
 
 export const useAddToCart = () => {
     return useMutation({ mutationFn: basketService.addToCart });
@@ -205,3 +246,6 @@ export const useUpdateCartItem = () => {
 export const useRemoveFromCart = () => {
     return useMutation({ mutationFn: basketService.removeFromCart });
 };
+
+// ─── Re-export edilmemiş utility (hook dışı kullanım için) ────────────────────
+export { IDEMPOTENCY_KEY_HEADER };
