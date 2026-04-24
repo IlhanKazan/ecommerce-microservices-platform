@@ -55,7 +55,7 @@ public class BasketController {
                         item.getProductName(),
                         item.getQuantity(),
                         item.getPrice(),
-                        item.getImageUrl()
+                        item.getMainImageUrl()
                 )).toList();
 
         BasketResponse response = new BasketResponse(

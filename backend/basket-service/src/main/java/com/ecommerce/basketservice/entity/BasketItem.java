@@ -14,5 +14,5 @@ public class BasketItem {
     private String productName;
     private Integer quantity;
     private BigDecimal price;
-    private String imageUrl;
+    private String mainImageUrl;
 }

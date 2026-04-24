@@ -33,8 +33,8 @@ public class ProductClientAdapter {
 
             // Aktif mi? Satışta mı?
             if (!"ACTIVE".equals(response.status()) || "OUT_OF_STOCK".equals(response.salesStatus())) {
-                log.warn("Ürün satışa kapalı. ProductId: {}, Status: {}, SalesStatus: {}",
-                        productId, response.status(), response.salesStatus());
+                log.warn("Ürün satışa kapalı. ProductId: {}, Status: {}, SalesStatus: {}, Rastgele: {}",
+                        productId, response.status(), response.salesStatus(), response.name());
 
                 throw new BusinessException(
                         "Bu ürün şu an satışa kapalı veya tükendi.",
