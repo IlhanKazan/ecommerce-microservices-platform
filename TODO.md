@@ -29,77 +29,43 @@ Format: Her item kısa başlık + bağlam + (varsa) dosya referansı + zorluk (S
   - `BaseInbox` zenginleştirildi (`status`, `retry_count`, `error_message`, `received_at`, `processed_at`)
   - `InboxStatus` enum'u `com.ecommerce.common.constant` altına taşındı, tüm servisler import edecek.
   - `@Idempotent` AOP + `@CurrentUser` resolver + `TenantSecurityEvaluator` + `FeignClientInterceptor` stabil.
-- **product-service Inbox** `BaseInbox` extend ediyor ✅.
+- **product-service Inbox** `BaseInbox` extend ediyor, `@SuperBuilder` annotation'ı düzeltildi ✅.
 - **stock-service Inbox** `BaseInbox` extend ediyor ✅.
 - **stock-service migration V3** DB tarafı (outbox drop+recreate as BIGINT IDENTITY, inbox enrich) tamamlandı ✅.
+- **stock-service Java tarafı migration (Stage 3.3)** tamamlandı ✅:
+  - `StockInfo` → `stock/query/` paketine taşındı, `implements Serializable` eklendi.
+  - `Outbox.java`: `@GeneratedValue(IDENTITY)`, `@AllArgsConstructor` kaldırıldı, `@SuperBuilder` zaten vardı.
+  - `InboxService` interface'e `isMessageProcessed` metodu eklendi, Impl'e `@Override` eklendi.
+  - `V4__outbox_replica_identity_full.sql` eklendi.
+  - `V5__add_inbox_indexes.sql` eklendi (idx_inbox_status, idx_inbox_pending partial index).
+- **Stage 3: stock-service event pipeline** ÇALIŞIYOR ✅
+  - 3.1: Tüm connector'lar `register_connector.sh` ile push edildi, `message_type` header'lı.
+  - 3.2: stock-service replication slot drop edildi, connector re-register edildi, `RUNNING`.
+  - 3.3: Java tarafı migration tamamlandı (yukarıda detay).
+  - 3.4: End-to-end verify: `addManualStock` → outbox → Debezium → Kafka `STOCK_STATUS_CHANGED_EVENT` (message_type header'lı) → search-service consumer → Elasticsearch `inStock: true`. Yeni ürün ekleme de `PRODUCT_CREATED_EVENT` zinciriyle ES'e düştü.
 
 ---
-
-## 🔥 Aktif (Stage 3) — bu sprint'in işi
-
-### 3.1 Debezium connector fix'inin push'u
-- [ ] `infrastructure/debezium/*.json` dosyalarında `transforms.outbox.table.fields.additional.placement: "message_type:header:message_type"` config'i **var**. Debezium'a **push edilmedi**. Script çalıştır:
-  ```bash
-  cd infrastructure/scripts && ./register_connector.sh
-  ```
-  Önce `product-service-connector`'ı verify et (Kafdrop'tan topic ve header'ları gözlemle):
-  ```bash
-  docker exec -it kafka kafka-console-consumer \
-    --bootstrap-server kafka:9092 --topic PRODUCT \
-    --property print.headers=true --from-beginning --max-messages 3
-  ```
-  Header'da `message_type=PRODUCT_CREATED_EVENT` vb. görmelisin. **S**
-
-### 3.2 stock-service connector re-register (slot temizliği dahil)
-- [ ] Outbox id tipi UUID'den BIGINT'e değiştiği için (migration V3), Debezium replication slot'u eski şemayı hatırlar. Adımlar:
-  1. Connector'ı sil:
-     ```bash
-     curl -X DELETE http://localhost:8083/connectors/stock-service-connector
-     ```
-  2. Replication slot'u drop et:
-     ```bash
-     docker exec -it postgres psql -U $POSTGRES_USER -d stock_db \
-       -c "SELECT pg_drop_replication_slot('stock_service_debezium_slot');"
-     ```
-  3. Yeniden register:
-     ```bash
-     cd infrastructure/scripts && ./register_connector.sh
-     ```
-  4. Verify — status RUNNING, Kafka'ya STOCK topic'i düşmeli. **M**
-
-### 3.3 stock-service Java tarafı migration kalan işler
-- [ ] `stock/entity/StockInfo.java` → `stock/query/StockInfo.java` paketine taşı, `implements Serializable` ekle. `StockService` / `StockServiceImpl` import'larını güncelle. **S**
-- [ ] `stock/outbox/entity/Outbox.java`: `@GeneratedValue(strategy = GenerationType.UUID)` → `@GeneratedValue(strategy = GenerationType.IDENTITY)` (field `Long`, DB kolonu BIGINT IDENTITY). **S**
-- [ ] `stock/outbox/entity/Outbox.java`: `@SuperBuilder` kullan, `@Builder` değil (parent `BaseOutbox` `@SuperBuilder`). Builder kullanımı `OutboxServiceImpl`'de zaten `Outbox.builder()` — sınıf seviyesinde doğru annotation yeterli. **S**
-- [ ] `inbox/service/InboxService.java` boş interface. `isMessageProcessed(String, String, String)` metodunu interface'e taşı, Impl'de `@Override` ekle. **S**
-- [ ] `V4__outbox_replica_identity_full.sql` ekle — V3 outbox'ı drop+recreate etti ama `REPLICA IDENTITY FULL` ayarını tekrar set etmedi, teyit et:
-  ```sql
-  ALTER TABLE outbox REPLICA IDENTITY FULL;
-  ```
-  Servisi restart ettikten sonra Debezium'un outbox'taki delete/update event'leri doğru okuyup okumadığını test et. **S**
-
-### 3.4 stock-service + search-service end-to-end verify
-- [ ] stock-service'ten manuel `addManualStock` çağrısı yap (idempotency-key header'ı ile). Kafka STOCK topic'inde `STOCK_STATUS_CHANGED_EVENT` mesajı görmelisin. Sonra search-service'teki Elasticsearch `products` index'inde ilgili ürünün `inStock: true` olduğunu doğrula:
-  ```bash
-  curl -s localhost:9200/products/_doc/<productId> | jq '._source.inStock'
-  ```
-  **S**
 
 ---
 
 ## ⏭️ Sıradaki (Stage 4)
 
 ### 4.1 payment-service migration
-- [ ] Önce **oku**: `backend/payment-service/src/main/java/com/ecommerce/paymentservice/{outbox,inbox}/entity/*.java`. Mevcut tam tanımlı Outbox/Inbox var, `BaseOutbox`/`BaseInbox` extend etmiyor.
-- [ ] `payment-service/pom.xml`'e `event-contracts` dependency ekle.
-- [ ] `outbox/entity/Outbox.java` → `extends BaseOutbox`, kendi field'larını sil.
-- [ ] `inbox/entity/Inbox.java` → `extends BaseInbox`, kendi inline `InboxStatus` enum'unu sil, `com.ecommerce.common.constant.InboxStatus` import et.
-- [ ] Bu iki entity'nin `@SuperBuilder` kullandığından emin ol.
-- [ ] `InboxRepository` var mı? Yoksa oluştur: `JpaRepository<Inbox, String>` (PK String).
-- [ ] Flyway migration ekle: payment_db'deki mevcut `outbox` ve `inbox` tablolarını yeni şemaya uydur (kolonların uyumlu olduğunu verify et; uyumsuzluk varsa `ALTER TABLE`). Dev'de volume silmek de kabul.
-- [ ] Debezium için `infrastructure/debezium/payment-connector.json` ekle (diğer iki connector'ı örnek al).
-- [ ] `register_connector.sh`'a ekle.
-- [ ] Hangi event'leri yayınlayacağımıza karar ver: `PAYMENT_SUCCESS_EVENT`, `PAYMENT_FAILED_EVENT`, `SUBSCRIPTION_ACTIVATED_EVENT`? Bunlar için event-contracts'e payload record'ları ekle (`com.ecommerce.contracts.event.payment.*` paketi).
+- [x] Önce **oku**: `backend/payment-service/src/main/java/com/ecommerce/paymentservice/{outbox,inbox}/entity/*.java`. Mevcut tam tanımlı Outbox/Inbox var, `BaseOutbox`/`BaseInbox` extend etmiyor.
+- [x] `payment-service/pom.xml`'e `event-contracts` dependency ekle.
+- [x] `outbox/entity/Outbox.java` → `extends BaseOutbox`, kendi field'larını sil (`processed`, `sentAt` dahil — Debezium pattern'ında gereksiz).
+- [x] `inbox/entity/Inbox.java` → `extends BaseInbox`, kendi inline `InboxStatus` enum'unu sil, `com.ecommerce.common.constant.InboxStatus` import et.
+- [x] Bu iki entity'nin `@SuperBuilder` kullandığından emin ol.
+- [x] `InboxRepository` oluşturuldu: `JpaRepository<Inbox, String>` (PK String).
+- [x] `InboxService` + `InboxServiceImpl` oluşturuldu (stock-service pattern — `REQUIRES_NEW` + idempotency).
+- [x] `OutboxService` arayüzüne `publishPaymentSuccessEvent`, `publishPaymentFailedEvent`, `publishSubscriptionActivatedEvent` eklendi; `OutboxServiceImpl` implement etti (`MANDATORY` propagation, ObjectMapper).
+- [x] `PaymentServiceImpl`'e `OutboxService` inject edildi; `handleIyzicoResponse` SUCCESS/FAILURE branch'larına publish çağrıları eklendi.
+- [x] `EventConstants`'a `AGGREGATE_PAYMENT`, `EVENT_PAYMENT_SUCCESS`, `EVENT_PAYMENT_FAILED`, `EVENT_SUBSCRIPTION_ACTIVATED` eklendi.
+- [x] `event-contracts`'a `PaymentSuccessEventPayload`, `PaymentFailedEventPayload`, `SubscriptionActivatedEventPayload` eklendi (`com.ecommerce.contracts.event.payment.*`).
+- [x] Flyway `V3__migrate_outbox_inbox_for_base_classes.sql` eklendi: `processed`/`sent_at` DROP, `retry_count` ADD, `REPLICA IDENTITY FULL`.
+- [x] `infrastructure/debezium/payment-connector.json` oluşturuldu (`payment_db`, slot: `payment_service_debezium_slot`).
+- [x] `register_connector.sh`'a `payment-connector.json` satırı eklendi.
+- [ ] **Verify (runtime)**: payment-service restart → Flyway V3 migration uygulansın → `register_connector.sh` çalıştır → abonelik ödemesi yap → PAYMENT topic'inde mesaj gör.
 - **M-L**
 
 ### 4.2 user-tenant-service migration

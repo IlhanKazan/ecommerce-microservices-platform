@@ -665,9 +665,6 @@ Aktif migration sürecindeki item'lar `TODO.md` "Stage 3/4" altında. Aşağıda
 
 | Konum | Durum | Stage |
 |---|---|---|
-| stock-service Outbox `@GeneratedValue(UUID)` bug | Java düzeltmesi kalan | 3 |
-| stock-service `StockInfo` yanlış pakette | `query/` altına taşı, `Serializable` ekle | 3 |
-| stock-service `InboxService` boş interface | metodu interface'e taşı | 3 |
 | payment-service Outbox/Inbox base extend etmiyor | `BaseOutbox`/`BaseInbox`/`common.InboxStatus`'a migrate | 4 |
 | payment-service `pom.xml` `event-contracts` yok | publish senaryosu kararlaşınca ekle | 4 |
 | user-tenant-service Outbox entity BaseOutbox extend etmiyor | migrate | 4 |

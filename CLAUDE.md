@@ -170,6 +170,36 @@ docker logs product-service 2>&1 | grep -iE 'migrat|flyway' | head
 # MinIO console           : http://localhost:9001
 ```
 
+## Outbox schema değişikliği runbook
+
+Bir servisin `outbox` tablosunda tip/kolon değişikliği yapıldığında (ör. UUID→BIGINT id) Debezium'un replication slot'unu da temizlemek gerekir — connector silmek yetmez.
+
+```bash
+# 1. Connector'ı sil
+curl -X DELETE http://localhost:8083/connectors/<servis>-connector
+
+# 2. Replication slot'u drop et (kritik — eski şemayı hafızada tutar)
+docker exec -it postgres psql -U $POSTGRES_USER -d <servis_db> \
+  -c "SELECT pg_drop_replication_slot('<servis>_debezium_slot');"
+
+# 3. Servisi restart et → yeni Flyway migration'ları uygulansın
+docker restart <servis>
+
+# 4. Migration'ları doğrula
+docker logs <servis> 2>&1 | grep -iE 'migrat|flyway' | head -20
+
+# 5. Connector'ları yeniden kaydet (script önce DELETE yapar, sonra POST eder)
+cd infrastructure/scripts && ./register_connector.sh
+
+# 6. Status ve topic doğrula
+curl -s http://localhost:8083/connectors/<servis>-connector/status | jq
+docker exec -it kafka kafka-console-consumer \
+  --bootstrap-server kafka:9092 --topic <TOPIC> \
+  --from-beginning --property print.headers=true --max-messages 3
+```
+
+> **Tuzak:** `REPLICA IDENTITY FULL` outbox tablosunu yeni yarattıktan sonra tekrar set edilmeli (DROP+CREATE sıfırlar). Yeni migration'da `ALTER TABLE outbox REPLICA IDENTITY FULL;` mutlaka ekle.
+
 ## Dil ve ton
 
 Kullanıcı **Türkçe, casual, direkt** iletişim kuruyor. Kod tabanında Türkçe iş mesajları ve log'lar yaygın — bunu koru. Yeni kod eklerken çevredeki stile bak; hem Türkçe hem İngilizce kabul edilir ama `exception.errorCode`, method/class/variable isimleri her zaman İngilizce.
