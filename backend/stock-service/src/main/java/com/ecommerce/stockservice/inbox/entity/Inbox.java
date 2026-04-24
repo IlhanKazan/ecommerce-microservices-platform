@@ -1,34 +1,16 @@
 package com.ecommerce.stockservice.inbox.entity;
 
+import com.ecommerce.common.entity.BaseInbox;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-import java.time.LocalDateTime;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "inbox")
 @Getter
 @Setter
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class Inbox {
+public class Inbox extends BaseInbox {
 
-    @Id
-    private String messageId;
-
-    private String eventType;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
-    private String payload;
-
-    @Column(updatable = false)
-    private LocalDateTime processedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        this.processedAt = LocalDateTime.now();
-    }
 }

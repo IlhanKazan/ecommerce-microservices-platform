@@ -1,7 +1,7 @@
 package com.ecommerce.stockservice.stock.service;
 
 import com.ecommerce.stockservice.stock.entity.Stock;
-import com.ecommerce.stockservice.stock.entity.StockInfo;
+import com.ecommerce.stockservice.stock.query.StockInfo;
 
 import java.util.UUID;
 

@@ -7,6 +7,6 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 
 @Repository
-public interface InboxRepository extends JpaRepository<Inbox, Long> {
+public interface InboxRepository extends JpaRepository<Inbox, String> {
     int deleteByProcessedAtBefore(LocalDateTime date);
 }

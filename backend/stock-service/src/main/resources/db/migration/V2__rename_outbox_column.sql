@@ -1,0 +1,1 @@
+ALTER TABLE outbox RENAME COLUMN event_type TO message_type;

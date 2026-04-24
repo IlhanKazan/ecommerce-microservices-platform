@@ -6,7 +6,7 @@ import com.ecommerce.stockservice.client.dto.ProductResponse;
 import com.ecommerce.stockservice.outbox.constant.TransactionType;
 import com.ecommerce.stockservice.outbox.service.OutboxService;
 import com.ecommerce.stockservice.stock.entity.Stock;
-import com.ecommerce.stockservice.stock.entity.StockInfo;
+import com.ecommerce.stockservice.stock.query.StockInfo;
 import com.ecommerce.stockservice.stock.repository.StockRepository;
 import com.ecommerce.stockservice.stock.service.StockService;
 import com.ecommerce.stockservice.stockmovement.service.StockMovementService;

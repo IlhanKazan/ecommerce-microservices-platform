@@ -1,38 +1,20 @@
 package com.ecommerce.stockservice.outbox.entity;
 
+import com.ecommerce.common.entity.BaseOutbox;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-import java.time.LocalDateTime;
-import java.util.UUID;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "outbox")
 @Getter
 @Setter
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class Outbox {
+public class Outbox extends BaseOutbox {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    private String aggregateType;
-    private String aggregateId;
-    private String eventType;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(nullable = false, columnDefinition = "jsonb")
-    private String messagePayload;
-
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-    }
 }

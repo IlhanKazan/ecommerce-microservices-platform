@@ -2,9 +2,9 @@ package com.ecommerce.stockservice.outbox.service.impl;
 
 import com.ecommerce.common.event.constants.EventConstants;
 import com.ecommerce.common.exception.SystemException;
+import com.ecommerce.contracts.event.stock.StockReservedEventPayload;
+import com.ecommerce.contracts.event.stock.StockStatusChangedEventPayload;
 import com.ecommerce.stockservice.outbox.entity.Outbox;
-import com.ecommerce.stockservice.outbox.payload.StockReservedPayload;
-import com.ecommerce.stockservice.outbox.payload.StockStatusChangedPayload;
 import com.ecommerce.stockservice.outbox.repository.OutboxRepository;
 import com.ecommerce.stockservice.outbox.service.OutboxService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -23,19 +23,17 @@ public class OutboxServiceImpl implements OutboxService {
     private final OutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
 
-    // Sadece Transaction olan bir yerden çağrılabilir
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void publishStockStatusChangedEvent(String aggregateId, Long productId, boolean inStock, String status) {
         try {
-            StockStatusChangedPayload payload = new StockStatusChangedPayload(productId, inStock, status);
-            String jsonPayload = objectMapper.writeValueAsString(payload);
+            StockStatusChangedEventPayload payload = new StockStatusChangedEventPayload(productId, inStock, status);
 
             Outbox outboxEvent = Outbox.builder()
                     .aggregateType(EventConstants.AGGREGATE_STOCK)
                     .aggregateId(aggregateId)
-                    .eventType(EventConstants.EVENT_STOCK_STATUS_CHANGED)
-                    .messagePayload(jsonPayload)
+                    .messageType(EventConstants.EVENT_STOCK_STATUS_CHANGED)
+                    .messagePayload(objectMapper.writeValueAsString(payload))
                     .build();
 
             outboxRepository.save(outboxEvent);
@@ -47,21 +45,17 @@ public class OutboxServiceImpl implements OutboxService {
         }
     }
 
-    // SAGA'nın ilk adımı için fırlatılacak event
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void publishStockReservedEvent(String aggregateId, Long productId, int amount, String orderId) {
         try {
-            StockReservedPayload payload = new StockReservedPayload(
-                    orderId, productId, amount, "RESERVED", EventConstants.EVENT_STOCK_RESERVED
-            );
-            String jsonPayload = objectMapper.writeValueAsString(payload);
+            StockReservedEventPayload payload = new StockReservedEventPayload(orderId, productId, amount, "RESERVED");
 
             Outbox outboxEvent = Outbox.builder()
                     .aggregateType(EventConstants.AGGREGATE_STOCK)
                     .aggregateId(aggregateId)
-                    .eventType(EventConstants.EVENT_STOCK_RESERVED)
-                    .messagePayload(jsonPayload)
+                    .messageType(EventConstants.EVENT_STOCK_RESERVED)
+                    .messagePayload(objectMapper.writeValueAsString(payload))
                     .build();
 
             outboxRepository.save(outboxEvent);
@@ -72,5 +66,4 @@ public class OutboxServiceImpl implements OutboxService {
             throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");
         }
     }
-
 }

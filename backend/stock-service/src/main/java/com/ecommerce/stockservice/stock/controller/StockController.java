@@ -6,7 +6,7 @@ import com.ecommerce.common.security.dto.AuthUser;
 import com.ecommerce.stockservice.common.constants.ApiPaths;
 import com.ecommerce.stockservice.stock.controller.dto.request.AddStockRequest;
 import com.ecommerce.stockservice.stock.controller.dto.response.StockResponse;
-import com.ecommerce.stockservice.stock.entity.StockInfo;
+import com.ecommerce.stockservice.stock.query.StockInfo;
 import com.ecommerce.stockservice.stock.service.StockService;
 import com.ecommerce.stockservice.stock.entity.Stock;
 import jakarta.validation.Valid;

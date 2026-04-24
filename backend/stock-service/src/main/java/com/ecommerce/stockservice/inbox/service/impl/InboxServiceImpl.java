@@ -1,5 +1,6 @@
 package com.ecommerce.stockservice.inbox.service.impl;
 
+import com.ecommerce.common.constant.InboxStatus;
 import com.ecommerce.stockservice.inbox.entity.Inbox;
 import com.ecommerce.stockservice.inbox.repository.InboxRepository;
 import com.ecommerce.stockservice.inbox.service.InboxService;
@@ -17,6 +18,7 @@ public class InboxServiceImpl implements InboxService {
 
     private final InboxRepository inboxRepository;
 
+    @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean isMessageProcessed(String messageId, String eventType, String payload) {
         try {
@@ -24,6 +26,7 @@ public class InboxServiceImpl implements InboxService {
                     .messageId(messageId)
                     .eventType(eventType)
                     .payload(payload)
+                    .status(InboxStatus.PROCESSED)  // direkt PROCESSED; gelişmiş retry ileride
                     .build();
             inboxRepository.saveAndFlush(message);
             return false;
@@ -32,5 +35,4 @@ public class InboxServiceImpl implements InboxService {
             return true;
         }
     }
-
 }
