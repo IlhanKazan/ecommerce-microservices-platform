@@ -17,6 +17,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { tenantService } from '../api/tenantService.ts';
 import { TENANT_ROLES, type TenantMember, type AddMemberRequest, type TenantRole } from '../../../types/tenant';
+import { useNotification } from '../../../components/shared/NotificationProvider';
 
 interface TeamManagementSectionProps {
     tenantId: number;
@@ -36,6 +37,13 @@ const TeamManagementSection: React.FC<TeamManagementSectionProps> = ({ tenantId,
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [pendingRole, setPendingRole] = useState<TenantRole | null>(null);
 
+    const { notify } = useNotification();
+
+    const [confirmRemoveDialog, setConfirmRemoveDialog] = useState<{ open: boolean; memberId: number | null }>({
+        open: false,
+        memberId: null
+    });
+
     const addMemberMutation = useMutation({
         mutationFn: async () => {
             return tenantService.addMember(tenantId, addFormData);
@@ -45,7 +53,7 @@ const TeamManagementSection: React.FC<TeamManagementSectionProps> = ({ tenantId,
             setOpenAddModal(false);
             setAddFormData({ email: '', role: 'STAFF' });
             setAddErrorMsg(null);
-            alert("Personel başarıyla eklendi.");
+            notify('Personel başarıyla eklendi.', 'success');
         },
         onError: (err: any) => {
             const message = err.response?.data?.message || "Ekleme sırasında hata oluştu.";
@@ -59,9 +67,10 @@ const TeamManagementSection: React.FC<TeamManagementSectionProps> = ({ tenantId,
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
+            notify('Personel başarıyla silindi.', 'success');
         },
         onError: () => {
-            alert("Silme işlemi başarısız oldu.");
+            notify('Silme işlemi başarısız oldu.', 'error');
         }
     });
 
@@ -71,10 +80,11 @@ const TeamManagementSection: React.FC<TeamManagementSectionProps> = ({ tenantId,
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
+            notify('Rol başarıyla güncellendi.', 'success');
             resetRoleStates();
         },
         onError: () => {
-            alert("Rol güncelleme başarısız oldu.");
+            notify('Rol güncelleme başarısız oldu.', 'error');
             resetRoleStates();
         }
     });
@@ -87,9 +97,7 @@ const TeamManagementSection: React.FC<TeamManagementSectionProps> = ({ tenantId,
     };
 
     const handleRemoveClick = (memberId: number) => {
-        if (window.confirm("Bu personeli ekipten çıkarmak istediğinize emin misiniz?")) {
-            removeMemberMutation.mutate(memberId);
-        }
+        setConfirmRemoveDialog({ open: true, memberId });
     };
 
     const handleRoleEditClick = (event: React.MouseEvent<HTMLElement>, memberId: number) => {
@@ -109,11 +117,23 @@ const TeamManagementSection: React.FC<TeamManagementSectionProps> = ({ tenantId,
     };
 
     const handleConfirmRoleChange = () => {
-        if (selectedMemberId && pendingRole) {
-            updateRoleMutation.mutate({ memberId: selectedMemberId, newRole: pendingRole });
-        } else {
-            console.error("ID veya Rol kayıp!", { selectedMemberId, pendingRole });
+        if (!selectedMemberId || !pendingRole) {
+            notify('Lütfen önce bir personel ve rol seçin.', 'warning');
+            return;
         }
+
+        updateRoleMutation.mutate({ memberId: selectedMemberId, newRole: pendingRole });
+    };
+
+    const handleConfirmRemove = () => {
+        if (confirmRemoveDialog.memberId) {
+            removeMemberMutation.mutate(confirmRemoveDialog.memberId);
+        }
+        setConfirmRemoveDialog({ open: false, memberId: null });
+    };
+
+    const handleCancelRemove = () => {
+        setConfirmRemoveDialog({ open: false, memberId: null });
     };
 
     const handleAddClose = () => {
@@ -122,8 +142,6 @@ const TeamManagementSection: React.FC<TeamManagementSectionProps> = ({ tenantId,
     };
 
     const targetMember = members.find(m => m.memberId === selectedMemberId);
-
-    console.log("GELEN ÜYE LİSTESİ:", JSON.stringify(members, null, 2));
 
     return (
         <Paper sx={{ p: 3, borderRadius: 4 }} variant="outlined">
@@ -311,6 +329,38 @@ const TeamManagementSection: React.FC<TeamManagementSectionProps> = ({ tenantId,
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Confirm Remove Dialog */}
+            <Dialog
+                open={confirmRemoveDialog.open}
+                onClose={handleCancelRemove}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: 'bold' }}>
+                    Personeli Çıkar
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Bu personeli ekipten çıkarmak istediğinize emin misiniz? Bu işlem geri alınamaz.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelRemove} color="inherit">
+                        İptal
+                    </Button>
+                    <Button 
+                        onClick={handleConfirmRemove} 
+                        color="error" 
+                        variant="contained"
+                        disabled={removeMemberMutation.isPending}
+                    >
+                        {removeMemberMutation.isPending ? 'Çıkarılıyor...' : 'Çıkar'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+
         </Paper>
     );
 };

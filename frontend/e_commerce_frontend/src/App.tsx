@@ -2,11 +2,18 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import PageLayout from './components/shared/PageLayout';
 import LoadingSpinner from './components/shared/LoadingSpinner';
+import { NotificationProvider } from './components/shared/NotificationProvider';
 import { AppRoutes } from './utils/routes';
 import { useAuthStore } from "./store/useAuthStore";
+import { useCartStore } from "./store/useCartStore";
+import { useMe } from './query/useUserQueries';
 import { useAuth } from "react-oidc-context";
 import ProtectedRoute from "./components/shared/ProtectedRoute";
 import { MerchantProtectedRoute } from "./components/shared/MerchantProtectedRoute";
+import ToastContainer from "./components/shared/ToastContainer.tsx";
+import { useAddToBasket } from './query/useBasketQueries';
+import { useGetCategories } from './query/useProductQueries';
+import { useCategoryStore } from './store/useCategoryStore';
 
 const HomePage = lazy(() => import('./features/catalog/pages/HomePage.tsx'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
@@ -33,34 +40,63 @@ const MerchantSubscription = lazy(() => import('./features/tenant/pages/Merchant
 const MerchantProducts = lazy(() => import('./features/tenant/pages/MerchantPlaceholderPages').then(module => ({ default: module.MerchantProducts })));
 const MerchantOrders = lazy(() => import('./features/tenant/pages/MerchantPlaceholderPages').then(module => ({ default: module.MerchantOrders })));
 const MerchantReviews = lazy(() => import('./features/tenant/pages/MerchantPlaceholderPages').then(module => ({ default: module.MerchantReviews })));
+const MerchantWarehouse = lazy(() => import('./features/tenant/pages/MerchantWarehousePage'));
+const MerchantReviewsPage = lazy(() => import('./features/tenant/pages/MerchantReviewsPage'));
 
 function App() {
     const auth = useAuth();
     const setAuth = useAuthStore((state) => state.setAuth);
     const clearAuth = useAuthStore((state) => state.clearAuth);
-    const fetchMe = useAuthStore((state) => state.fetchMe);
+    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+    const setUser = useAuthStore((state) => state.setUser);
+    const { data: userData } = useMe(isAuthenticated);
+    const { items: localCartItems, clearCart } = useCartStore();
+    const { mutate: addToBasket } = useAddToBasket();
 
     useEffect(() => {
-        if (auth.isAuthenticated && auth.user && auth.user.access_token) {
+        if (userData) setUser(userData);
+    }, [userData, setUser]);
+
+    useEffect(() => {
+        if (auth.isAuthenticated && auth.user?.access_token) {
             setAuth(auth.user.access_token, auth.user.profile);
-            fetchMe();
-        }
-        else if (!auth.isLoading && !auth.isAuthenticated && !auth.user?.access_token) {
+
+            // GUEST CART SENKRONİZASYONU
+            if (localCartItems.length > 0) {
+                // Localdeki her ürünü backend'e at
+                localCartItems.forEach(item => {
+                    addToBasket({ productId: item.productId, quantity: item.quantity });
+                });
+                clearCart(); // Backend'e geçince local'i sıfırla
+            }
+        } else if (!auth.isLoading && !auth.isAuthenticated) {
             clearAuth();
         }
 
         if (auth.error) {
-            console.error("Token hatası:", auth.error.message);
+            console.error('Token hatası:', auth.error.message);
             clearAuth();
-            auth.removeUser().then(() => { window.location.href = "/"; });
+            auth.removeUser().then(() => { window.location.href = '/'; });
         }
-    }, [auth.isAuthenticated, auth.user, auth.error, setAuth, clearAuth, fetchMe, auth]);
+    }, [auth.isAuthenticated, auth.user, auth.error, setAuth, clearAuth]);
+
+    const { data: categoryData } = useGetCategories();
+    const setCategories = useCategoryStore((state) => state.setCategories);
+
+    useEffect(() => {
+        if (categoryData) {
+            setCategories(categoryData);
+        }
+    }, [categoryData, setCategories]);
 
     if (auth.isLoading) return <LoadingSpinner />;
 
     return (
-        <Suspense fallback={<LoadingSpinner />}>
-            <Routes>
+        <NotificationProvider>
+            <ToastContainer />
+            <Suspense fallback={<LoadingSpinner />}>
+                <Routes>
                 <Route path={AppRoutes.HOME} element={<PageLayout />}>
                     <Route index element={<HomePage />} />
                     <Route path={AppRoutes.ABOUT.slice(1)} element={<AboutPage />} />
@@ -75,7 +111,14 @@ function App() {
                     </Route>
 
                     <Route path={AppRoutes.CART.slice(1)} element={<CartPage />} />
-                    <Route path={AppRoutes.CHECKOUT.slice(1)} element={<CheckoutPage />} />
+                    <Route
+                        path={AppRoutes.CHECKOUT.slice(1)}
+                        element={
+                            <ProtectedRoute>
+                                <CheckoutPage />
+                            </ProtectedRoute>
+                        }
+                    />
                     <Route path={AppRoutes.PRODUCT_DETAIL.slice(1)} element={<ProductDetailPage />} />
                     <Route path={AppRoutes.PRODUCT_LIST.slice(1)} element={<ProductListPage />} />
                 </Route>
@@ -90,12 +133,15 @@ function App() {
                         <Route path="reviews" element={<MerchantReviews />} />
                         <Route path="subscription" element={<MerchantSubscription />} />
                         <Route path="settings" element={<MerchantSettings />} />
+                        <Route path="reviews"    element={<MerchantReviewsPage />} />
+                        <Route path="warehouses" element={<MerchantWarehouse />} />
                     </Route>
                 </Route>
 
                 <Route path="*" element={<NotFoundPage />} />
             </Routes>
         </Suspense>
+        </NotificationProvider>
     );
 }
 

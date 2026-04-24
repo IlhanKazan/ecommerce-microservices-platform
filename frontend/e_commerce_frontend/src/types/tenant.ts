@@ -17,12 +17,27 @@ export const TENANT_ROLES: { value: TenantRole; label: string }[] = [
     { value: 'ACCOUNTANT', label: 'Muhasebeci (Accountant)' },
 ];
 
+/**
+ * SECURITY WARNING: This is used for backend communication only.
+ * Frontend should NEVER store sensitive card data in React state.
+ * Use Stripe or similar payment processor for tokenization.
+ */
 export interface PaymentCardInfo {
     holderName: string;
-    number: string;
+    number: string;      // Only for direct backend->payment processor, never store in frontend state
     expireMonth: string;
     expireYear: string;
-    cvc: string;
+    cvc: string;         // NEVER store in frontend state
+}
+
+/**
+ * Non-sensitive payment information that can be safely stored in React state
+ */
+export interface PaymentInfo {
+    holderName: string;
+    expiryMonth: string;
+    expiryYear: string;
+    // Never store card number or CVC in state!
 }
 
 export interface CreateTenantRequest {

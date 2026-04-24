@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Box, Typography, TextField, Button, Grid, Avatar, Select, MenuItem, FormControl, InputLabel, Alert, CircularProgress, Stack, Badge, IconButton, type SelectChangeEvent, Paper, Divider
 } from '@mui/material';
+import { useNotification } from '../../../components/shared/NotificationProvider';
 import {
     Person as PersonIcon,
     Security as SecurityIcon,
@@ -11,7 +12,7 @@ import {
     Email as EmailIcon,
     Badge as BadgeIcon
 } from '@mui/icons-material';
-import { userService } from '../../../service/userService';
+import { userService } from '../api/userService.ts';
 import type { User, UpdateProfileRequest } from '../../../types/user';
 import { useAuthStore } from '../../../store/useAuthStore';
 import ErrorState from '../../../components/shared/ErrorState';
@@ -29,6 +30,8 @@ const AccountProfile: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'success' | 'error' | null>(null);
     const [loadError, setLoadError] = useState(false);
+
+    const { notify } = useNotification();
 
     const fetchUserData = useCallback(async () => {
         if (!token) return;
@@ -61,7 +64,7 @@ const AccountProfile: React.FC = () => {
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files[0]) {
             const file = event.target.files[0];
-            if (file.size > 10 * 1024 * 1024) { alert("Maksimum dosya boyutu 10MB!"); return; }
+            if (file.size > 10 * 1024 * 1024) { notify('Maksimum dosya boyutu 10MB!', 'warning'); return; }
             setSelectedFile(file);
             setPreviewUrl(URL.createObjectURL(file));
             setSaveStatus(null);

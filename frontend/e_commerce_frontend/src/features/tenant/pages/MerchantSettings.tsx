@@ -4,6 +4,7 @@ import {
     Divider, CircularProgress, MenuItem, Stack,
     FormControlLabel, Radio, RadioGroup, Grid, IconButton
 } from '@mui/material';
+import { useNotification } from '../../../components/shared/NotificationProvider';
 import {
     Save as SaveIcon,
     Info as InfoIcon,
@@ -18,7 +19,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useMerchantStore } from '../../../store/useMerchantStore';
 import { tenantService } from '../api/tenantService.ts';
-import { userService } from '../../../service/userService';
+import { userService } from '../../user/api/userService.ts';
 import AddressSelectionGrid from '../../../components/shared/address/AddressSelectionGrid';
 import AddressForm, { type AddressFormData } from '../../../components/shared/address/AddressForm';
 import TenantAddressCard from '../../../components/shared/address/TenantAddressCard';
@@ -57,6 +58,7 @@ const MerchantSettings: React.FC = () => {
 
     const [isVerified, setIsVerified] = useState(false);
     const [isEditingVerification, setIsEditingVerification] = useState(false);
+    const { notify } = useNotification();
 
     const [manualAddress, setManualAddress] = useState<AddressFormData>({
         recipientName: '', phoneNumber: '', country: 'Turkey', city: '',
@@ -222,14 +224,14 @@ const MerchantSettings: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['tenant', activeTenant?.id] });
 
             if (!isVerified) {
-                alert("Doğrulama işleminiz başarıyla tamamlandı. Artık ödeme alabilirsiniz.");
+                notify('Doğrulama işleminiz başarıyla tamamlandı. Artık ödeme alabilirsiniz.', 'success');
             } else {
-                alert("Kritik bilgileriniz başarıyla güncellendi.");
+                notify('Kritik bilgileriniz başarıyla güncellendi.', 'success');
             }
         },
         onError: (error: any) => {
             if (error.message !== "VALIDATION_ERROR") {
-                alert(error?.response?.data?.message || error.message || "İşlem sırasında bir hata oluştu.");
+                notify(error?.response?.data?.message || error.message || 'İşlem sırasında bir hata oluştu.', 'error');
             }
         }
     });
@@ -310,6 +312,10 @@ const MerchantSettings: React.FC = () => {
             setIsEditingAddress(false);
             setIsForcedAddressChange(false);
             setIsAddressDirty(false);
+            notify('Mağaza bilgileri başarıyla güncellendi.', 'success');
+        },
+        onError: (error: any) => {
+            notify(error?.response?.data?.message || error?.message || 'Mağaza bilgileri güncellenirken hata oluştu.', 'error');
         }
     });
 

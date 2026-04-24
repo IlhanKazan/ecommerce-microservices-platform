@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Box, Stepper, Step, StepLabel, Button, Typography, TextField,
     Paper, MenuItem, Grid, Radio, RadioGroup, FormControlLabel,
     CircularProgress, Alert, Stack, Divider
-} from '@mui/material';
-import {
+} from '@mui/material';import { useNotification } from '../../../components/shared/NotificationProvider';import {
     CreditCard as CardIcon,
     CheckCircle as CheckIcon,
     Business as BusinessIcon,
     Check as CheckMarkIcon,
     Person as PersonIcon
 } from '@mui/icons-material';
-import { userService } from '../../../service/userService';
+import { userService } from '../../user/api/userService.ts';
 import { tenantService } from "../api/tenantService.ts";
 import type { Address } from '../../../types/user';
 import type {
@@ -27,7 +26,9 @@ import AddressSelectionGrid from '../../../components/shared/address/AddressSele
 import { AddressType, BusinessType } from '../../../types/enums';
 import type { CreateAddressRequest } from '../../../types/user';
 import type {ApiErrorResponse} from "../../../types/common.ts";
-import {useMerchantStore} from "../../../store/useMerchantStore.ts";
+import { useMerchantStore } from "../../../store/useMerchantStore.ts";
+import { useInvalidateMyTenants } from '../../../query/useTenantQueries';
+import { useInvalidateMe } from '../../../query/useUserQueries';
 
 const steps = ['Plan Seçimi', 'Mağaza Bilgileri', 'Adres Bilgileri', 'Ödeme & Onay'];
 
@@ -42,12 +43,27 @@ interface StoreDataState {
     websiteUrl: string;
 }
 
+/**
+ * SECURITY: Sensitive card data is captured via refs at submit time,
+ * never stored in React state to prevent exposure in DevTools
+ */
+interface CardInputRefs {
+    holderName: React.RefObject<HTMLInputElement>;
+    number: React.RefObject<HTMLInputElement>;
+    expireMonth: React.RefObject<HTMLInputElement>;
+    expireYear: React.RefObject<HTMLInputElement>;
+    cvc: React.RefObject<HTMLInputElement>;
+}
+
 const CreateStorePage: React.FC = () => {
     const navigate = useNavigate();
-    const { fetchMyTenants, setActiveTenant } = useMerchantStore();
+    const { setActiveTenant } = useMerchantStore();
+    const invalidateMyTenants = useInvalidateMyTenants();
+    const invalidateMe = useInvalidateMe();
     const [activeStep, setActiveStep] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [myAddresses, setMyAddresses] = useState<Address[]>([]);
+    const { notify } = useNotification();
 
     const [storeData, setStoreData] = useState<StoreDataState>({
         name: '',
@@ -70,9 +86,14 @@ const CreateStorePage: React.FC = () => {
         stateProvince: '', zipCode: '', line1: '', addressType: AddressType.SHIPPING, line2: '', label: '', isDefault: false
     });
 
-    const [cardInfo, setCardInfo] = useState<PaymentCardInfo>({
-        holderName: '', number: '', expireMonth: '', expireYear: '', cvc: ''
-    });
+    // SECURITY: Use refs for sensitive payment data - never store in state
+    const cardRefs: CardInputRefs = {
+        holderName: useRef<HTMLInputElement>(null),
+        number: useRef<HTMLInputElement>(null),
+        expireMonth: useRef<HTMLInputElement>(null),
+        expireYear: useRef<HTMLInputElement>(null),
+        cvc: useRef<HTMLInputElement>(null),
+    };
 
     useEffect(() => {
         const initData = async () => {
@@ -95,7 +116,7 @@ const CreateStorePage: React.FC = () => {
 
     const handleNext = async () => {
         if (activeStep === 0 && !selectedPlanId) {
-            alert("Lütfen devam etmeden önce bir abonelik planı seçiniz.");
+            notify('Lütfen devam etmeden önce bir abonelik planı seçiniz.', 'warning');
             return;
         }
 
@@ -108,16 +129,43 @@ const CreateStorePage: React.FC = () => {
 
     const handleBack = () => setActiveStep((prev) => prev - 1);
 
+    /**
+     * SECURITY: Sensitive card data is captured from refs at submit time only,
+     * never stored in React state to prevent exposure in DevTools
+     */
     const handleSubmit = async () => {
         if (!selectedPlanId) return;
 
-        setIsLoading(true);
+        // SECURITY: Capture sensitive data from refs at submit time only
+        const cardNumber = cardRefs.number.current?.value?.trim() || '';
+        const cardCvc = cardRefs.cvc.current?.value?.trim() || '';
+        const cardHolder = cardRefs.holderName.current?.value?.trim() || '';
+        const cardMonth = cardRefs.expireMonth.current?.value?.trim() || '';
+        const cardYear = cardRefs.expireYear.current?.value?.trim() || '';
+
+        // Validate card data
+        if (!cardNumber || !cardCvc || !cardHolder || !cardMonth || !cardYear) {
+            notify('Lütfen tüm kart bilgilerini doldurunuz.', 'error');
+            return;
+        }
+
         try {
+            setIsLoading(true);
+
             let finalSelectedAddressId: number | null = addressMode === 'EXISTING' ? selectedAddressId : null;
             if (addressMode === 'NEW') {
                 const created = await userService.addAddress(newAddress);
                 finalSelectedAddressId = created.id;
             }
+
+            // SECURITY: Build payload with sensitive data captured from refs
+            const cardInfo: PaymentCardInfo = {
+                holderName: cardHolder,
+                number: cardNumber,
+                expireMonth: cardMonth,
+                expireYear: cardYear,
+                cvc: cardCvc,
+            };
 
             const payload: CreateTenantRequest = {
                 ...storeData,
@@ -129,9 +177,16 @@ const CreateStorePage: React.FC = () => {
 
             await tenantService.createTenant(payload);
 
-            alert("Tebrikler! Mağazanız başarıyla oluşturuldu.");
+            // SECURITY: Clear sensitive data after sending
+            if (cardRefs.number.current) cardRefs.number.current.value = '';
+            if (cardRefs.cvc.current) cardRefs.cvc.current.value = '';
 
-            await fetchMyTenants();
+            notify('Tebrikler! Mağazanız başarıyla oluşturuldu.', 'success');
+
+            // Invalidate tenant list cache so it refetches with new tenant
+            invalidateMyTenants();
+            // Invalidate user profile cache so isMerchant status updates
+            invalidateMe();
             navigate(AppRoutes.MERCHANT_SELECT);
 
         } catch (error: any) {
@@ -144,26 +199,20 @@ const CreateStorePage: React.FC = () => {
                     const createdTenantId = apiError.details?.tenantId;
                     console.log("Ödeme başarısız ama mağaza açıldı. ID:", createdTenantId);
 
-                    alert("Mağazanız oluşturuldu ancak ödeme işlemi başarısız oldu. Kontrol panelinize yönlendiriliyorsunuz.");
+                    notify('Mağazanız oluşturuldu ancak ödeme işlemi başarısız oldu. Kontrol panelinize yönlendiriliyorsunuz.', 'warning');
 
-                    if (createdTenantId) {
-                        await fetchMyTenants();
-
-                        const freshTenants = useMerchantStore.getState().myTenants;
-                        const newTenant = freshTenants.find(t => t.id === createdTenantId);
-
-                        if (newTenant) {
-                            setActiveTenant(newTenant);
-                        }
-                    }
+                    // Invalidate tenant list cache so it refetches with new tenant
+                    invalidateMyTenants();
+                    // Invalidate user profile cache so isMerchant status updates
+                    invalidateMe();
 
                     navigate(AppRoutes.MERCHANT_DASHBOARD);
                     return;
                 }
 
-                alert(`Hata: ${apiError.message}`);
+                notify(`Hata: ${apiError.message}`, 'error');
             } else {
-                alert("Beklenmeyen bir hata oluştu. Lütfen bağlantınızı kontrol ediniz.");
+                notify('Beklenmeyen bir hata oluştu. Lütfen bağlantınızı kontrol ediniz.', 'error');
             }
         } finally {
             setIsLoading(false);
@@ -341,8 +390,11 @@ const CreateStorePage: React.FC = () => {
     const renderStep3_Payment = () => (
         <Grid container spacing={3}>
             <Grid size={12}>
-                <Alert severity="info" icon={<BusinessIcon />}>
-                    Mağaza aktivasyonu ve abonelik ücreti için kart bilgilerinizi giriniz. Güvenli ödeme altyapısı kullanılmaktadır.
+                <Alert severity="warning" icon={<BusinessIcon />}>
+                    <Typography variant="body2" fontWeight="bold">🔒 Güvenlik Uyarısı:</Typography>
+                    <Typography variant="caption">
+                        Kart numarası ve CVC güvenli şekilde işlenir. Bu sayfayı kapatırken verileriniz otomatik olarak silinir.
+                    </Typography>
                 </Alert>
             </Grid>
 
@@ -350,28 +402,44 @@ const CreateStorePage: React.FC = () => {
                 <Paper variant="outlined" sx={{ p: 3, bgcolor: '#fafafa' }}>
                     <Grid container spacing={2}>
                         <Grid size={12}>
+                            {/* SECURITY: Holder name can be stored, as it's not sensitive */}
                             <TextField label="Kart Üzerindeki İsim" fullWidth required
-                                       value={cardInfo.holderName} onChange={e => setCardInfo({...cardInfo, holderName: e.target.value})}
+                                       defaultValue=""
+                                       inputRef={cardRefs.holderName}
                                        InputProps={{ startAdornment: <PersonIcon sx={{mr:1, color:'text.secondary'}} /> }}
                             />
                         </Grid>
                         <Grid size={12}>
+                            {/* SECURITY: Card number captured from ref at submit time, never stored in state */}
                             <TextField label="Kart Numarası" fullWidth required placeholder="0000 0000 0000 0000"
-                                       value={cardInfo.number} onChange={e => setCardInfo({...cardInfo, number: e.target.value})}
+                                       defaultValue=""
+                                       inputRef={cardRefs.number}
+                                       autoComplete="cc-number"
                                        InputProps={{ startAdornment: <CardIcon sx={{mr:1, color:'text.secondary'}} /> }}
                             />
                         </Grid>
                         <Grid size={{ xs: 6, md: 4 }}>
                             <TextField label="Ay (MM)" fullWidth required placeholder="01"
-                                       value={cardInfo.expireMonth} onChange={e => setCardInfo({...cardInfo, expireMonth: e.target.value})} />
+                                       defaultValue=""
+                                       inputRef={cardRefs.expireMonth}
+                                       autoComplete="cc-exp-month"
+                            />
                         </Grid>
                         <Grid size={{ xs: 6, md: 4 }}>
                             <TextField label="Yıl (YY)" fullWidth required placeholder="28"
-                                       value={cardInfo.expireYear} onChange={e => setCardInfo({...cardInfo, expireYear: e.target.value})} />
+                                       defaultValue=""
+                                       inputRef={cardRefs.expireYear}
+                                       autoComplete="cc-exp-year"
+                            />
                         </Grid>
                         <Grid size={{ xs: 6, md: 4 }}>
+                            {/* SECURITY: CVC captured from ref at submit time, never stored in state */}
                             <TextField label="CVC" fullWidth required type="password" placeholder="123"
-                                       value={cardInfo.cvc} onChange={e => setCardInfo({...cardInfo, cvc: e.target.value})} />
+                                       defaultValue=""
+                                       inputRef={cardRefs.cvc}
+                                       autoComplete="cc-csc"
+                                       helperText="Kartın arka tarafındaki 3 haneli kod"
+                            />
                         </Grid>
                     </Grid>
                 </Paper>
@@ -424,6 +492,7 @@ const CreateStorePage: React.FC = () => {
                     </Button>
                 </Box>
             </Paper>
+
         </Box>
     );
 

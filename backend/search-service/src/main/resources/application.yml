@@ -38,3 +38,8 @@ management:
   zipkin:
     tracing:
       endpoint: http://localhost:9411/api/v2/spans
+
+application:
+  clients:
+    user-tenant:
+      url: ${USER_TENANT_SERVICE_URL}

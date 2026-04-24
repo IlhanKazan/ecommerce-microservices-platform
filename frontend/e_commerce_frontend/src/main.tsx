@@ -10,7 +10,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, type AuthProviderProps } from "react-oidc-context";
 import { User } from 'oidc-client-ts';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            staleTime: 60_000,
+            retry: 1,
+            refetchOnWindowFocus: false,
+        },
+    },
+});
+
 const theme = customTheme;
 
 const GlobalScrollbarFix = (

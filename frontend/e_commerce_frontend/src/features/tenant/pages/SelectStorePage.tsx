@@ -1,12 +1,16 @@
 import { Typography, Card, CardContent, Grid, Avatar, Container } from '@mui/material';
 import { Store as StoreIcon, Add as AddIcon } from '@mui/icons-material';
 import { useMerchantStore } from '../../../store/useMerchantStore';
+import { useMyTenants } from '../../../query/useTenantQueries';
+import { useAuthStore } from '../../../store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
 import type {TenantSummary} from "../../../types/tenant.ts";
 import { AppRoutes } from '../../../utils/routes.ts'
 
 const SelectStorePage = () => {
-    const { myTenants, setActiveTenant } = useMerchantStore();
+    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const { data: myTenants = [] } = useMyTenants(isAuthenticated);
+    const { setActiveTenant } = useMerchantStore();
     const navigate = useNavigate();
 
     const handleSelect = (tenant: TenantSummary) => {

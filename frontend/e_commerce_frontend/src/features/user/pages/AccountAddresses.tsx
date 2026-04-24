@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Grid, Alert, CircularProgress } from '@mui/material';
+import { Box, Typography, Button, Grid, Alert, CircularProgress, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { useNotification } from '../../../components/shared/NotificationProvider';
 import { Add as AddIcon } from '@mui/icons-material';
-import { userService } from '../../../service/userService';
+import { userService } from '../api/userService.ts';
 import type { Address, CreateAddressRequest } from '../../../types/user';
 import ErrorState from '../../../components/shared/ErrorState';
 import AddressCard from '../../../components/customer/AddresCard';
@@ -13,9 +14,11 @@ const AccountAddresses: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [settingDefaultId, setSettingDefaultId] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
-
+    const { notify } = useNotification();
     const [openModal, setOpenModal] = useState(false);
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [addressToDelete, setAddressToDelete] = useState<number | null>(null);
 
     const fetchAddresses = async () => {
         try {
@@ -44,7 +47,7 @@ const AccountAddresses: React.FC = () => {
 
     const handleFormSubmit = async (formData: CreateAddressRequest) => {
         if (!formData.label || !formData.line1 || !formData.city || !formData.recipientName) {
-            alert("Lütfen zorunlu alanları doldurunuz.");
+            notify('Lütfen zorunlu alanları doldurunuz.', 'warning');
             return;
         }
 
@@ -65,18 +68,34 @@ const AccountAddresses: React.FC = () => {
             fetchAddresses();
         } catch (err) {
             console.error(err);
-            alert("İşlem başarısız oldu.");
+            notify('İşlem başarısız oldu.', 'error');
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleDelete = async (id: number) => {
-        if (!window.confirm("Bu adresi silmek istediğinize emin misiniz?")) return;
+    const handleDelete = (id: number) => {
+        setAddressToDelete(id);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!addressToDelete) return;
         try {
-            await userService.deleteAddress(id);
-            setAddresses(prev => prev.filter(addr => addr.id !== id));
-        } catch (err) { alert("Silinemedi." + err); }
+            await userService.deleteAddress(addressToDelete);
+            setAddresses(prev => prev.filter(addr => addr.id !== addressToDelete));
+            notify('Adres başarıyla silindi.', 'success');
+        } catch (err) {
+            notify('Silinemedi. ' + (err as any)?.message || String(err), 'error');
+        } finally {
+            setAddressToDelete(null);
+            setDeleteDialogOpen(false);
+        }
+    };
+
+    const handleCancelDelete = () => {
+        setAddressToDelete(null);
+        setDeleteDialogOpen(false);
     };
 
     const handleSetDefault = async (id: number) => {
@@ -85,8 +104,10 @@ const AccountAddresses: React.FC = () => {
             await userService.setDefaultAddress(id);
             setAddresses(prev => prev.map(addr => ({ ...addr, isDefault: addr.id === id })));
             fetchAddresses();
-        } catch (err) { alert("Güncellenemedi." + err); }
-        finally { setSettingDefaultId(null); }
+            notify('Varsayılan adres olarak ayarlandı.', 'success');
+        } catch (err) {
+            notify('Güncellenemedi. ' + (err as any)?.message || String(err), 'error');
+        } finally { setSettingDefaultId(null); }
     };
 
     if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}><CircularProgress /></Box>;
@@ -129,6 +150,24 @@ const AccountAddresses: React.FC = () => {
                     ))}
                 </Grid>
             )}
+
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={handleCancelDelete}
+                maxWidth="xs"
+                fullWidth
+            >
+                <DialogTitle>Adres Silme Onayı</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Bu adresi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelDelete} color="inherit">İptal</Button>
+                    <Button onClick={handleConfirmDelete} color="error" variant="contained">Sil</Button>
+                </DialogActions>
+            </Dialog>
 
             <AddressFormModal
                 open={openModal}

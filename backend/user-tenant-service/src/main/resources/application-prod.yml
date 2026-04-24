@@ -1,0 +1,27 @@
+server:
+  port: 8081
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/${USER_DB_NAME}
+    username: ${USER_DB_USERNAME}
+    password: ${USER_DB_PASSWORD}
+  kafka:
+    producer:
+      bootstrap-servers: kafka:9092
+
+security:
+  oauth2:
+    resourceserver:
+      jwt:
+        issuer-uri: http://keycloak:8080/realms/${REALM_NAME}
+
+minio:
+  url: http://minio:9000
+  access-key: ${MINIO_ACCESS_KEY}
+  secret-key: ${MINIO_SECRET_KEY}
+  bucket-name: ${USER_MINIO_BUCKET}
+
+application:
+  config:
+    payment-url: http://payment-service:8082

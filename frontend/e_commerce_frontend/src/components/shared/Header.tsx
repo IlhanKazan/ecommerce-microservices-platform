@@ -2,83 +2,132 @@ import React, { useState } from 'react';
 import {
     AppBar, Toolbar, Typography, Button, IconButton, Box, Drawer,
     List, ListItem, ListItemText, ListItemButton, ListItemIcon,
-    useMediaQuery, useTheme, Divider
+    useMediaQuery, useTheme, Divider, Badge, InputBase, Paper
 } from '@mui/material';
 import {
     Menu as MenuIcon,
     Storefront as StoreIcon,
-    AddBusiness as AddBusinessIcon
+    AddBusiness as AddBusinessIcon,
+    ShoppingCartOutlined as CartIcon,
+    Search as SearchIcon,
+    PersonOutline as PersonIcon,
 } from '@mui/icons-material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { AppRoutes } from "../../utils/routes";
-import { useAuth } from "react-oidc-context";
-import { useAuthStore } from "../../store/useAuthStore";
+import { AppRoutes } from '../../utils/routes';
+import { useAuth } from 'react-oidc-context';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useCartStore } from '../../store/useCartStore';
+import { useBasketItemCount } from '../../query/useBasketQueries';
 
 const Header: React.FC = () => {
     const auth = useAuth();
     const { user } = useAuthStore();
     const navigate = useNavigate();
-
-    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-    const login = () => auth.signinRedirect();
-    const logout = () => auth.signoutRedirect({ post_logout_redirect_uri: window.location.origin });
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [searchValue, setSearchValue] = useState('');
 
-    const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
-        if (event.type === 'keydown' && ((event as React.KeyboardEvent).key === 'Tab' || (event as React.KeyboardEvent).key === 'Shift')) return;
-        setIsDrawerOpen(open);
+    // --- SEPET SAYISI MANTIĞINI DEĞİŞTİRDİK ---
+    const localItemCount = useCartStore((state) => state.getItemCount());
+    const apiItemCount = useBasketItemCount();
+    const itemCount = auth.isAuthenticated ? apiItemCount : localItemCount;
+
+    const login = () => auth.signinRedirect();
+    const logout = () => auth.signoutRedirect({
+        post_logout_redirect_uri: window.location.origin
+    });
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!searchValue.trim()) return;
+        navigate(`${AppRoutes.PRODUCT_LIST}?keyword=${encodeURIComponent(searchValue.trim())}`);
+        setSearchValue('');
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') handleSearch(e as any);
     };
 
     const publicNavItems = [
         { name: 'Anasayfa', path: AppRoutes.HOME },
+        { name: 'Ürünler', path: AppRoutes.PRODUCT_LIST },
         { name: 'Hakkımızda', path: AppRoutes.ABOUT },
-        { name: 'İletişim', path: AppRoutes.CONTACT },
     ];
 
     const DrawerContent = (
-        <Box sx={{ width: 250 }} role="presentation" onClick={toggleDrawer(false)} onKeyDown={toggleDrawer(false)}>
+        <Box sx={{ width: 280 }} role="presentation">
+            <Box sx={{ p: 2, bgcolor: 'primary.main' }}>
+                <Typography variant="h6" color="white" fontWeight="bold">
+                    İlhan E-Ticaret
+                </Typography>
+            </Box>
             <List>
                 {publicNavItems.map((item) => (
                     <ListItem key={item.name} disablePadding>
-                        <ListItemButton component={RouterLink} to={`${item.path}`}>
+                        <ListItemButton
+                            component={RouterLink}
+                            to={item.path}
+                            onClick={() => setIsDrawerOpen(false)}
+                        >
                             <ListItemText primary={item.name} />
                         </ListItemButton>
                     </ListItem>
                 ))}
                 <Divider />
-
-                {auth.isAuthenticated ? (
+                {auth.isAuthenticated && (
                     <ListItem disablePadding>
-                        {user?.isMerchant ? (
-                            <ListItemButton component={RouterLink} to="/merchant/select">
-                                <ListItemIcon><StoreIcon color="primary" /></ListItemIcon>
-                                <ListItemText primary="Mağaza Paneli" primaryTypographyProps={{ fontWeight: 'bold', color: 'primary.main' }} />
-                            </ListItemButton>
-                        ) : (
-                            <ListItemButton component={RouterLink} to={AppRoutes.CREATE_STORE}>
-                                <ListItemIcon><AddBusinessIcon color="secondary" /></ListItemIcon>
-                                <ListItemText primary="Mağaza Aç & Satış Yap" primaryTypographyProps={{ fontWeight: 'bold', color: 'secondary.main' }} />
-                            </ListItemButton>
-                        )}
-                    </ListItem>
-                ) : (
-                    <ListItem disablePadding>
-                        <ListItemButton component={RouterLink} to={AppRoutes.CREATE_STORE}>
-                            <ListItemIcon><AddBusinessIcon /></ListItemIcon>
-                            <ListItemText primary="Satış Yap" />
+                        <ListItemButton
+                            component={RouterLink}
+                            to={AppRoutes.CART}
+                            onClick={() => setIsDrawerOpen(false)}
+                        >
+                            <ListItemIcon>
+                                <Badge badgeContent={itemCount} color="error">
+                                    <CartIcon />
+                                </Badge>
+                            </ListItemIcon>
+                            <ListItemText primary="Sepetim" />
                         </ListItemButton>
                     </ListItem>
                 )}
-
                 <Divider />
-
                 {auth.isAuthenticated ? (
                     <>
+                        {user?.isMerchant ? (
+                            <ListItem disablePadding>
+                                <ListItemButton
+                                    component={RouterLink}
+                                    to={AppRoutes.MERCHANT_SELECT}
+                                    onClick={() => setIsDrawerOpen(false)}
+                                >
+                                    <ListItemIcon><StoreIcon color="primary" /></ListItemIcon>
+                                    <ListItemText
+                                        primary="Mağaza Paneli"
+                                        primaryTypographyProps={{ fontWeight: 'bold', color: 'primary.main' }}
+                                    />
+                                </ListItemButton>
+                            </ListItem>
+                        ) : (
+                            <ListItem disablePadding>
+                                <ListItemButton
+                                    component={RouterLink}
+                                    to={AppRoutes.CREATE_STORE}
+                                    onClick={() => setIsDrawerOpen(false)}
+                                >
+                                    <ListItemIcon><AddBusinessIcon color="secondary" /></ListItemIcon>
+                                    <ListItemText primary="Mağaza Aç" />
+                                </ListItemButton>
+                            </ListItem>
+                        )}
                         <ListItem disablePadding>
-                            <ListItemButton component={RouterLink} to={AppRoutes.ACCOUNT}>
-                                <ListItemText primary="Hesabım" />
+                            <ListItemButton
+                                component={RouterLink}
+                                to={AppRoutes.ACCOUNT}
+                                onClick={() => setIsDrawerOpen(false)}
+                            >
+                                <ListItemText primary={`Hesabım (${user?.firstName || ''})`} />
                             </ListItemButton>
                         </ListItem>
                         <ListItem disablePadding>
@@ -90,7 +139,7 @@ const Header: React.FC = () => {
                 ) : (
                     <ListItem disablePadding>
                         <ListItemButton onClick={login}>
-                            <ListItemText primary="Giriş Yap" sx={{ fontWeight: 'bold' }} />
+                            <ListItemText primary="Giriş Yap" primaryTypographyProps={{ fontWeight: 'bold' }} />
                         </ListItemButton>
                     </ListItem>
                 )}
@@ -99,70 +148,188 @@ const Header: React.FC = () => {
     );
 
     return (
-        <AppBar position="static" color="default" elevation={1}>
-            <Toolbar sx={{ maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
-                {isMobile && (
-                    <IconButton size="large" edge="start" color="inherit" onClick={toggleDrawer(true)} sx={{ mr: 2 }}>
-                        <MenuIcon />
-                    </IconButton>
-                )}
+        <AppBar position="sticky" color="default" elevation={1} sx={{ bgcolor: 'white' }}>
+            <Toolbar
+                sx={{
+                    maxWidth: '1400px',
+                    width: '100%',
+                    mx: 'auto',
+                    px: { xs: 1.5, md: 3 },
+                    minHeight: { xs: 56, md: 64 },
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: { xs: 1, md: 2 },
+                }}
+            >
+                <Box
+                    sx={{
+                        flex: '1 1 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        minWidth: 0,
+                    }}
+                >
+                    {isMobile && (
+                        <IconButton
+                            size="large"
+                            edge="start"
+                            color="inherit"
+                            onClick={() => setIsDrawerOpen(true)}
+                            sx={{ mr: 0.5 }}
+                        >
+                            <MenuIcon />
+                        </IconButton>
+                    )}
 
-                <Typography variant="h6" component="div" sx={{ flexGrow: 1, cursor: 'pointer', fontWeight: 'bold', color: 'primary.main' }} onClick={() => navigate('/')}>
-                    İlhan E-Ticaret
-                </Typography>
+                    <Typography
+                        variant="h6"
+                        fontWeight="bold"
+                        color="primary.main"
+                        sx={{
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            fontSize: { xs: '1rem', md: '1.2rem' },
+                            letterSpacing: '-0.3px',
+                            whiteSpace: 'nowrap',
+                        }}
+                        onClick={() => navigate(AppRoutes.HOME)}
+                    >
+                        İlhan E-Ticaret
+                    </Typography>
+                </Box>
 
-                {!isMobile && (
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                        {publicNavItems.map((item) => (
-                            <Button key={item.name} color="inherit" component={RouterLink} to={`${item.path}`}>
-                                {item.name}
-                            </Button>
-                        ))}
+                <Box
+                    sx={{
+                        flex: '2 1 0',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        maxWidth: 620,
+                        mx: 'auto',
+                    }}
+                >
+                    <Paper
+                        component="form"
+                        onSubmit={handleSearch}
+                        elevation={0}
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            width: '100%',
+                            border: '1.5px solid',
+                            borderColor: 'divider',
+                            borderRadius: 2,
+                            px: 1.5,
+                            py: 0.25,
+                            transition: 'border-color 0.2s, box-shadow 0.2s',
+                            '&:focus-within': {
+                                borderColor: 'primary.main',
+                                boxShadow: '0 0 0 3px rgba(125,85,37,0.08)',
+                            },
+                        }}
+                    >
+                        <InputBase
+                            value={searchValue}
+                            onChange={(e) => setSearchValue(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder={isMobile ? 'Ara...' : 'Ürün, kategori veya marka ara...'}
+                            sx={{ flex: 1, fontSize: '0.9rem' }}
+                            inputProps={{ 'aria-label': 'ürün ara' }}
+                        />
+                        <IconButton type="submit" size="small" color="primary" aria-label="ara">
+                            <SearchIcon fontSize="small" />
+                        </IconButton>
+                    </Paper>
+                </Box>
 
-                        {auth.isAuthenticated ? (
-                            user?.isMerchant ? (
+                <Box
+                    sx={{
+                        flex: '1 1 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        gap: 0.5,
+                        minWidth: 0,
+                    }}
+                >
+                    {!isMobile && (
+                        <>
+                            {auth.isAuthenticated ? (
+                                user?.isMerchant ? (
+                                    <Button
+                                        variant="outlined"
+                                        color="primary"
+                                        startIcon={<StoreIcon />}
+                                        component={RouterLink}
+                                        to={AppRoutes.MERCHANT_SELECT}
+                                        size="small"
+                                        sx={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}
+                                    >
+                                        Mağazam
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="text"
+                                        color="inherit"
+                                        startIcon={<AddBusinessIcon />}
+                                        component={RouterLink}
+                                        to={AppRoutes.CREATE_STORE}
+                                        size="small"
+                                        sx={{ whiteSpace: 'nowrap' }}
+                                    >
+                                        Mağaza Aç
+                                    </Button>
+                                )
+                            ) : (
                                 <Button
-                                    variant="contained"
-                                    color="secondary"
-                                    startIcon={<StoreIcon />}
+                                    color="inherit"
                                     component={RouterLink}
-                                    to="/merchant/select"
-                                    sx={{ ml: 2, borderRadius: 2, fontWeight: 'bold' }}
+                                    to={AppRoutes.CREATE_STORE}
+                                    size="small"
+                                    sx={{ whiteSpace: 'nowrap' }}
                                 >
-                                    Mağaza Paneli
+                                    Satış Yap
+                                </Button>
+                            )}
+
+                            {auth.isAuthenticated ? (
+                                <Button
+                                    color="inherit"
+                                    startIcon={<PersonIcon />}
+                                    component={RouterLink}
+                                    to={AppRoutes.ACCOUNT}
+                                    size="small"
+                                    sx={{ whiteSpace: 'nowrap' }}
+                                >
+                                    {user?.firstName || 'Hesabım'}
                                 </Button>
                             ) : (
                                 <Button
-                                    variant="outlined"
-                                    color="secondary"
-                                    startIcon={<AddBusinessIcon />}
-                                    component={RouterLink}
-                                    to={AppRoutes.CREATE_STORE}
-                                    sx={{ ml: 2, borderWidth: 2, fontWeight: 'bold', '&:hover': { borderWidth: 2 } }}
+                                    variant="contained"
+                                    onClick={login}
+                                    size="small"
+                                    sx={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}
                                 >
-                                    Mağaza Aç
+                                    Giriş Yap
                                 </Button>
-                            )
-                        ) : (
-                            <Button color="inherit" component={RouterLink} to={AppRoutes.CREATE_STORE} sx={{ ml: 2 }}>
-                                Satış Yap
-                            </Button>
-                        )}
+                            )}
+                        </>
+                    )}
 
-                        {auth.isAuthenticated ? (
-                            <>
-                                <Button color="inherit" component={RouterLink} to={AppRoutes.ACCOUNT} sx={{ ml: 1 }}>
-                                    Hesabım
-                                </Button>
-                                <Button color="error" onClick={logout} sx={{ ml: 1 }}>Çıkış</Button>
-                            </>
-                        ) : (
-                            <Button variant="contained" onClick={login} sx={{ ml: 2 }}>Giriş Yap</Button>
-                        )}
-                    </Box>
-                )}
+                    <IconButton
+                        component={RouterLink}
+                        to={AppRoutes.CART}
+                        color="inherit"
+                        aria-label={`Sepet, ${itemCount} ürün`}
+                    >
+                        <Badge badgeContent={itemCount} color="error" max={99}>
+                            <CartIcon />
+                        </Badge>
+                    </IconButton>
+                </Box>
             </Toolbar>
-            <Drawer anchor="left" open={isDrawerOpen} onClose={toggleDrawer(false)}>
+
+            <Drawer anchor="left" open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)}>
                 {DrawerContent}
             </Drawer>
         </AppBar>

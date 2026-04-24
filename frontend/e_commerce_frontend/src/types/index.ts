@@ -24,3 +24,7 @@ export interface Order {
     total: number;
     status: OrderStatus;
 }
+
+export type { ProductSummary, ProductDetail, PageResponse, ProductSearchPayload } from './product';
+export type { BasketItem, BasketResponse, AddItemRequest } from './basket';
+

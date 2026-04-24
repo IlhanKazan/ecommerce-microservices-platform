@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     Box, Typography, Paper, Button, Chip, Divider,
     Stack, CircularProgress, Grid, Alert, Dialog, DialogTitle,
@@ -17,8 +17,21 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMerchantStore } from '../../../store/useMerchantStore';
+import { useNotification } from '../../../components/shared/NotificationProvider';
 import { tenantService } from '../api/tenantService.ts';
 import type { SubscriptionPlan, PaymentCardInfo, PaymentStatus, PaymentType } from '../../../types/tenant';
+
+/**
+ * SECURITY: Sensitive card data is captured via refs at submit time,
+ * never stored in React state to prevent exposure in DevTools
+ */
+interface CardInputRefs {
+    holderName: React.RefObject<HTMLInputElement>;
+    number: React.RefObject<HTMLInputElement>;
+    expireMonth: React.RefObject<HTMLInputElement>;
+    expireYear: React.RefObject<HTMLInputElement>;
+    cvc: React.RefObject<HTMLInputElement>;
+}
 
 const MerchantSubscription: React.FC = () => {
     const { activeTenant } = useMerchantStore();
@@ -26,12 +39,24 @@ const MerchantSubscription: React.FC = () => {
 
     const [retryModalOpen, setRetryModalOpen] = useState(false);
     const [retryPlanId, setRetryPlanId] = useState<number | null>(null);
-    const [cardInfo, setCardInfo] = useState<PaymentCardInfo>({
-        holderName: '', number: '', expireMonth: '', expireYear: '', cvc: ''
-    });
+
+    // SECURITY: Use refs for sensitive payment data - never store in state
+    const cardRefs: CardInputRefs = {
+        holderName: useRef<HTMLInputElement>(null),
+        number: useRef<HTMLInputElement>(null),
+        expireMonth: useRef<HTMLInputElement>(null),
+        expireYear: useRef<HTMLInputElement>(null),
+        cvc: useRef<HTMLInputElement>(null),
+    };
 
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(5);
+    const { notify } = useNotification();
+
+    const [planChangeDialog, setPlanChangeDialog] = useState<{ open: boolean; plan?: SubscriptionPlan | null}>({
+        open: false,
+        plan: null
+    });
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ['tenantSubscription', activeTenant?.id],
@@ -65,9 +90,9 @@ const MerchantSubscription: React.FC = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tenantSubscription', activeTenant?.id] });
-            alert("Paket değişikliği başarıyla uygulandı.");
+            notify('Paket değişikliği başarıyla uygulandı.', 'success');
         },
-        onError: () => alert("Paket değiştirilirken bir hata oluştu.")
+        onError: () => notify('Paket değiştirilirken bir hata oluştu.', 'error')
     });
 
     const retryPaymentMutation = useMutation({
@@ -75,17 +100,43 @@ const MerchantSubscription: React.FC = () => {
             if (!activeTenant) throw new Error("Tenant yok");
             if (!retryPlanId) throw new Error("Lütfen önce bir paket seçin.");
 
+            // SECURITY: Capture sensitive data from refs at submit time only
+            const cardNumber = cardRefs.number.current?.value?.trim() || '';
+            const cardCvc = cardRefs.cvc.current?.value?.trim() || '';
+            const cardHolder = cardRefs.holderName.current?.value?.trim() || '';
+            const cardMonth = cardRefs.expireMonth.current?.value?.trim() || '';
+            const cardYear = cardRefs.expireYear.current?.value?.trim() || '';
+
+            if (!cardNumber || !cardCvc || !cardHolder || !cardMonth || !cardYear) {
+                throw new Error('Lütfen tüm kart bilgilerini doldurunuz.');
+            }
+
+            const cardInfo: PaymentCardInfo = {
+                holderName: cardHolder,
+                number: cardNumber,
+                expireMonth: cardMonth,
+                expireYear: cardYear,
+                cvc: cardCvc,
+            };
+
             return tenantService.retryPayment(activeTenant.id, retryPlanId, cardInfo);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tenantSubscription', activeTenant?.id] });
             queryClient.invalidateQueries({ queryKey: ['tenantPaymentHistory', activeTenant?.id] });
+            
+            // SECURITY: Clear sensitive data after sending
+            if (cardRefs.number.current) cardRefs.number.current.value = '';
+            if (cardRefs.cvc.current) cardRefs.cvc.current.value = '';
+            
             setRetryModalOpen(false);
             setRetryPlanId(null);
-            setCardInfo({ holderName: '', number: '', expireMonth: '', expireYear: '', cvc: '' });
-            alert("İşlem başarıyla tamamlandı!");
+            notify('İşlem başarıyla tamamlandı!', 'success');
         },
-        onError: () => alert("İşlem başarısız oldu. Lütfen kart bilgilerinizi kontrol edin.")
+        onError: (error: any) => {
+            const message = error.message || "İşlem başarısız oldu. Lütfen kart bilgilerinizi kontrol edin.";
+            notify(message, 'error');
+        }
     });
 
     const handleRetryOpen = (overridePlanId?: number) => {
@@ -105,10 +156,19 @@ const MerchantSubscription: React.FC = () => {
         }
 
         if (plan.name !== data.subDetail.planName) {
-            if (window.confirm(`${plan.name} paketine geçmek istediğinize emin misiniz?`)) {
-                changePlanMutation.mutate(plan.id);
-            }
+            setPlanChangeDialog({ open: true, plan });
         }
+    };
+
+    const confirmChangePlan = () => {
+        if (planChangeDialog.plan) {
+            changePlanMutation.mutate(planChangeDialog.plan.id);
+        }
+        setPlanChangeDialog({ open: false, plan: null });
+    };
+
+    const cancelChangePlan = () => {
+        setPlanChangeDialog({ open: false, plan: null });
     };
 
     const handleRetryClose = () => {
@@ -395,33 +455,49 @@ const MerchantSubscription: React.FC = () => {
             <Dialog open={retryModalOpen} onClose={handleRetryClose} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ fontWeight: 'bold' }}>Ödeme Yöntemini Güncelle</DialogTitle>
                 <DialogContent dividers>
-                    <Alert severity="info" sx={{ mb: 3 }}>
-                        Aboneliğinizi başlatmak veya devam ettirmek için güncel kart bilgilerinizi giriniz.
+                    <Alert severity="warning" sx={{ mb: 3 }}>
+                        <Typography variant="body2" fontWeight="bold">🔒 Güvenlik Uyarısı:</Typography>
+                        <Typography variant="caption">
+                            Kart numarası ve CVC güvenli şekilde işlenir. Dialog kapandığında verileriniz otomatik olarak silinir.
+                        </Typography>
                     </Alert>
                     <Grid container spacing={2}>
                         <Grid size={12}>
                             <TextField label="Kart Üzerindeki İsim" fullWidth required
-                                       value={cardInfo.holderName} onChange={e => setCardInfo({...cardInfo, holderName: e.target.value})}
+                                       defaultValue=""
+                                       inputRef={cardRefs.holderName}
                                        InputProps={{ startAdornment: <PersonIcon sx={{mr:1, color:'text.secondary'}} /> }}
                             />
                         </Grid>
                         <Grid size={12}>
                             <TextField label="Kart Numarası" fullWidth required placeholder="0000 0000 0000 0000"
-                                       value={cardInfo.number} onChange={e => setCardInfo({...cardInfo, number: e.target.value})}
+                                       defaultValue=""
+                                       inputRef={cardRefs.number}
+                                       autoComplete="cc-number"
                                        InputProps={{ startAdornment: <CardIcon sx={{mr:1, color:'text.secondary'}} /> }}
                             />
                         </Grid>
                         <Grid size={{ xs: 6, md: 4 }}>
                             <TextField label="Ay (MM)" fullWidth required placeholder="01"
-                                       value={cardInfo.expireMonth} onChange={e => setCardInfo({...cardInfo, expireMonth: e.target.value})} />
+                                       defaultValue=""
+                                       inputRef={cardRefs.expireMonth}
+                                       autoComplete="cc-exp-month"
+                            />
                         </Grid>
                         <Grid size={{ xs: 6, md: 4 }}>
                             <TextField label="Yıl (YY)" fullWidth required placeholder="28"
-                                       value={cardInfo.expireYear} onChange={e => setCardInfo({...cardInfo, expireYear: e.target.value})} />
+                                       defaultValue=""
+                                       inputRef={cardRefs.expireYear}
+                                       autoComplete="cc-exp-year"
+                            />
                         </Grid>
                         <Grid size={{ xs: 6, md: 4 }}>
                             <TextField label="CVC" fullWidth required type="password" placeholder="123"
-                                       value={cardInfo.cvc} onChange={e => setCardInfo({...cardInfo, cvc: e.target.value})} />
+                                       defaultValue=""
+                                       inputRef={cardRefs.cvc}
+                                       autoComplete="cc-csc"
+                                       helperText="Kartın arka tarafındaki 3 haneli kod"
+                            />
                         </Grid>
                     </Grid>
                 </DialogContent>
@@ -433,9 +509,32 @@ const MerchantSubscription: React.FC = () => {
                         onClick={() => retryPaymentMutation.mutate()}
                         variant="contained"
                         color="primary"
-                        disabled={retryPaymentMutation.isPending || !cardInfo.number}
+                        disabled={retryPaymentMutation.isPending}
                     >
                         {retryPaymentMutation.isPending ? <CircularProgress size={24} color="inherit" /> : 'Ödemeyi Tamamla'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={planChangeDialog.open}
+                onClose={cancelChangePlan}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: 'bold' }}>Paket Değişikliğini Onayla</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        {planChangeDialog.plan
+                            ? `${planChangeDialog.plan.name} paketine geçmek istediğinize emin misiniz?`
+                            : 'Paket bilgisi alınamadı.'
+                        }
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={cancelChangePlan} color="inherit">İptal</Button>
+                    <Button onClick={confirmChangePlan} variant="contained" color="primary" disabled={changePlanMutation.isPending}>
+                        {changePlanMutation.isPending ? 'Uygulanıyor...' : 'Onayla'}
                     </Button>
                 </DialogActions>
             </Dialog>
