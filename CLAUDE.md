@@ -69,9 +69,9 @@ cd infrastructure/scripts && ./register_connector.sh
 # Tek servisi IDE dışında çalıştır
 cd backend/<servis-adı> && ./mvnw spring-boot:run
 
-# Build
-./mvnw clean package              # testlerle
-./mvnw clean package -DskipTests  # hızlı
+# Build — her servis KENDİ klasöründen (parent POM yok, -pl flag'i ÇALIŞMAZ)
+cd backend/<servis-adı> && ./mvnw clean package              # testlerle
+cd backend/<servis-adı> && ./mvnw clean package -DskipTests  # hızlı
 
 # Frontend
 cd frontend/e_commerce_frontend
@@ -81,6 +81,8 @@ npm run lint
 npm run build
 npm run build-keycloak   # Keycloakify teması
 ```
+
+> **Build notu:** Kullanıcı terminal'de `mvnw` komutlarında JDK/JAVA_HOME sorunu yaşıyor. Claude Code build çağrısı yapacaksa **her zaman servis klasörüne `cd` etmeli**, root'tan `-pl` ile çalıştırmamalı (parent POM yok, flag işe yaramaz). Ayrıca ajanlara "kullanıcı açık olarak istemeden build çalıştırma" kuralı konmuştur — kullanıcı IDE'den build alıp çıktı paylaşacak.
 
 ### Port haritası (dev)
 
@@ -123,16 +125,58 @@ Kullanıcı net belirtti, ihlal etme:
 - **"İşte tam çözüm" diye 500 satır yazıp yanlış çıkma.** Emin değilsen önce keşif yap, dosyayı oku, ilgili test komutunu çalıştır, sonra yaz.
 - **Hallucination yasak.** Görmediğin bir metot, annotation, config key'i varmış gibi yazma. Bilmiyorsan söyle.
 - **Küçük adımlar.** Büyük refactor'da commit başına bir konsept. Frontend ile senkron gitmesi gereken backend API değişikliklerinde `TODO.md` "Frontend <-> Backend" bölümünde açık olan talepler var; önce ona bak.
+- **Build/test kullanıcı istemeden çalıştırma.** Kullanıcı IDE'den build alıyor, terminal sorunlu. Kodu yaz, kullanıcıya "şimdi build alman iyi olur" öner, sonucunu bekle.
 
 ## ASLA dokunma (kullanıcı tarafından kilitli alanlar)
 
 Bu alanlarda değişiklik yapmak için **açık kullanıcı onayı şart**. Kendiliğinden dokunma.
 
 - **Flyway migration'ları** (`src/main/resources/db/migration/V*.sql`) — mevcut `V1`, `V2`, ... dosyaları **asla** düzenlenmez. Schema değişikliği için **yeni** `V(N+1)__aciklama.sql` eklenir. Dev ortamı olsa bile mevcut migration'ı değiştirmek checksum bozar; sıfırdan başlatma dışında düzeltilmez.
+- **`.env` dosyası** — kullanıcı manuel yönetir. Ajanlar değiştirmez.
 - **Keycloak realm-export.json ve SPI jar** (`infrastructure/keycloak/import/`, `backend/keycloak-spi/`) — auth akışını bozar. Kullanıcı manuel yönetir.
 - **common-lib security + shared base'ler** (`GlobalSecurityConfig`, `JwtAuthConverter`, `FeignClientInterceptor`, `TenantSecurityEvaluator`, `CurrentUserArgumentResolver`, `BaseEntity`, `BaseInbox`, `BaseOutbox`, `InboxStatus`) — tüm servislere yayılır, breaking change hepsini çöker.
-- **Debezium connector JSON'ları** (`infrastructure/debezium/*.json`) — Debezium'a kullanıcı elle `register_connector.sh` ile push ediyor. Kodu değiştirsen bile Debezium'a manuel push gerekir.
+- **Debezium connector JSON'ları** (`infrastructure/debezium/*.json`) — sadece `debezium-ops` ajanı düzenlemeli. `register_connector.sh` ile push sonrası Kafka Connect aktifleşir.
 - **event-contracts** (`backend/event-contracts/`) — event payload record'ları **kontrat**tır. Breaking change yok, yalnızca additive. Field silmek, isim değiştirmek, tip değiştirmek yasak.
+- **`application.yml`, `application-dev.yml`, `docker-compose.yml`** — sadece `devops-infra` ajanı düzenlemeli (sonraki turda gelecek). `backend-refactor` ajanı YAML'a dokunursa Java kafasıyla düzenleyip kırabilir.
+
+## Agent ve Skill mimarisi
+
+Token tasarrufu için proje rol bazlı ajanlar ve ihtiyaç-üzerine-yüklenen skill'lerle organize edilmiştir. Claude Code görevine göre otomatik seçim yapar; sen ajan çağırmak istersen `@ajanisim` ile çağırabilirsin.
+
+### Ajanlar (rol bazlı)
+
+`.claude/agents/` altında:
+
+| Ajan | Ne zaman |
+|---|---|
+| `backend-refactor` | Java/Spring kodu, endpoint, business logic, entity/repo/service/mapper. Ana iş ajanı. |
+| `flyway-migration` | Flyway V-dosyası yazımı. Schema değişikliği. |
+| `debezium-ops` | Debezium connector, replication slot, Kafka test, event pipeline doğrulama. |
+| `git-committer` | Servis bazında commit mesajı üretme, AI slop yorum temizliği, commit atma (push yok). |
+
+**Sonraki turda gelecek:** `devops-infra` (compose/yml/healthcheck), `test-writer` (Testcontainers + JUnit), `frontend-refactor` (React/TS).
+
+### Skills (ihtiyaca göre yüklenen referanslar)
+
+`.claude/skills/` altında:
+
+| Skill | Ne zaman yüklenir |
+|---|---|
+| `outbox-inbox-pattern` | Event publish/consume, BaseOutbox/BaseInbox, @KafkaListener işleri |
+| `debezium-connector-config` | Connector JSON, slot management, event routing |
+| `spring-service-conventions` | Controller/service/entity/DTO/Info/Command kuralları |
+| `flyway-migration-rules` | V-file yazımı, REPLICA IDENTITY, drop+recreate pattern'leri |
+
+**Sonraki turda gelecek:** `minio-storage-pattern`, `frontend-data-fetching`, `frontend-state-management`, `frontend-component-patterns`.
+
+### Custom slash command'lar
+
+`.claude/commands/` altında:
+
+- `/commit-by-service` — `git-committer` ajanını çağırıp servis bazında commit'leme
+- `/continue-from-todo` — TODO.md'den devam et, bir sonraki adımı belirle
+
+**Sonraki turda gelecek:** `/verify-event-pipeline` (doğrulama komutları).
 
 ## Doğrulama komutları (çalıştığından emin olmak için)
 

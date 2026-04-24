@@ -43,41 +43,93 @@ Format: Her item kısa başlık + bağlam + (varsa) dosya referansı + zorluk (S
   - 3.2: stock-service replication slot drop edildi, connector re-register edildi, `RUNNING`.
   - 3.3: Java tarafı migration tamamlandı (yukarıda detay).
   - 3.4: End-to-end verify: `addManualStock` → outbox → Debezium → Kafka `STOCK_STATUS_CHANGED_EVENT` (message_type header'lı) → search-service consumer → Elasticsearch `inStock: true`. Yeni ürün ekleme de `PRODUCT_CREATED_EVENT` zinciriyle ES'e düştü.
+- **Stage 4.1: payment-service migration (kod)** tamamlandı ✅
+  - `Outbox`, `Inbox` → `BaseOutbox`/`BaseInbox` extend ediyor, `@SuperBuilder` uyumlu
+  - Lokal `InboxStatus` enum silindi, `common-lib`'ten import
+  - `InboxRepository` (`JpaRepository<Inbox, String>`), `InboxService` + `InboxServiceImpl` eklendi
+  - `OutboxService` + `OutboxServiceImpl` eklendi (MANDATORY propagation)
+  - `PaymentServiceImpl.handleIyzicoResponse` SUCCESS/FAILURE branch'larında publish çağrıları
+  - `EventConstants`'a `AGGREGATE_PAYMENT`, `EVENT_PAYMENT_SUCCESS`, `EVENT_PAYMENT_FAILED`, `EVENT_SUBSCRIPTION_ACTIVATED` eklendi
+  - `event-contracts`'a `PaymentSuccessEventPayload`, `PaymentFailedEventPayload`, `SubscriptionActivatedEventPayload` eklendi
+  - `V3__migrate_outbox_inbox_for_base_classes.sql` eklendi
+  - `infrastructure/debezium/payment-connector.json` + `register_connector.sh`'a satır eklendi
+- **Stage 4.2: user-tenant-service migration (kod)** tamamlandı ✅
+  - `Outbox` entity → `extends BaseOutbox`, `@SuperBuilder` uyumlu
+  - `V4` migration: `processed`, `sent_at` DROP, `REPLICA IDENTITY FULL`
+  - `OutboxService` + `OutboxServiceImpl` eklendi (MANDATORY propagation)
+  - `EventConstants`'a `AGGREGATE_TENANT`, `EVENT_TENANT_CREATED`, `EVENT_TENANT_ACTIVATED`, `EVENT_TENANT_PAYMENT_FAILED` eklendi
+  - `event-contracts`'a `TenantCreatedEventPayload`, `TenantActivatedEventPayload`, `TenantPaymentFailedEventPayload` eklendi
+  - `TenantStateService` → `saveInitialTenant`, `activateTenant`, `markTenantAsPaymentFailed` publish çağrıları
 
 ---
 
+## ⏭️ Sıradaki
+
+### Stage 5: Runtime verification (payment + user-tenant)
+
+Stage 4.1 ve 4.2'nin kod değişiklikleri tamam ama **runtime doğrulama** yapılmadı. Servisler restart edilip Flyway migration'lar uygulandıktan, connector'lar push edildikten sonra test senaryoları çalıştırılmalı.
+
+#### 5.1 payment-service runtime verify
+- [ ] payment-service'i **durdur** → replication slot temiz mi teyit et → **başlat** (Flyway V3 uygulanmalı).
+  - Log: `docker logs payment-service 2>&1 | grep -iE 'migrat|flyway' | head -20`
+  - `V3__migrate_outbox_inbox_for_base_classes.sql` görünmeli.
+- [ ] Connector kontrol:
+  - `cd infrastructure/scripts && ./register_connector.sh`
+  - `curl -s http://localhost:8083/connectors/payment-connector/status | jq` → `RUNNING`
+- [ ] Outbox `REPLICA IDENTITY` teyit:
+  - `docker exec -it postgres psql -U $POSTGRES_USER -d payment_db -c "SELECT relname, relreplident FROM pg_class WHERE relname = 'outbox';"` → `f` (FULL) beklenen
+- [ ] End-to-end ödeme testi:
+  - Abonelik ödemesi yap (frontend veya Postman)
+  - `payment-service` log'unda publish çağrısı görün
+  - `kafka-console-consumer --topic PAYMENT --from-beginning --property print.headers=true --max-messages 5` — `message_type` header'lı mesaj gelmeli (`PAYMENT_SUCCESS_EVENT` veya `SUBSCRIPTION_ACTIVATED_EVENT`)
+- **S** (komutlar, kullanıcı çalıştırır)
+
+#### 5.2 user-tenant-service runtime verify
+- [ ] UTS'i durdur → slot temizlik gerekirse → başlat → V4 migration görünmeli
+- [ ] `register_connector.sh` ile `user-tenant-service-connector` push
+- [ ] REPLICA IDENTITY teyit (`user_tenant_db.outbox`)
+- [ ] Tenant oluştur (frontend üzerinden)
+- [ ] `kafka-console-consumer --topic TENANT` — `TENANT_CREATED_EVENT`, sonra ödeme başarılıysa `TENANT_ACTIVATED_EVENT` görün
+- **S**
+
+#### 5.3 Consumer tarafı hazırlığı (ileri adım)
+- [ ] `PAYMENT` ve `TENANT` topic'lerini dinleyecek bir consumer **henüz yok**. Publish çalışıyor ama event'leri tüketen bir servis yok — bunu görünce "boşuna mı atılıyor" hissi normaldir, mantık doğru: event-driven mimari future-proof, consumer sonra eklenir (mail-service, saga-orchestrator vb.).
+- [ ] Kısa vadede: `TENANT_ACTIVATED_EVENT` sonrası mail atmak için **mail-service** MVP'si mantıklı olabilir. Stage 7'de değerlendir.
+
 ---
 
-## ⏭️ Sıradaki (Stage 4)
+### Stage 6: Product image upload (FB-1 kapsamı)
 
-### 4.1 payment-service migration
-- [x] Önce **oku**: `backend/payment-service/src/main/java/com/ecommerce/paymentservice/{outbox,inbox}/entity/*.java`. Mevcut tam tanımlı Outbox/Inbox var, `BaseOutbox`/`BaseInbox` extend etmiyor.
-- [x] `payment-service/pom.xml`'e `event-contracts` dependency ekle.
-- [x] `outbox/entity/Outbox.java` → `extends BaseOutbox`, kendi field'larını sil (`processed`, `sentAt` dahil — Debezium pattern'ında gereksiz).
-- [x] `inbox/entity/Inbox.java` → `extends BaseInbox`, kendi inline `InboxStatus` enum'unu sil, `com.ecommerce.common.constant.InboxStatus` import et.
-- [x] Bu iki entity'nin `@SuperBuilder` kullandığından emin ol.
-- [x] `InboxRepository` oluşturuldu: `JpaRepository<Inbox, String>` (PK String).
-- [x] `InboxService` + `InboxServiceImpl` oluşturuldu (stock-service pattern — `REQUIRES_NEW` + idempotency).
-- [x] `OutboxService` arayüzüne `publishPaymentSuccessEvent`, `publishPaymentFailedEvent`, `publishSubscriptionActivatedEvent` eklendi; `OutboxServiceImpl` implement etti (`MANDATORY` propagation, ObjectMapper).
-- [x] `PaymentServiceImpl`'e `OutboxService` inject edildi; `handleIyzicoResponse` SUCCESS/FAILURE branch'larına publish çağrıları eklendi.
-- [x] `EventConstants`'a `AGGREGATE_PAYMENT`, `EVENT_PAYMENT_SUCCESS`, `EVENT_PAYMENT_FAILED`, `EVENT_SUBSCRIPTION_ACTIVATED` eklendi.
-- [x] `event-contracts`'a `PaymentSuccessEventPayload`, `PaymentFailedEventPayload`, `SubscriptionActivatedEventPayload` eklendi (`com.ecommerce.contracts.event.payment.*`).
-- [x] Flyway `V3__migrate_outbox_inbox_for_base_classes.sql` eklendi: `processed`/`sent_at` DROP, `retry_count` ADD, `REPLICA IDENTITY FULL`.
-- [x] `infrastructure/debezium/payment-connector.json` oluşturuldu (`payment_db`, slot: `payment_service_debezium_slot`).
-- [x] `register_connector.sh`'a `payment-connector.json` satırı eklendi.
-- [ ] **Verify (runtime)**: payment-service restart → Flyway V3 migration uygulansın → `register_connector.sh` çalıştır → abonelik ödemesi yap → PAYMENT topic'inde mesaj gör.
-- **M-L**
+Frontend'in beklediği backend endpoint'i. UTS'deki `ImageService` referans alınıp product-service'e yayılacak.
 
-### 4.2 user-tenant-service migration
-- [ ] Önce **oku**: `backend/user-tenant-service/src/main/java/com/ecommerce/usertenantservice/outbox/entity/Outbox.java`. Kendi tam tanımlı entity'si var.
-- [ ] `user-tenant-service/pom.xml`'e `event-contracts` dependency ekle (publish edilecek event varsa).
-- [ ] `Outbox` entity → `extends BaseOutbox`.
-- [ ] `@SuperBuilder` uyumu.
-- [ ] DB şeması — V1'de yaratılmış outbox tablosu BaseOutbox'la uyumlu mu, kolon adları (`message_type` vs. `event_type`) tutarlı mı kontrol et. Uyumsuzsa V4 migration.
-- [ ] `REPLICA IDENTITY FULL` set.
-- [ ] Debezium `user-tenant-connector.json` zaten var (`register_connector.sh`'tan çağrılıyor), push'unu verify et.
-- [ ] Publish senaryosu: `TENANT_CREATED_EVENT`, `TENANT_ACTIVATED_EVENT`, `TENANT_SUSPENDED_EVENT`? Consumer tarafı şu an yok — sadece schema hazırlığı mı, yoksa gerçek consumer da mı yazılacak? Kullanıcıya danış.
+#### 6.1 product-service'e image upload endpoint'i
+- [ ] **Önce UTS'deki ImageService'i oku:** `backend/user-tenant-service/src/main/java/com/ecommerce/usertenantservice/user/service/ImageService.java` — ne yapıyor, hangi config'lere bağımlı.
+- [ ] product-service'e benzer bir `ImageService` ekle:
+  - `product/service/ImageService.java` + `Impl`
+  - Multipart `MultipartFile` alır, MinIO'ya yazar, public URL döner
+  - `folderName = "products"`, object key: `products/<uuid>_<originalName>`
+- [ ] Controller endpoint: `POST /api/v1/products/images/upload`
+  - Multipart form-data, field adı `file`
+  - Response: `{ "url": "https://minio.../bucket/products/xxx.jpg" }`
+  - `@PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")` — tenant yetkisi gerekli
+- [ ] product-service `application.yml` + `application-dev.yml`:
+  - MinIO config'i ekle (`spring.minio.url`, access key, secret key, bucket)
+- [ ] product-service `pom.xml`: MinIO SDK dependency (UTS'de ne kullanılıyorsa)
+- [ ] UTS'den komple kopyalamak yerine farklı — kullanıcıya kontrol ettir, ortak olanı `common-lib`'e taşımak mantıklıysa Stage 6.2'ye al.
 - **M**
+
+#### 6.2 (opsiyonel) ImageService'i common-lib'e taşı
+- [ ] product-service'teki ImageService ile UTS'deki ortak bir `AbstractImageService` veya `ImageStorageClient` haline getir.
+- [ ] Product, tenant, user profile fotoları hep bu infrastructure'dan geçsin.
+- [ ] UTS'deki TODO'da da not var: "ImageService common jar'a taşı".
+- Yorum: Önce Stage 6.1'i bitir, ikinci servis eklerken pattern'i çıkar. Tek örnekten abstraction çıkarma prensibi (rule of three).
+- **L** (ileri adım)
+
+#### 6.3 Frontend entegrasyonu verify
+- [ ] `productService.uploadProductImage(file)` çağrısı endpoint'e ulaşıyor mu
+- [ ] Response'taki URL `mainImageUrl`/`imageUrls` olarak product create/update request'ine dönüyor mu
+- [ ] Base64 yolu tamamen kapandı mı (frontend'in eski dataUrl pattern'i)
+- **S** (frontend test)
 
 ---
 
@@ -85,13 +137,8 @@ Format: Her item kısa başlık + bağlam + (varsa) dosya referansı + zorluk (S
 
 Frontend chat'lerinden gelen, backend tarafında **henüz yapılmamış** istekler:
 
-### FB-1: Ürün görseli upload endpoint'i
-- [ ] product-service'e `POST /api/v1/products/images/upload` endpoint'i ekle.
-- Multipart form-data `file` parametresi alır, backend proxy ile MinIO'ya yazar, public URL döner.
-- UTS'deki `ImageService` (`user/service/ImageService.java`) implementasyonunu referans al — aynı pattern, `folderName = "products"`.
-- common-lib'e taşımak daha temiz olur (UTS'deki TODO'da da bahsediliyor) ama şimdilik kopyala, refactor Stage 5+.
-- Frontend `productService.uploadProductImage(file)` bu endpoint'i çağırıyor, dönen URL'i state'e yazıp submit'te product create/update request'inde `mainImageUrl` / `imageUrls` olarak yolluyor. Base64 YOK, sadece MinIO URL'leri.
-- **M**
+### FB-1: Ürün görseli upload endpoint'i → **Stage 6'da ele alınıyor**
+- Plan detayı yukarıdaki Stage 6.1'de.
 
 ### FB-2: Tenant product detail endpoint'i
 - [ ] Frontend edit formu açılınca `getTenantProductById(tenantId, productId)` çağırıyor (`useGetTenantProductById` hook). Mevcut endpoint'i incele:
@@ -114,7 +161,7 @@ Frontend chat'lerinden gelen, backend tarafında **henüz yapılmamış** istekl
 Kodda `// TODO [tarih HH:MM]: ...` formatında bırakılmış notlar. Tarih sırasıyla:
 
 ### Early (2025)
-- `UserController.uploadProfileImage` — [11.12.2025 18:54] ImageService common jar'a taşı (profile/product/tenant ortak). FB-1 ile birleştir.
+- `UserController.uploadProfileImage` — [11.12.2025 18:54] ImageService common jar'a taşı (profile/product/tenant ortak). Stage 6.2 ile birleştir.
 - `UserController.me` — [29.12.2025 06:48] Optional kullanımı standardize et.
 - `PaymentController.processPayment` — [29.12.2025 00:33] `@CurrentUser` ile token doğrulaması ekle (şu an body'deki `customerId` güveniliyor, güvenlik açığı).
 
@@ -167,7 +214,7 @@ Kodda `// TODO [tarih HH:MM]: ...` formatında bırakılmış notlar. Tarih sır
   IYZICO_API_KEY / SECRET_KEY / BASE_URL
   MY_SPI_KEYCLOAK_TOKEN_URL / CLIENT_ID / CLIENT_SECRET / USER_SERVICE_HEALTH_URL
   ```
-  **S**
+  **S** — devops-infra ajanı için ideal görev
 - [ ] stock-service `application.yml`'inde `application.clients.user-tenant.url` var ama stock hiç UTS'ye gitmiyor — gereksiz, temizle. **S**
 
 ### Resilience
@@ -175,7 +222,7 @@ Kodda `// TODO [tarih HH:MM]: ...` formatında bırakılmış notlar. Tarih sır
 - [ ] `PaymentServiceFallback` aktifleştir (yukarıda).
 
 ### Observability
-- [ ] **Zipkin, Prometheus, Grafana** ana `docker-compose.yml`'de yok. `infrastructure/devops/docker-compose.yml` ayrı, merge et. **M**
+- [ ] **Zipkin, Prometheus, Grafana** ana `docker-compose.yml`'de yok. `infrastructure/devops/docker-compose.yml` ayrı, merge et. **M** — devops-infra ajanı için ideal görev
 
 ### Frontend (notlar)
 - [ ] `.env` yorum satırları temizlenmeli
@@ -221,6 +268,7 @@ Kodda `// TODO [tarih HH:MM]: ...` formatında bırakılmış notlar. Tarih sır
 - [ ] **mail-service (Notification)** — **L**
   - Event-driven consumer: `PaymentFailed`, `PaymentSuccess`, `OrderShipped`, `TenantActivated` vb.
   - Mailhog dev'de hazır, prod SMTP config'lenebilir.
+  - Stage 5.3 notu: `TENANT_ACTIVATED_EVENT`, `PAYMENT_SUCCESS_EVENT` dinleyen bir MVP makul bir adım olabilir.
 - [ ] **AI Engine (FastAPI)** — **XL**
   - İzole Python servisi.
   - NLP ürün yorum özetleme (`Product.aiReviewReport` field hazır).
