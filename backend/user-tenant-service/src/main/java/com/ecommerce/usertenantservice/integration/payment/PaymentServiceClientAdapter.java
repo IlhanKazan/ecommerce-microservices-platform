@@ -10,7 +10,7 @@ import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHis
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.SubMerchantResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSubscriptionResponse;
-import com.ecommerce.usertenantservice.tenant.domain.PaymentProcessRequest;
+import com.ecommerce.usertenantservice.tenant.command.PaymentProcessRequest;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

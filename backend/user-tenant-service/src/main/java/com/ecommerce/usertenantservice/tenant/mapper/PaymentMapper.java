@@ -1,7 +1,7 @@
 package com.ecommerce.usertenantservice.tenant.mapper;
 
 import com.ecommerce.usertenantservice.tenant.controller.dto.request.CreateTenantRequest;
-import com.ecommerce.usertenantservice.tenant.domain.TenantCreationContext;
+import com.ecommerce.usertenantservice.tenant.command.TenantCreationContext;
 import org.mapstruct.Mapper;
 import org.mapstruct.Named;
 import org.mapstruct.ReportingPolicy;

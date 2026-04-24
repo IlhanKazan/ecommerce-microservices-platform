@@ -1,4 +1,4 @@
-package com.ecommerce.usertenantservice.tenant.domain;
+package com.ecommerce.usertenantservice.tenant.command;
 
 import com.ecommerce.usertenantservice.tenant.constant.BusinessType;
 

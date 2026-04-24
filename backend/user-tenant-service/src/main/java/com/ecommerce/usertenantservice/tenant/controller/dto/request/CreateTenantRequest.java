@@ -1,8 +1,8 @@
 package com.ecommerce.usertenantservice.tenant.controller.dto.request;
 
 import com.ecommerce.usertenantservice.tenant.constant.BusinessType;
-import com.ecommerce.usertenantservice.tenant.domain.AddressInfo;
-import com.ecommerce.usertenantservice.tenant.domain.PaymentCardInfo;
+import com.ecommerce.usertenantservice.tenant.command.AddressInfo;
+import com.ecommerce.usertenantservice.tenant.command.PaymentCardInfo;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 

@@ -8,7 +8,7 @@ import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHis
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.SubMerchantResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSubscriptionResponse;
-import com.ecommerce.usertenantservice.tenant.domain.PaymentProcessRequest;
+import com.ecommerce.usertenantservice.tenant.command.PaymentProcessRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;

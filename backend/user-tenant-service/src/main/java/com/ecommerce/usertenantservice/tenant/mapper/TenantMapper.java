@@ -1,12 +1,10 @@
 package com.ecommerce.usertenantservice.tenant.mapper;
 
 import com.ecommerce.usertenantservice.tenant.controller.dto.request.UpdateTenantGeneralRequest;
-import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantAddressResponse;
-import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantMemberResponse;
-import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantResponse;
-import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSummaryResponse;
+import com.ecommerce.usertenantservice.tenant.controller.dto.response.*;
 import com.ecommerce.usertenantservice.tenant.entity.Tenant;
 import com.ecommerce.usertenantservice.tenant.entity.UserTenant;
+import com.ecommerce.usertenantservice.tenant.query.TenantStorefrontInfo;
 import com.ecommerce.usertenantservice.user.entity.Address;
 import org.mapstruct.*;
 
@@ -49,4 +47,6 @@ public interface TenantMapper {
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateTenantGeneralFromRequest(UpdateTenantGeneralRequest request, @MappingTarget Tenant tenant);
+
+    TenantStorefrontResponse toStorefrontFromInfo(TenantStorefrontInfo info);
 }

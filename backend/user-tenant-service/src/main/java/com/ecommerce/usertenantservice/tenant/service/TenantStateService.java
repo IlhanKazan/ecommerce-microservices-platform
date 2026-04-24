@@ -3,7 +3,7 @@ package com.ecommerce.usertenantservice.tenant.service;
 import com.ecommerce.usertenantservice.common.constants.AddressType;
 import com.ecommerce.usertenantservice.tenant.constant.TenantRole;
 import com.ecommerce.usertenantservice.tenant.constant.TenantStatus;
-import com.ecommerce.usertenantservice.tenant.domain.TenantCreationContext;
+import com.ecommerce.usertenantservice.tenant.command.TenantCreationContext;
 import com.ecommerce.usertenantservice.tenant.entity.Tenant;
 import com.ecommerce.usertenantservice.tenant.entity.UserTenant;
 import com.ecommerce.usertenantservice.tenant.repository.TenantRepository;

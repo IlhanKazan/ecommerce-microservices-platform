@@ -9,7 +9,7 @@ import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentHis
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSubscriptionResponse;
 import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSummaryResponse;
-import com.ecommerce.usertenantservice.tenant.domain.TenantCreationContext;
+import com.ecommerce.usertenantservice.tenant.command.TenantCreationContext;
 import com.ecommerce.usertenantservice.tenant.entity.Tenant;
 import com.ecommerce.usertenantservice.tenant.entity.UserTenant;
 import com.ecommerce.usertenantservice.tenant.mapper.PaymentMapper;

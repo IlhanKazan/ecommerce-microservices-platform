@@ -1,4 +1,4 @@
-package com.ecommerce.usertenantservice.tenant.domain;
+package com.ecommerce.usertenantservice.tenant.command;
 
 public record PaymentCardInfo(
         String holderName,
