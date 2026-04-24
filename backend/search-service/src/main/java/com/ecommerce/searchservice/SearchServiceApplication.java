@@ -10,7 +10,6 @@ import static org.springframework.data.web.config.EnableSpringDataWebSupport.Pag
 
 @SpringBootApplication
 @EnableFeignClients(basePackages = {"com.ecommerce.searchservice", "com.ecommerce.common"})
-@ComponentScan(basePackages = {"com.ecommerce.searchservice", "com.ecommerce.common"})
 @EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)
 public class SearchServiceApplication {
 

@@ -14,7 +14,7 @@ public class GeneralLoggerAspect {
     private final Logger log = LoggerFactory.getLogger(this.getClass());
 
     // tüm mikroservislerin service katmanını dinleyecek
-    @Around("execution(* com.ecommerce..*.service..*(..))")
+    @Around("execution(* com.ecommerce..*.service..*(..)) && !within(com.ecommerce.paymentservice..*)")
     public Object logAround(ProceedingJoinPoint joinPoint) throws Throwable {
         long start = System.currentTimeMillis();
 
@@ -32,7 +32,10 @@ public class GeneralLoggerAspect {
         }
 
         long executionTime = System.currentTimeMillis() - start;
-        log.info("End -> Method: {}, Result: {}, Time: {} ms", methodName, result, executionTime);
+        log.info("End -> Method: {}, ResultType: {}, Time: {} ms",
+                methodName,
+                result != null ? result.getClass().getSimpleName() : "null",
+                executionTime);
 
         return result;
     }

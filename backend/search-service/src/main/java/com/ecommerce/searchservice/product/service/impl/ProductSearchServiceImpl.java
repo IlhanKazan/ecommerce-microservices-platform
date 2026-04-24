@@ -34,53 +34,92 @@ public class ProductSearchServiceImpl implements ProductSearchService {
 
         BoolQuery.Builder boolQueryBuilder = QueryBuilders.bool();
 
-        // Müşteriye sadece stokta olan ürünleri gösterir
-        boolQueryBuilder.filter(QueryBuilders.term(t -> t.field("inStock").value(true)));
+        // inStock filtresi — null gelirse filtre uygulanmaz, true gelirse sadece stokta olanlar
+        if (request.inStock() != null && request.inStock()) {
+            boolQueryBuilder.filter(
+                    QueryBuilders.term(t -> t.field("inStock").value(true))
+            );
+        }
 
+        // Keyword — name, tags, description'da arar
         if (request.keyword() != null && !request.keyword().isBlank()) {
-            Query multiMatchQuery = QueryBuilders.multiMatch(m -> m
+            boolQueryBuilder.must(QueryBuilders.multiMatch(m -> m
                     .fields("name^3", "description", "tags^2")
                     .query(request.keyword())
+            ));
+        }
+
+        // Category — frontend tüm alt kategori ID'lerini zaten biliyor, terms filter
+        if (request.categoryIds() != null && !request.categoryIds().isEmpty()) {
+            List<FieldValue> categoryValues = request.categoryIds().stream()
+                    .map(FieldValue::of)
+                    .toList();
+            boolQueryBuilder.filter(
+                    QueryBuilders.terms(t -> t.field("categoryId")
+                            .terms(terms -> terms.value(categoryValues)))
             );
-            boolQueryBuilder.must(multiMatchQuery);
         }
 
-        if (request.categoryId() != null) {
-            boolQueryBuilder.filter(QueryBuilders.term(t -> t.field("categoryId").value(request.categoryId())));
-        }
-
+        // Brand filtresi
         if (request.brands() != null && !request.brands().isEmpty()) {
             List<FieldValue> brandValues = request.brands().stream()
                     .map(FieldValue::of)
                     .toList();
-            boolQueryBuilder.filter(QueryBuilders.terms(t -> t.field("brand").terms(terms -> terms.value(brandValues))));
+            boolQueryBuilder.filter(
+                    QueryBuilders.terms(t -> t.field("brand")
+                            .terms(terms -> terms.value(brandValues)))
+            );
         }
 
+        // Fiyat aralığı
         if (request.minPrice() != null || request.maxPrice() != null) {
             boolQueryBuilder.filter(QueryBuilders.range(r -> r
-                    .untyped( u -> u
-                        .field("price")
-                        .gte(request.minPrice() != null ? co.elastic.clients.json.JsonData.of(request.minPrice()) : null)
-                        .lte(request.maxPrice() != null ? co.elastic.clients.json.JsonData.of(request.maxPrice()) : null)
-                    )
+                    .untyped(u -> {
+                        u.field("price");
+                        if (request.minPrice() != null)
+                            u.gte(co.elastic.clients.json.JsonData.of(request.minPrice()));
+                        if (request.maxPrice() != null)
+                            u.lte(co.elastic.clients.json.JsonData.of(request.maxPrice()));
+                        return u;
+                    })
             ));
         }
+
+        // Sort
+        List<co.elastic.clients.elasticsearch._types.SortOptions> sortOptions =
+                buildSort(request.sortBy());
 
         Pageable pageable = PageRequest.of(request.page(), request.size());
 
         NativeQuery nativeQuery = NativeQuery.builder()
                 .withQuery(boolQueryBuilder.build()._toQuery())
+                .withSort(sortOptions)
                 .withPageable(pageable)
-                // TODO [09.03.2026 07:02]: İleride buraya .withSort() ekleyip fiyata göre sıralama
                 .build();
 
-        SearchHits<ProductDocument> searchHits = elasticsearchOperations.search(nativeQuery, ProductDocument.class);
+        SearchHits<ProductDocument> searchHits =
+                elasticsearchOperations.search(nativeQuery, ProductDocument.class);
 
         List<ProductDocument> documents = searchHits.getSearchHits().stream()
                 .map(SearchHit::getContent)
                 .toList();
 
         return new PageImpl<>(documents, pageable, searchHits.getTotalHits());
+    }
+
+    private List<co.elastic.clients.elasticsearch._types.SortOptions> buildSort(String sortBy) {
+        return switch (sortBy) {
+            case "price_asc" -> List.of(co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
+                    .field(f -> f.field("price").order(co.elastic.clients.elasticsearch._types.SortOrder.Asc))));
+            case "price_desc" -> List.of(co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
+                    .field(f -> f.field("price").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc))));
+            case "popular" -> List.of(co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
+                    .field(f -> f.field("saleCount").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc))));
+            case "rating" -> List.of(co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
+                    .field(f -> f.field("ratingAverage").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc))));
+            default -> List.of(co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s  // newest
+                    .field(f -> f.field("createdAt").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc))));
+        };
     }
 
 }
