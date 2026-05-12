@@ -10,6 +10,7 @@ import type {
     ReviewCreateRequest,
     CategoryResponse,
     TenantProductResponse,
+    ProductDetailResponse,
     ProductCreateRequest,
     ProductUpdateRequest,
 } from '../../../types/product';
@@ -165,13 +166,13 @@ export const productService = {
         );
     },
 
-    uploadProductImage: async (file: File): Promise<string> => {
+    uploadProductImage: async (tenantId: number, file: File): Promise<string> => {
         const formData = new FormData();
         formData.append('file', file);
         const response = await api.post<{ url: string }>(
-            '/api/v1/products/images/upload',
+            API_ENDPOINTS.PRODUCT.TENANT_IMAGE_UPLOAD(tenantId),
             formData,
-            // axios multipart header'ı FormData ile otomatik set eder
+            { headers: { 'Content-Type': undefined } },
         );
         return response.data.url;
     },
@@ -182,6 +183,16 @@ export const productService = {
     ): Promise<TenantProductResponse> => {
         const response = await api.get<TenantProductResponse>(
             API_ENDPOINTS.PRODUCT.TENANT_BY_ID(tenantId, productId),
+        );
+        return response.data;
+    },
+
+    getTenantProductDetail: async (
+        tenantId: number,
+        productId: number,
+    ): Promise<ProductDetailResponse> => {
+        const response = await api.get<ProductDetailResponse>(
+            API_ENDPOINTS.PRODUCT.TENANT_DETAIL(tenantId, productId),
         );
         return response.data;
     },

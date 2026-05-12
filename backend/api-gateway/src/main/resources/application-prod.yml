@@ -4,14 +4,68 @@ server:
 spring:
   security:
     oauth2:
-      resource-server:
+      resourceserver:
         jwt:
-          issuer-uri: http://keycloak:8080/realms/${REALM_NAME}
+          jwk-set-uri: http://keycloak:8080/realms/${REALM_NAME}/protocol/openid-connect/certs
+          issuer-uri: http://localhost:8080/realms/${REALM_NAME}
 
   cloud:
     gateway:
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - "http://localhost:5173"
+                  - "http://localhost:3000"
+                allowedMethods: "*"
+                allowedHeaders: "*"
+                allowCredentials: true
       routes:
+        - id: search-service
+          uri: http://search-service:8085
+          predicates:
+            - Path=/api/v1/public/search/**
+
         - id: user-tenant-service
           uri: http://user-tenant-service:8081
           predicates:
             - Path=/api/v1/users/**, /api/v1/tenants/**, /api/v1/addresses/**
+
+        - id: payment-service
+          uri: http://payment-service:8082
+          predicates:
+            - Path=/api/v1/subscriptions/**
+
+        - id: product-service
+          uri: http://product-service:8084
+          predicates:
+            - Path=/api/v1/products/**, /api/v1/public/products/**, /api/v1/categories/**
+
+        - id: basket-service
+          uri: http://basket-service:8086
+          predicates:
+            - Path=/api/v1/baskets/**
+
+        - id: stock-service
+          uri: http://stock-service:8087
+          predicates:
+            - Path=/api/v1/stocks/**
+
+  devtools:
+    restart:
+      enabled: false
+
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+
+logging:
+  level:
+    root: WARN
+    com.ecommerce.apigateway: INFO

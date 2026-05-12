@@ -117,6 +117,39 @@ export interface PageResponse<T> {
 
 // ─── Tenant Product Management ────────────────────────────────────────────────
 
+/** GET /api/v1/products/tenants/{tenantId}/{productId}/detail — edit formu için tam veri */
+export interface ProductDetailResponse {
+    id: number;
+    tenantId: number;
+    categoryId: number;
+    categoryName: string;
+    parentProductId: number | null;
+    name: string;
+    description: string | null;
+    sku: string;
+    brand: string | null;
+    price: number;
+    discountPercentage: number | null;
+    discountedPrice: number | null;
+    currency: string;
+    mainImageUrl: string | null;
+    imageUrls: string[] | null;
+    attributes: Record<string, string> | null;
+    weightGrams: number | null;
+    dimensionsCm: string | null;
+    minOrderQty: number | null;
+    maxOrderQty: number | null;
+    tags: string[] | null;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    seoKeywords: string | null;
+    status: string;
+    salesStatus: string;
+    isFeatured: boolean;
+    ratingAverage: number | null;
+    reviewCount: number;
+}
+
 export interface TenantProductResponse {
     id: number;
     tenantId: number;

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="tr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Mağazanız Aktif Edildi</title>
+    <style>
+        body { margin: 0; padding: 0; background-color: #f5f5f5; font-family: Arial, sans-serif; }
+        .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; }
+        .header { background-color: #1976d2; padding: 32px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 24px; }
+        .body { padding: 32px; color: #333333; }
+        .body h2 { font-size: 20px; margin-top: 0; }
+        .body p { line-height: 1.6; }
+        .badge { display: inline-block; background: #e8f5e9; color: #2e7d32; border-radius: 4px; padding: 6px 14px; font-weight: bold; font-size: 15px; margin: 16px 0; }
+        .footer { background: #f5f5f5; padding: 20px 32px; text-align: center; color: #888888; font-size: 12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>E-Commerce Platform</h1>
+    </div>
+    <div class="body">
+        <h2>Mağazanız Aktif!</h2>
+        <p>Merhaba,</p>
+        <p><strong th:text="${tenantName}">Mağaza Adı</strong> isimli mağazanız başarıyla aktif edildi ve artık ürün satışına hazır.</p>
+        <div class="badge">✓ Mağaza Aktif</div>
+        <p>Şimdi yapabilecekleriniz:</p>
+        <ul>
+            <li>Ürünlerinizi ekleyin ve yönetin</li>
+            <li>Depo ve stok ayarlarınızı yapın</li>
+            <li>Müşterilerinize satış yapmaya başlayın</li>
+        </ul>
+        <p>Başarılı satışlar dileriz!</p>
+    </div>
+    <div class="footer">
+        <p>Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayınız.</p>
+    </div>
+</div>
+</body>
+</html>

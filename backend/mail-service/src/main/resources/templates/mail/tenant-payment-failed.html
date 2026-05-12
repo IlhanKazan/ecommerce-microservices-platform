@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="tr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Ödeme Başarısız</title>
+    <style>
+        body { margin: 0; padding: 0; background-color: #f5f5f5; font-family: Arial, sans-serif; }
+        .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; }
+        .header { background-color: #d32f2f; padding: 32px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 24px; }
+        .body { padding: 32px; color: #333333; }
+        .body h2 { font-size: 20px; margin-top: 0; }
+        .body p { line-height: 1.6; }
+        .alert { background: #fff3e0; border-left: 4px solid #f57c00; padding: 14px 18px; border-radius: 4px; margin: 16px 0; color: #bf360c; }
+        .footer { background: #f5f5f5; padding: 20px 32px; text-align: center; color: #888888; font-size: 12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>E-Commerce Platform</h1>
+    </div>
+    <div class="body">
+        <h2>Ödeme İşlemi Başarısız</h2>
+        <p>Merhaba,</p>
+        <p><strong th:text="${tenantName}">Mağaza Adı</strong> hesabınız için gerçekleştirilen abonelik ödemesi başarısız oldu.</p>
+        <div class="alert">
+            ⚠️ Ödeme alınamadığı takdirde mağazanız askıya alınabilir.
+        </div>
+        <p>Lütfen ödeme yönteminizi kontrol edin ve hesabınıza giriş yaparak ödemeyi yeniden deneyin.</p>
+        <p>Sorun yaşamaya devam ederseniz destek ekibimizle iletişime geçin.</p>
+    </div>
+    <div class="footer">
+        <p>Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayınız.</p>
+    </div>
+</div>
+</body>
+</html>

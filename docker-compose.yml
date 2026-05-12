@@ -142,22 +142,24 @@ services:
           memory: 1g
 
   connector-init:
-    image: curlimages/curl
+    image: curlimages/curl:latest
     container_name: connector-init
+    restart: "no"
     depends_on:
       connect:
         condition: service_healthy
     networks:
       - e-commerce-network
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - ./infrastructure/debezium/user-tenant-connector.json:/user-tenant-connector.json
-      - ./infrastructure/debezium/product-connector.json:/product-connector.json
-    command: >
-      /bin/sh -c "
-      echo 'Waiting for Debezium...';
-      sleep 10;
-      curl -i -X POST -H 'Accept:application/json' -H 'Content-Type:application/json' http://debezium-connect:8083/connectors/ -d @/connector.json;
-      "
+      - ./infrastructure/scripts/docker-init-connectors.sh:/init-connectors.sh:ro
+      - ./infrastructure/debezium/user-tenant-connector.json:/connectors/user-tenant-connector.json:ro
+      - ./infrastructure/debezium/product-connector.json:/connectors/product-connector.json:ro
+      - ./infrastructure/debezium/stock-connector.json:/connectors/stock-connector.json:ro
+      - ./infrastructure/debezium/payment-connector.json:/connectors/payment-connector.json:ro
+    command: ["/bin/sh", "/init-connectors.sh"]
 
   minio:
     image: minio/minio:latest
@@ -260,25 +262,254 @@ services:
 
   user-tenant-service:
     build:
-      context: ./backend/user-tenant-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: user-tenant-service/Dockerfile
     container_name: user-tenant-service
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      redis:
+        condition: service_started
       keycloak:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      PAYMENT_SERVICE_URL: http://host.docker.internal:8082
+      USER_DB_NAME: ${USER_DB_NAME}
+      USER_DB_USERNAME: ${USER_DB_USERNAME}
+      USER_DB_PASSWORD: ${USER_DB_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REALM_NAME: ${REALM_NAME}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      USER_MINIO_BUCKET: ${USER_MINIO_BUCKET}
+      USER_TENANT_SERVICE_URL: http://user-tenant-service:8081
     ports:
       - "8081:8081"
     networks:
       - e-commerce-network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  mail-service:
+    build:
+      context: ./backend
+      dockerfile: mail-service/Dockerfile
+    container_name: mail-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      MAIL_DB_NAME: ${MAIL_DB_NAME}
+      MAIL_DB_USERNAME: ${MAIL_DB_USERNAME}
+      MAIL_DB_PASSWORD: ${MAIL_DB_PASSWORD}
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
+      SMTP_AUTH: "false"
+      SMTP_STARTTLS: "false"
+      MAIL_FROM_ADDRESS: noreply@ecommerce.dev
+    ports:
+      - "8089:8089"
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  product-service:
+    build:
+      context: ./backend
+      dockerfile: product-service/Dockerfile
+    container_name: product-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+      keycloak:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PRODUCT_DB_NAME: ${PRODUCT_DB_NAME}
+      PRODUCT_DB_USERNAME: ${PRODUCT_DB_USERNAME}
+      PRODUCT_DB_PASSWORD: ${PRODUCT_DB_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REALM_NAME: ${REALM_NAME}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      USER_MINIO_BUCKET: ${USER_MINIO_BUCKET}
+    ports:
+      - "8084:8084"
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  api-gateway:
+    build:
+      context: ./backend
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    depends_on:
+      user-tenant-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      stock-service:
+        condition: service_started
+      search-service:
+        condition: service_started
+      basket-service:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      REALM_NAME: ${REALM_NAME}
+    ports:
+      - "9050:9050"
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  basket-service:
+    build:
+      context: ./backend
+      dockerfile: basket-service/Dockerfile
+    container_name: basket-service
+    depends_on:
+      redis:
+        condition: service_started
+      keycloak:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REALM_NAME: ${REALM_NAME}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+    ports:
+      - "8086:8086"
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  search-service:
+    build:
+      context: ./backend
+      dockerfile: search-service/Dockerfile
+    container_name: search-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_started
+      redis:
+        condition: service_started
+      keycloak:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REALM_NAME: ${REALM_NAME}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+    ports:
+      - "8085:8085"
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  stock-service:
+    build:
+      context: ./backend
+      dockerfile: stock-service/Dockerfile
+    container_name: stock-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      keycloak:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      STOCK_DB_NAME: ${STOCK_DB_NAME}
+      STOCK_DB_USERNAME: ${STOCK_DB_USERNAME}
+      STOCK_DB_PASSWORD: ${STOCK_DB_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REALM_NAME: ${REALM_NAME}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+    ports:
+      - "8087:8087"
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  payment-service:
+    build:
+      context: ./backend
+      dockerfile: payment-service/Dockerfile
+    container_name: payment-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      keycloak:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PAYMENT_DB_NAME: ${PAYMENT_DB_NAME}
+      PAYMENT_DB_USERNAME: ${PAYMENT_DB_USERNAME}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REALM_NAME: ${REALM_NAME}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      IYZICO_API_KEY: ${IYZICO_API_KEY}
+      IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY}
+      IYZICO_BASE_URL: ${IYZICO_BASE_URL}
+    ports:
+      - "8082:8082"
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
 networks:
   e-commerce-network:

@@ -5,12 +5,15 @@ import com.ecommerce.common.annotation.Idempotent;
 import com.ecommerce.common.dto.PageResponse;
 import com.ecommerce.common.security.dto.AuthUser;
 import com.ecommerce.productservice.common.constants.ApiPaths;
+import com.ecommerce.productservice.common.service.ImageService;
 import com.ecommerce.productservice.product.constant.SalesStatus;
 import com.ecommerce.productservice.product.controller.dto.request.ProductUpdateRequest;
 import com.ecommerce.productservice.product.entity.Product;
 import com.ecommerce.productservice.product.command.ProductCreateContext;
 import com.ecommerce.productservice.product.controller.dto.request.ProductCreateRequest;
+import com.ecommerce.productservice.product.controller.dto.response.ProductDetailResponse;
 import com.ecommerce.productservice.product.controller.dto.response.ProductResponse;
+import com.ecommerce.productservice.product.query.ProductDetailInfo;
 import com.ecommerce.productservice.product.query.ProductInfo;
 import com.ecommerce.productservice.product.command.ProductUpdateContext;
 import com.ecommerce.productservice.product.mapper.ProductMapper;
@@ -21,6 +24,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping(ApiPaths.TenantProduct.TENANT_PRODUCTS)
@@ -29,6 +35,7 @@ public class TenantProductController {
 
     private final TenantProductService tenantProductService;
     private final ProductMapper productMapper;
+    private final ImageService imageService;
 
     @PostMapping
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
@@ -79,6 +86,16 @@ public class TenantProductController {
         return ResponseEntity.ok(productMapper.toResponseFromInfo(info));
     }
 
+    @GetMapping("/{productId}/detail")
+    @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
+    public ResponseEntity<ProductDetailResponse> getTenantProductDetail(
+            @PathVariable Long tenantId,
+            @PathVariable Long productId) {
+
+        ProductDetailInfo info = tenantProductService.getProductDetail(productId, tenantId);
+        return ResponseEntity.ok(productMapper.toDetailResponse(info));
+    }
+
     @Idempotent(cachePrefix = "idempotency:product-update:")
     @PutMapping("/{productId}")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
@@ -114,5 +131,15 @@ public class TenantProductController {
 
         tenantProductService.deleteProduct(tenantId, productId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/images/upload")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<Map<String, String>> uploadProductImage(
+            @PathVariable Long tenantId,
+            @RequestParam("file") MultipartFile file) {
+
+        String url = imageService.uploadImage(file, "products");
+        return ResponseEntity.ok(Map.of("url", url));
     }
 }

@@ -172,9 +172,9 @@ export function useGetTenantProductById(
 ) {
     return useQuery({
         queryKey: ['tenant-product-detail', tenantId, productId],
-        queryFn: () => productService.getTenantProductById(tenantId, productId!),
+        queryFn: () => productService.getTenantProductDetail(tenantId, productId!),
         enabled: !!tenantId && !!productId && enabled,
-        staleTime: 0, // edit her açılışta taze data
+        staleTime: 0,
     });
 }
 

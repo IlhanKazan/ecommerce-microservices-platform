@@ -53,6 +53,8 @@ export const API_ENDPOINTS = {
         TENANT_CREATE: (tenantId: number) => `/products/tenants/${tenantId}`,
         TENANT_BY_ID: (tenantId: number, productId: number) =>
             `/products/tenants/${tenantId}/${productId}`,
+        TENANT_DETAIL: (tenantId: number, productId: number) =>
+            `/products/tenants/${tenantId}/${productId}/detail`,
         TENANT_UPDATE: (tenantId: number, productId: number) =>
             `/products/tenants/${tenantId}/${productId}`,
         TENANT_DELETE: (tenantId: number, productId: number) =>
@@ -61,6 +63,8 @@ export const API_ENDPOINTS = {
             `/products/tenants/${tenantId}/${productId}/sales-status`,
         SELLER_RESPONSE: (tenantId: number, productId: number, reviewId: number) =>
             `/products/tenants/${tenantId}/${productId}/reviews/${reviewId}/response`,
+        TENANT_IMAGE_UPLOAD: (tenantId: number) =>
+            `/products/tenants/${tenantId}/images/upload`,
     },
     CATEGORY: {
         ALL: '/categories',
