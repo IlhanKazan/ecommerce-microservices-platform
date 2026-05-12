@@ -20,3 +20,9 @@ security:
     resource server:
       jwt:
         issuer-uri: http://localhost:8080/realms/${REALM_NAME}
+
+minio:
+  url: http://localhost:9005
+  access-key: ${MINIO_ACCESS_KEY}
+  secret-key: ${MINIO_SECRET_KEY}
+  bucket-name: ${USER_MINIO_BUCKET}

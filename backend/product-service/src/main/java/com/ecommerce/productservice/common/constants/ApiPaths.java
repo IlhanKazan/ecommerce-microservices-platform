@@ -11,6 +11,7 @@ public class ApiPaths {
     @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class TenantProduct {
         public static final String TENANT_PRODUCTS = BASE_PATH_V1 + "/products/tenants/{tenantId}";
+        public static final String IMAGE_UPLOAD = BASE_PATH_V1 + "/products/tenants/{tenantId}/images/upload";
     }
 
     @NoArgsConstructor(access = AccessLevel.PRIVATE)

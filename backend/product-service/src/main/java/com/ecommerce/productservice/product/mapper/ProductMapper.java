@@ -6,6 +6,8 @@ import com.ecommerce.productservice.product.controller.dto.request.ProductUpdate
 import com.ecommerce.productservice.product.entity.*;
 import com.ecommerce.productservice.product.controller.dto.request.ProductCreateRequest;
 import com.ecommerce.productservice.product.controller.dto.response.ProductResponse;
+import com.ecommerce.productservice.product.controller.dto.response.ProductDetailResponse;
+import com.ecommerce.productservice.product.query.ProductDetailInfo;
 import com.ecommerce.productservice.product.query.ProductInfo;
 import com.ecommerce.productservice.product.query.PublicProductInfo;
 import org.mapstruct.Mapper;
@@ -33,6 +35,8 @@ public interface ProductMapper {
     ProductResponse toResponse(Product product);
 
     ProductResponse toResponseFromInfo(ProductInfo info);
+
+    ProductDetailResponse toDetailResponse(ProductDetailInfo info);
 
     ProductResponse toResponseFromPublicInfo(PublicProductInfo info);
 

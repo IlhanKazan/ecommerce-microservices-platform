@@ -9,6 +9,7 @@ import com.ecommerce.productservice.product.constant.ProductStatus;
 import com.ecommerce.productservice.product.constant.SalesStatus;
 import com.ecommerce.productservice.product.command.ProductCreateContext;
 import com.ecommerce.productservice.product.entity.Product;
+import com.ecommerce.productservice.product.query.ProductDetailInfo;
 import com.ecommerce.productservice.product.query.ProductInfo;
 import com.ecommerce.productservice.product.command.ProductUpdateContext;
 import com.ecommerce.productservice.product.mapper.ProductMapper;
@@ -196,6 +197,43 @@ public class TenantProductServiceImpl implements TenantProductService {
                 product.getStatus(),
                 product.getSalesStatus(),
                 product.getAttributes()
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProductDetailInfo getProductDetail(Long productId, Long tenantId) {
+        Product product = getProductByIdAndTenantId(productId, tenantId);
+        return new ProductDetailInfo(
+                product.getId(),
+                product.getTenantId(),
+                product.getCategory().getId(),
+                product.getCategory().getName(),
+                product.getParentProduct() != null ? product.getParentProduct().getId() : null,
+                product.getName(),
+                product.getDescription(),
+                product.getSku(),
+                product.getBrand(),
+                product.getPrice(),
+                product.getDiscountPercentage(),
+                product.getDiscountedPrice(),
+                product.getCurrency(),
+                product.getMainImageUrl(),
+                product.getImageUrls(),
+                product.getAttributes(),
+                product.getWeightGrams(),
+                product.getDimensionsCm(),
+                product.getMinOrderQty(),
+                product.getMaxOrderQty(),
+                product.getTags(),
+                product.getSeoTitle(),
+                product.getSeoDescription(),
+                product.getSeoKeywords(),
+                product.getStatus(),
+                product.getSalesStatus(),
+                product.getIsFeatured(),
+                product.getRatingAverage(),
+                product.getReviewCount()
         );
     }
 
