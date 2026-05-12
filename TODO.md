@@ -1,362 +1,405 @@
 # TODO.md
 
-Bu dosya üç kaynaktan beslenir:
-1. **Tamamlanmış aşamalar** (ne çalışıyor, üzerine dönme)
-2. **Aktif ve sıradaki migration aşamaları** (şu an elinde olan iş)
-3. **Kod tabanındaki teknik borç** (TODO yorumları + convention sapmaları)
-4. **Frontend ↔ Backend arası açık talepler** (frontend'in beklediği backend değişiklikleri)
-5. **Eksik testler** (servis bazında)
-6. **İleride yapılacaklar** (v2, README'de vaat edilen planlı servisler)
+Bu dosya **aktif sprint** odaklıdır. Genel bilgi için kardeş dosyalar:
 
-Format: Her item kısa başlık + bağlam + (varsa) dosya referansı + zorluk (S/M/L/XL). Bittiği zaman satırın başına `- [x]` koy ya da taşı "Tamamlanmış" bölümüne.
+- 📋 `TECHNICAL-DEBT.md` — kategori bazında bilinen borç (güvenlik, prod-blocker, kalite, nice-to-have)
+- 🛠️ `SERVICE-WORK.md` — servis bazında yapılacak iş (endpoint, business logic, future)
+
+İş bu üçü arasında akar:
+
+```
+SERVICE-WORK / TECHNICAL-DEBT  →  TODO.md "Aktif"  →  TODO.md "✅ Tamamlanmış"
+        (backlog)                   (sprint)              (tarihçe)
+```
 
 ---
 
 ## ✅ Tamamlanmış
 
-Üzerine dönme, düzeltme yapmana gerek yok.
+Üzerine dönme.
 
-- **Stage 1: product-service event akışı** ÇALIŞIYOR.
-  - Outbox → Debezium → Kafka → Elasticsearch zinciri end-to-end sağlam.
-  - `common-lib/BaseOutbox` yerinde, product-service entity'si extend ediyor.
-  - `V2__outbox_CDC_config.sql` `REPLICA IDENTITY FULL` ekledi.
-  - Debezium `product-service-connector` doğru config ile çalışıyor (`message_type:header:message_type`).
-- **Stage 2: search-service consumer `event-contracts`'a geçti.**
-  - Eski inline consumer DTO'ları silindi.
-  - `@Header("message_type")` kullanımı Debezium config'iyle tutarlı.
-  - `ProductCreatedEventPayload`, `ProductUpdatedEventPayload`, `ProductDeletedEventPayload`, `StockStatusChangedEventPayload` event-contracts'tan import ediliyor.
-- **common-lib geliştirmeleri:**
-  - `BaseInbox` zenginleştirildi (`status`, `retry_count`, `error_message`, `received_at`, `processed_at`)
-  - `InboxStatus` enum'u `com.ecommerce.common.constant` altına taşındı, tüm servisler import edecek.
-  - `@Idempotent` AOP + `@CurrentUser` resolver + `TenantSecurityEvaluator` + `FeignClientInterceptor` stabil.
-- **product-service Inbox** `BaseInbox` extend ediyor, `@SuperBuilder` annotation'ı düzeltildi ✅.
-- **stock-service Inbox** `BaseInbox` extend ediyor ✅.
-- **stock-service migration V3** DB tarafı (outbox drop+recreate as BIGINT IDENTITY, inbox enrich) tamamlandı ✅.
-- **stock-service Java tarafı migration (Stage 3.3)** tamamlandı ✅:
-  - `StockInfo` → `stock/query/` paketine taşındı, `implements Serializable` eklendi.
-  - `Outbox.java`: `@GeneratedValue(IDENTITY)`, `@AllArgsConstructor` kaldırıldı, `@SuperBuilder` zaten vardı.
-  - `InboxService` interface'e `isMessageProcessed` metodu eklendi, Impl'e `@Override` eklendi.
-  - `V4__outbox_replica_identity_full.sql` eklendi.
-  - `V5__add_inbox_indexes.sql` eklendi (idx_inbox_status, idx_inbox_pending partial index).
-- **Stage 3: stock-service event pipeline** ÇALIŞIYOR ✅
-  - 3.1: Tüm connector'lar `register_connector.sh` ile push edildi, `message_type` header'lı.
-  - 3.2: stock-service replication slot drop edildi, connector re-register edildi, `RUNNING`.
-  - 3.3: Java tarafı migration tamamlandı (yukarıda detay).
-  - 3.4: End-to-end verify: `addManualStock` → outbox → Debezium → Kafka `STOCK_STATUS_CHANGED_EVENT` (message_type header'lı) → search-service consumer → Elasticsearch `inStock: true`. Yeni ürün ekleme de `PRODUCT_CREATED_EVENT` zinciriyle ES'e düştü.
-- **Stage 4.1: payment-service migration (kod)** tamamlandı ✅
-  - `Outbox`, `Inbox` → `BaseOutbox`/`BaseInbox` extend ediyor, `@SuperBuilder` uyumlu
-  - Lokal `InboxStatus` enum silindi, `common-lib`'ten import
-  - `InboxRepository` (`JpaRepository<Inbox, String>`), `InboxService` + `InboxServiceImpl` eklendi
-  - `OutboxService` + `OutboxServiceImpl` eklendi (MANDATORY propagation)
-  - `PaymentServiceImpl.handleIyzicoResponse` SUCCESS/FAILURE branch'larında publish çağrıları
-  - `EventConstants`'a `AGGREGATE_PAYMENT`, `EVENT_PAYMENT_SUCCESS`, `EVENT_PAYMENT_FAILED`, `EVENT_SUBSCRIPTION_ACTIVATED` eklendi
-  - `event-contracts`'a `PaymentSuccessEventPayload`, `PaymentFailedEventPayload`, `SubscriptionActivatedEventPayload` eklendi
-  - `V3__migrate_outbox_inbox_for_base_classes.sql` eklendi
-  - `infrastructure/debezium/payment-connector.json` + `register_connector.sh`'a satır eklendi
-- **Stage 4.2: user-tenant-service migration (kod)** tamamlandı ✅
-  - `Outbox` entity → `extends BaseOutbox`, `@SuperBuilder` uyumlu
-  - `V4` migration: `processed`, `sent_at` DROP, `REPLICA IDENTITY FULL`
-  - `OutboxService` + `OutboxServiceImpl` eklendi (MANDATORY propagation)
-  - `EventConstants`'a `AGGREGATE_TENANT`, `EVENT_TENANT_CREATED`, `EVENT_TENANT_ACTIVATED`, `EVENT_TENANT_PAYMENT_FAILED` eklendi
-  - `event-contracts`'a `TenantCreatedEventPayload`, `TenantActivatedEventPayload`, `TenantPaymentFailedEventPayload` eklendi
-  - `TenantStateService` → `saveInitialTenant`, `activateTenant`, `markTenantAsPaymentFailed` publish çağrıları
+- **Stage 1: product-service event akışı** ÇALIŞIYOR — outbox → Debezium → Kafka → Elasticsearch
+- **Stage 2: search-service consumer event-contracts'a geçti** — header tabanlı dispatch
+- **common-lib zenginleştirme:**
+  - `BaseInbox` (status/retry/error/received_at), `BaseOutbox`, `InboxStatus` enum common'a
+  - `@Idempotent` AOP, `@CurrentUser` resolver, `TenantSecurityEvaluator`, `FeignClientInterceptor`
+- **product-service Inbox** `BaseInbox` extend ediyor
+- **stock-service migration (Stage 3):** Outbox UUID→BIGINT, Inbox enrichment, REPLICA IDENTITY, replication slot rebuilt, `event-contracts` kullanımı
+- **Stage 4.1: payment-service migration (kod tarafı)** — Outbox/Inbox refactored, OutboxService, payment connector, V3 migration
+- **Stage 4.2: user-tenant-service migration (kod tarafı)** — Outbox refactored, V4, OutboxService, tenant event'leri (CREATED, ACTIVATED, PAYMENT_FAILED)
+- **Stage 5: payment + user-tenant runtime verify** — connector status RUNNING, mesajlar `message_type` header'lı PAYMENT/TENANT topic'lerine düşüyor ✅
+- **Stage 6.1: product-service ImageService** kod tarafı tamamlandı (UTS pattern'i kopyalandı)
+- **Stage 6.2: product-service image upload runtime verify** ✅ — MinIO `products/` bucket oluştu, upload çalışıyor. Frontend URL fix (`tenantId` eksikti), multipart Content-Type fix (global axios header eziyordu)
+- **Stage 7: ImageService iyileştirmeleri** ✅ — RuntimeException→BusinessException/SystemException, validation (5MB/content-type/empty), try-with-resources, filename sanitization, @PostConstruct bucket check, UriComponentsBuilder URL build — UTS + product-service ikisinde
+- **FB-2: Tenant product detail endpoint'i** ✅ — `ProductDetailInfo` + `GET /tenants/{tenantId}/{productId}/detail`
+- **FB-4: Frontend ürün ekleme/düzenleme UI** ✅ — Edit formda `/detail` endpoint, tüm field'lar (weightGrams, seo, tags…) form state'te, veri kaybı yok
+- **Stage 8: mail-service MVP** ✅
+- **Stage 9.0: user-tenant-service container** ✅ — Dockerfile (BuildKit cache, non-root), prod.yml (HikariCP, JWT dual-mode, Flyway retry), compose wiring. "Started" logu doğrulandı. — Kafka consumer, Thymeleaf şablonları, inbox idempotency, docker-compose. TENANT_ACTIVATED + TENANT_PAYMENT_FAILED çalışıyor. Eksik event bağlantıları (VERIFIED, PAYMENT_SUCCESS, ORDER_*) → `SERVICE-WORK.md` "Mail Service" bölümüne taşındı.
 
 ---
 
-## ⏭️ Sıradaki
+## ⏭️ Aktif
 
-### Stage 5: Runtime verification (payment + user-tenant)
+### Stage 9: Tüm servisleri container'a çekme (prod profili geçişi)
 
-Stage 4.1 ve 4.2'nin kod değişiklikleri tamam ama **runtime doğrulama** yapılmadı. Servisler restart edilip Flyway migration'lar uygulandıktan, connector'lar push edildikten sonra test senaryoları çalıştırılmalı.
+#### Kritik bilgi — okumadan başlama
 
-#### 5.1 payment-service runtime verify
-- [ ] payment-service'i **durdur** → replication slot temiz mi teyit et → **başlat** (Flyway V3 uygulanmalı).
-  - Log: `docker logs payment-service 2>&1 | grep -iE 'migrat|flyway' | head -20`
-  - `V3__migrate_outbox_inbox_for_base_classes.sql` görünmeli.
-- [ ] Connector kontrol:
-  - `cd infrastructure/scripts && ./register_connector.sh`
-  - `curl -s http://localhost:8083/connectors/payment-connector/status | jq` → `RUNNING`
-- [ ] Outbox `REPLICA IDENTITY` teyit:
-  - `docker exec -it postgres psql -U $POSTGRES_USER -d payment_db -c "SELECT relname, relreplident FROM pg_class WHERE relname = 'outbox';"` → `f` (FULL) beklenen
-- [ ] End-to-end ödeme testi:
-  - Abonelik ödemesi yap (frontend veya Postman)
-  - `payment-service` log'unda publish çağrısı görün
-  - `kafka-console-consumer --topic PAYMENT --from-beginning --property print.headers=true --max-messages 5` — `message_type` header'lı mesaj gelmeli (`PAYMENT_SUCCESS_EVENT` veya `SUBSCRIPTION_ACTIVATED_EVENT`)
-- **S** (komutlar, kullanıcı çalıştırır)
+**Dockerfile pattern** (UTS'den öğrenildi, tüm servisler aynı):
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM maven:3.9.6-eclipse-temurin-21 AS builder
+WORKDIR /app
+COPY common-lib/pom.xml ./common-lib/pom.xml
+COPY common-lib/src ./common-lib/src
+RUN --mount=type=cache,target=/root/.m2 cd common-lib && mvn install -DskipTests -q
+COPY event-contracts/pom.xml ./event-contracts/pom.xml
+COPY event-contracts/src ./event-contracts/src
+RUN --mount=type=cache,target=/root/.m2 cd event-contracts && mvn install -DskipTests -q
+COPY <servis-adi>/pom.xml ./<servis-adi>/pom.xml
+COPY <servis-adi>/src ./<servis-adi>/src
+RUN --mount=type=cache,target=/root/.m2 cd <servis-adi> && mvn clean package -DskipTests -q
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+RUN addgroup -S spring && adduser -S spring -G spring
+COPY --from=builder --chown=spring:spring /app/<servis-adi>/target/*.jar app.jar
+USER spring
+ENV SPRING_PROFILES_ACTIVE=prod
+ENTRYPOINT ["java","-XX:+UseContainerSupport","-XX:MaxRAMPercentage=75.0","-Djava.security.egd=file:/dev/./urandom","-jar","app.jar"]
+```
 
-#### 5.2 user-tenant-service runtime verify
-- [ ] UTS'i durdur → slot temizlik gerekirse → başlat → V4 migration görünmeli
-- [ ] `register_connector.sh` ile `user-tenant-service-connector` push
-- [ ] REPLICA IDENTITY teyit (`user_tenant_db.outbox`)
-- [ ] Tenant oluştur (frontend üzerinden)
-- [ ] `kafka-console-consumer --topic TENANT` — `TENANT_CREATED_EVENT`, sonra ödeme başarılıysa `TENANT_ACTIVATED_EVENT` görün
-- **S**
+**JWT dual-mode pattern** (tüm prod.yml'lere — detay: `ARCHITECTURE.md §5.1`):
+```yaml
+security:
+  oauth2:
+    resourceserver:
+      jwt:
+        jwk-set-uri: http://keycloak:8080/realms/${REALM_NAME}/protocol/openid-connect/certs
+        issuer-uri: http://localhost:8080/realms/${REALM_NAME}
+```
+> Gateway WebFlux kullanıyor — aynı key'ler ama `spring.security.oauth2.resourceserver.jwt.*` altında.
 
-#### 5.3 Consumer tarafı hazırlığı (ileri adım)
-- [ ] `PAYMENT` ve `TENANT` topic'lerini dinleyecek bir consumer **henüz yok**. Publish çalışıyor ama event'leri tüketen bir servis yok — bunu görünce "boşuna mı atılıyor" hissi normaldir, mantık doğru: event-driven mimari future-proof, consumer sonra eklenir (mail-service, saga-orchestrator vb.).
-- [ ] Kısa vadede: `TENANT_ACTIVATED_EVENT` sonrası mail atmak için **mail-service** MVP'si mantıklı olabilir. Stage 7'de değerlendir.
+**prod.yml Flyway retry** (DB hazır olmadan başlarsa):
+```yaml
+spring:
+  flyway:
+    connect-retries: 10
+    connect-retries-interval: 3
+```
+
+**HikariCP minimum** (tüm DB'li servislere):
+```yaml
+spring:
+  datasource:
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+```
+
+**application-prod.yml yazma metodolojisi** — her servis için:
+1. `application.yml` + `application-dev.yml`'i oku (gerçek config buradadır)
+2. Host'ları container DNS'e çevir:
+   - `localhost:5432` → `postgres:5432`
+   - `localhost:29092` → `kafka:9092`
+   - `localhost:6379` → Redis için `host: redis`
+   - `localhost:8080` (jwk-set-uri'de) → `keycloak:8080` (sadece JWK fetch için)
+   - `issuer-uri` **localhost kalır** — token'daki `iss` claim localhost URL taşıyor, değiştirme
+   - Feign URL'ler: `${USER_TENANT_SERVICE_URL}` → `http://user-tenant-service:8081` vb.
+3. Boşluklu YAML key'leri düzelt: `resource server` → `resourceserver`, `time limiter` → `time-limiter`
+4. Ekle: HikariCP, Flyway retry, JWT dual-mode, `devtools.restart.enabled: false`, log seviyeleri, zipkin endpoint
+5. Sil: `spring.config.import: optional:file:.env[.properties]` (prod'da env var'lar compose'dan gelir)
+
+**⚠️ init.sql'e `stock_db` eksik** — docker-compose'da postgres bloğunun volumes mount'u `init.sql`'i çalıştırıyor ama `stock_db` yok. `infrastructure/postgres/init.sql`'e `CREATE DATABASE stock_db;` ekle. Postgres volume'ü varsa `docker compose down -v postgres` ile sil, yeniden başlat.
 
 ---
 
-### Stage 6: Product image upload (FB-1 kapsamı)
+#### 9.0 user-tenant-service ✅
+- [x] Dockerfile (BuildKit cache mount, non-root user)
+- [x] application-prod.yml (HikariCP, Kafka, Redis, MinIO, JWT dual-mode, Flyway retry, Zipkin)
+- [x] docker-compose: SPRING_PROFILES_ACTIVE=prod, tüm env var'lar map edildi
+- [x] Container ayağa kalkıyor, "Started" logu görüldü
 
-Frontend'in beklediği backend endpoint'i. UTS'deki `ImageService` referans alınıp product-service'e yayılacak.
+---
 
-#### 6.1 product-service'e image upload endpoint'i
-- [ ] **Önce UTS'deki ImageService'i oku:** `backend/user-tenant-service/src/main/java/com/ecommerce/usertenantservice/user/service/ImageService.java` — ne yapıyor, hangi config'lere bağımlı.
-- [ ] product-service'e benzer bir `ImageService` ekle:
-  - `product/service/ImageService.java` + `Impl`
-  - Multipart `MultipartFile` alır, MinIO'ya yazar, public URL döner
-  - `folderName = "products"`, object key: `products/<uuid>_<originalName>`
-- [ ] Controller endpoint: `POST /api/v1/products/images/upload`
-  - Multipart form-data, field adı `file`
-  - Response: `{ "url": "https://minio.../bucket/products/xxx.jpg" }`
-  - `@PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")` — tenant yetkisi gerekli
-- [ ] product-service `application.yml` + `application-dev.yml`:
-  - MinIO config'i ekle (`spring.minio.url`, access key, secret key, bucket)
-- [ ] product-service `pom.xml`: MinIO SDK dependency (UTS'de ne kullanılıyorsa)
-- [ ] UTS'den komple kopyalamak yerine farklı — kullanıcıya kontrol ettir, ortak olanı `common-lib`'e taşımak mantıklıysa Stage 6.2'ye al.
+#### 9.1 payment-service ✅
+- [x] Dockerfile yaz
+- [x] application-prod.yml yaz
+- [x] docker-compose servis bloğu ekle
+- [x] Build + `docker compose up -d payment-service` + log kontrol — "Started" logu görüldü ✅
+
+---
+
+#### 9.2 product-service ✅
+- [x] Dockerfile yaz
+- [x] application-prod.yml yaz
+- [x] docker-compose servis bloğu ekle
+- [x] Build + test — "Started" logu görüldü, ürün ekleme + görsel upload çalışıyor ✅
+- **Not:** Anasayfada ürün görünmüyor — search-service henüz container'da değil, Kafka event'lerini consume edemiyor. 9.4 tamamlanınca düzelecek.
+
+---
+
+#### 9.3 stock-service ✅
+- [x] `infrastructure/postgres/init.sql`'e `CREATE DATABASE stock_db;` eklendi (zaten vardı, dokümantasyon eksikti)
+- [x] Dockerfile yaz
+- [x] application-prod.yml yaz
+- [x] docker-compose servis bloğu ekle
+- [x] Build + test — "Started" logu görüldü ✅
+
+---
+
+#### 9.4 search-service ✅
+- [x] Dockerfile yaz
+- [x] application-prod.yml yaz
+- [x] docker-compose servis bloğu ekle
+- [x] Build + test — "Started" logu görüldü ✅
+
+---
+
+#### 9.5 basket-service ✅
+- [x] Dockerfile yaz
+- [x] application-prod.yml yaz
+- [x] docker-compose servis bloğu ekle
+- [x] Build + test — "Started" logu görüldü ✅
+
+---
+
+#### 9.6 api-gateway ✅
+- [x] Dockerfile yaz (common-lib yok, direkt build)
+- [x] application-prod.yml yaz — JWT dual-mode, tüm route'lar container DNS, CORS korundu
+- [x] docker-compose servis bloğu ekle
+- [x] Build + test — "Started" logu görüldü ✅
+
+---
+
+#### 9.7 Temizlik
+- [x] `connector-init` düzeltildi — `docker-init-connectors.sh` yazıldı, tüm 4 connector mount edildi, `service_healthy` ile bekleme, `restart: "no"` eklendi
+- [x] `.env.example`'ı tüm değişkenlerle yaz — tüm servisler, SMTP açıklaması, Keycloak SPI dahil
+- [ ] `application.yml`'lerdeki boşluklu YAML key'leri düzelt: `resource server` → `resource-server` (payment, product, search, basket dev yml'lerinde var)
+- [ ] Her servis için commit: `devops(<servis>): prod profile + Dockerfile + compose wiring`
+
+---
+
+### Stage 11: Observability — tek compose hedefi
+
+**Amaç:** `docker compose up -d` tek komutla tüm sistem + monitoring ayağa kalksın.
+
+**Şu anki durum:** `infrastructure/devops/docker-compose.yml` ayrı dosyada — Prometheus, Grafana, Zipkin, Loki, Promtail, cAdvisor burada. Servisler `e-commerce-network`'e bağlı değil, scrape target'ları eski IP'ler (`172.23.0.1:8081` vb.).
+
+**Yapılacaklar:**
+- [ ] `infrastructure/devops/docker-compose.yml`'deki tüm servisleri ana `docker-compose.yml`'e taşı — volume path'leri `./infrastructure/devops/...` olarak güncelle
+- [ ] Tüm observability servislerine `e-commerce-network` ekle
+- [ ] `infrastructure/devops/prometheus.yml` scrape target'larını güncelle — `172.23.0.1:PORT` → `container-name:PORT` (7 servis: UTS, payment, product, stock, search, basket, gateway — hepsi `/actuator/prometheus` açık)
+- [ ] Zipkin: servisler zaten `http://zipkin:9411/api/v2/spans` yazıyor — sadece `zipkin` container'ı aynı network'te olunca çalışır
+- [ ] Loki + Promtail: `promtail-config.yml` Docker container log path'lerini doğru göstermeli (`/var/lib/docker/containers`)
+- [ ] Grafana data source otomatik provision: Prometheus + Loki için `provisioning/datasources.yml`
+- [ ] Grafana dashboard'ları: JVM (Spring Boot), Kafka consumer lag, Redis, cAdvisor container metrikler
+- [ ] `infrastructure/devops/prometheus.yml`'den `cadvisor` scrape'i zaten var — cAdvisor da aynı network'e taşınınca çalışır
+- **L**
+
+---
+
+### Stage 10: Order Service — satın alma akışı
+
+Platform'un kalbindeki eksik parça. `order_db` ve `saga_orchestrator_db` init.sql'de zaten var. Şu an backend kodu sıfır.
+
+#### Genel mimari
+
+```
+[Frontend Checkout]
+     │  POST /api/v1/orders
+     ▼
+[order-service — port 8088]
+     │  SAGA Orchestrator
+     ├──► [stock-service Feign] reserve()
+     │        ↓ başarısız → BusinessException → OrderCancelled
+     ├──► [payment-service Feign] processPayment()
+     │        ↓ başarısız → compensation: stock.rollback() → OrderCancelled
+     └──► Order CONFIRMED
+          │  outbox → Debezium → ORDER topic
+          ▼
+     [mail-service] ORDER_CONFIRMED_EVENT → sipariş onay maili
+     [stock-service] stok commit (rezerveden gerçek düşmeye)
+```
+
+**SAGA tipi:** Senkron orkestrasyon (Feign) + outbox event. Faz 1'de async SAGA değil — Feign zinciri + compensation yeterli. Async SAGA (event-driven) ikinci iterasyonda.
+
+#### 10.0 event-contracts genişletme
+- [ ] `OrderCreatedEventPayload` record — orderId, userId, tenantId, items (snapshot), totalAmount
+- [ ] `OrderConfirmedEventPayload` — orderId, userId, tenantId
+- [ ] `OrderCancelledEventPayload` — orderId, userId, reason
+- [ ] `OrderShippedEventPayload` — orderId, trackingNumber
+- [ ] `EventConstants`'a `AGGREGATE_ORDER`, `ORDER_CREATED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED`, `ORDER_SHIPPED` sabitleri
+- Kural: additive only, breaking change yok
+
+#### 10.1 order-service iskelet + entity
+- [ ] Spring Boot 3.5.9, Java 21 proje oluştur — `backend/order-service/`
+- [ ] `pom.xml`: common-lib + event-contracts dependency, MapStruct, Lombok, Feign, Flyway, PostgreSQL
+- [ ] `OrderStatus` enum: `DRAFT → SUBMITTED → CONFIRMED → SHIPPED → DELIVERED → CANCELLED`
+- [ ] `Order` entity (BaseEntity extend): userId (UUID), tenantId, status, totalAmount, currency, shippingAddressJson (TEXT), paymentTransactionId
+- [ ] `OrderItem` entity: orderId (FK), productId, sku, productName (**snapshot**), productImageUrl (**snapshot**), unitPrice (**snapshot**), quantity
+- [ ] `SagaState` entity: sagaId (UUID PK), orderId (FK), currentStep (enum), status, compensationData (JSON), errorMessage
+- [ ] Flyway V1: orders, order_items, saga_states tablolar + index'ler
+- [ ] `OrderRepository`, `OrderItemRepository`, `SagaStateRepository`
+- [ ] REPLICA IDENTITY FULL outbox için (V1'de)
 - **M**
 
-#### 6.2 (opsiyonel) ImageService'i common-lib'e taşı
-- [ ] product-service'teki ImageService ile UTS'deki ortak bir `AbstractImageService` veya `ImageStorageClient` haline getir.
-- [ ] Product, tenant, user profile fotoları hep bu infrastructure'dan geçsin.
-- [ ] UTS'deki TODO'da da not var: "ImageService common jar'a taşı".
-- Yorum: Önce Stage 6.1'i bitir, ikinci servis eklerken pattern'i çıkar. Tek örnekten abstraction çıkarma prensibi (rule of three).
-- **L** (ileri adım)
+#### 10.2 Feign client'lar
+- [ ] `StockServiceClient` — `reserve(tenantId, productId, amount)`, `rollback(tenantId, productId, amount)`, `commit(tenantId, productId, amount)`, `getStock(tenantId, productId, warehouseId)`
+- [ ] `PaymentServiceClient` — `processOrderPayment(OrderPaymentRequest)` → `PaymentResult`
+- [ ] `BasketServiceClient` — `getMyBasket()` → basket items (checkout için)
+- [ ] `ProductServiceClient` — `getProductSnapshot(productId)` → fiyat + isim + stok snapshot
+- [ ] Her client için `FeignConfig` (FeignClientInterceptor'dan geliyor, JWT forward)
+- [ ] Fallback stub'ları (`@FallbackFactory` pattern) — circuit breaker hazır olsun
+- **M**
 
-#### 6.3 Frontend entegrasyonu verify
-- [ ] `productService.uploadProductImage(file)` çağrısı endpoint'e ulaşıyor mu
-- [ ] Response'taki URL `mainImageUrl`/`imageUrls` olarak product create/update request'ine dönüyor mu
-- [ ] Base64 yolu tamamen kapandı mı (frontend'in eski dataUrl pattern'i)
-- **S** (frontend test)
+#### 10.3 SAGA orchestrator servisi
+- [ ] `OrderSagaService.execute(Order)` — tek transaction değil, her adım ayrı transaction
+  - Adım 1: `StockServiceClient.reserve()` → başarısız → `ORDER_CANCELLED` at, RuntimeException throw etme
+  - Adım 2: `PaymentServiceClient.processOrderPayment()` → başarısız → `StockServiceClient.rollback()` + `ORDER_CANCELLED`
+  - Adım 3: Order `CONFIRMED`, outbox'a `ORDER_CONFIRMED_EVENT` at
+- [ ] `SagaState` her adımda güncellenir (idempotency için sagaId üzerinden tekrar çalıştırılabilir)
+- [ ] Compensation işlemlerinde ayrıca `SagaState.status = COMPENSATING` set et
+- [ ] `@Transactional` boundary: her SAGA adımı kendi transaction'ında — tüm zincir TEK transaction değil
+- **L**
+
+#### 10.4 Order API endpoint'leri
+- [ ] `POST /api/v1/orders` — sepetten sipariş oluştur
+  - `@CurrentUser` ile userId, `BasketServiceClient.getMyBasket()` ile items
+  - Her item için `ProductServiceClient.getProductSnapshot()` → fiyat snapshot
+  - `OrderCreateContext` service'e geçer (DTO değil)
+  - Service: Order + OrderItem kaydet, SAGA başlat
+  - Response: `OrderSummaryResponse` (id, status, totalAmount, itemCount)
+  - Idempotency-Key zorunlu
+- [ ] `GET /api/v1/orders/me` — kullanıcının sipariş geçmişi (sayfalandırılmış)
+- [ ] `GET /api/v1/orders/me/{orderId}` — sipariş detayı + item'lar
+- [ ] `POST /api/v1/orders/me/{orderId}/cancel` — iptal (sadece SUBMITTED veya CONFIRMED, SHIPPED değil)
+  - Cancellation logic: stok rollback + ödeme refund (payment-service Feign)
+- [ ] `GET /api/v1/orders/tenants/{tenantId}` — mağaza sahibi için gelen siparişler (OWNER)
+- [ ] `PUT /api/v1/orders/tenants/{tenantId}/{orderId}/status` — mağaza sahibi durum güncelle (SHIPPED, DELIVERED)
+  - SHIPPED → `ORDER_SHIPPED_EVENT` outbox'a at (mail-service kargo takip maili atar)
+- **L**
+
+#### 10.5 Outbox + Debezium
+- [ ] `Outbox` entity, `OutboxService`, `OutboxRepository` — mevcut pattern (BaseOutbox extend)
+- [ ] Flyway V1'e outbox tablosu + REPLICA IDENTITY FULL ekle
+- [ ] `order-service-connector.json` — Debezium connector (ORDER topic)
+- [ ] `register_connector.sh`'a ekle
+- [ ] Runtime verify: ORDER topic'te ORDER_CONFIRMED_EVENT mesajı gözüküyor mu
+- **M**
+
+#### 10.6 Frontend checkout akışı
+- [ ] `CartPage` → "Siparişi Tamamla" butonu aktif hale getir
+- [ ] Checkout adımları: Sepet özeti → Teslimat adresi seç → Ödeme onay → Sipariş tamamlandı
+- [ ] `useCreateOrder` mutation (idempotency key ile)
+- [ ] `useGetMyOrders`, `useGetOrderDetail` query hook'ları
+- [ ] Sipariş geçmişi sayfası (`/orders`) — `MyOrdersPage`
+- [ ] Sipariş detay sayfası (`/orders/{orderId}`)
+- [ ] "Siparişi İptal Et" butonu (sadece iptal edilebilir statüslerde)
+- [ ] `types/order.ts` — `OrderSummaryResponse`, `OrderDetailResponse`, `OrderItemResponse`
+- [ ] `config/apiEndpoints.ts`'e ORDER endpoint'leri
+- **L**
+
+> **Bağımlılıklar:** stock-service'te `POST reserve`, `POST rollback`, `POST commit` endpoint'leri yazılmalı (şu an sadece manual-add var). payment-service'te `processOrderPayment` endpoint'i.
 
 ---
 
 ## 🧩 Frontend ↔ Backend arası açık talepler
 
-Frontend chat'lerinden gelen, backend tarafında **henüz yapılmamış** istekler:
+### FB-1: Ürün görseli upload endpoint'i ✅
+### FB-2: Tenant product detail endpoint'i ✅
+### FB-4: Frontend ürün ekleme/düzenleme UI ✅
 
-### FB-1: Ürün görseli upload endpoint'i → **Stage 6'da ele alınıyor**
-- Plan detayı yukarıdaki Stage 6.1'de.
+### FB-3: MinIO prod reverse proxy (not, prod roadmap)
+Şu an dev'de doğrudan erişim. Prod'da signed URL + access control.
 
-### FB-2: Tenant product detail endpoint'i
-- [ ] Frontend edit formu açılınca `getTenantProductById(tenantId, productId)` çağırıyor (`useGetTenantProductById` hook). Mevcut endpoint'i incele:
-  - `GET /api/v1/products/tenants/{tenantId}/{productId}` — `TenantProductController.getTenantProduct` → `ProductInfo` dönüyor.
-  - `ProductInfo` **sınırlı alanlar** içeriyor: id, tenantId, categoryId, categoryName, parentProductId, name, sku, price, currency, mainImageUrl, status, salesStatus, attributes. **`description`, `imageUrls`, `brand`, `weightGrams`, `dimensionsCm`, `seoTitle/Description/Keywords`, `minOrderQty`, `maxOrderQty`, `tags`, `discountedPrice` YOK.**
-  - Frontend edit formu full detay istiyor. Seçenek:
-    - **(A)** Yeni `ProductDetailInfo` record'u yap, `TenantProductService.getProductDetailByIdAndTenantId` ekle, controller'da yeni endpoint (örn. `/api/v1/products/tenants/{tenantId}/{productId}/detail`) veya mevcut endpoint'i genişlet.
-    - **(B)** `ProductInfo`'ya tüm field'ları ekle (breaking change, tüm kullanım noktalarını güncelle).
-  - Önerim: (A) yolu temiz. Kullanıcıya hangi yolu seçeceğini sor.
+### FB-5: Tenant depo & stok detay görünümü
+
+Mağaza sahibi depo sayfasında hangi ürünün ne kadar stoku olduğunu göremiyoruz.
+
+**Backend (stock-service):**
+- [ ] `GET /stocks/tenant/{tenantId}/summary` — tenant'ın tüm ürünleri + toplam stok (warehouse bazında breakdown ile)
+  - Response: `[{ productId, sku, productName, totalAvailable, totalReserved, warehouseBreakdown: [{warehouseId, warehouseName, available, reserved}] }]`
+  - Feign ile product-service'den ürün adını çek VEYA stock-service'te productName snapshotı tut (ikincisi daha sağlam — sipariş gibi snapshot pattern)
+- [ ] `GET /stocks/tenant/{tenantId}/warehouses/{warehouseId}/stocks` — tek depo için stok listesi
+
+**Frontend (MerchantWarehousePage):**
+- [ ] Depo listesinin altına her depo için "Stok Detayı" toggle veya expand açılır tablo
+- [ ] Stok durumu: yeşil (yeterli), sarı (eşik altı), kırmızı (sıfır)
+- [ ] Ürün bazında toplam stok özeti tablosu (tüm depolar, tüm ürünler)
+- [ ] Stok girişi butonunu ilgili ürüne pre-fill olarak aç (tablo satırından)
 - **M**
 
-### FB-3: MinIO prod reverse proxy (not)
-- Prod geçişte MinIO nginx reverse proxy arkasına alınmalı (signed URL + access control). Şu an dev'de doğrudan erişiliyor.
-- Dev'de iş değil, prod roadmap'te not.
+### FB-6: Arama çubuğu autocomplete + ürün görseli
+
+Header arama çubuğu şu an sadece Enter'da product list sayfasına yönlendiriyor. Ürün görseli yok, autocomplete yok.
+
+**Backend (search-service):**
+- [ ] `GET /public/search/autocomplete?q={term}&size=5` endpoint — hızlı öneri
+  - ES `multi_match` query (name, brand, tags), sadece `name + mainImageUrl + price + id` döner
+  - Debounce için hafif endpoint (ağır arama değil)
+
+**Frontend:**
+- [ ] `Header.tsx`'te MUI `Autocomplete` component — debounced (300ms) query
+- [ ] Her seçenek: ürün görseli (32px avatar) + ürün adı + fiyat
+- [ ] Seçilince `/products/{id}` sayfasına git
+- [ ] Enter'da mevcut davranış korunur (keyword ile product list)
+- [ ] Görsel yoksa placeholder avatar (baş harf)
+- **M**
+
+### FB-7: Sipariş akışı frontend (Stage 10.6 ile aynı — oradan takip et)
 
 ---
 
-## 📋 Kod tabanındaki TODO yorumları
+## 🤖 AI Engine FastAPI (notu — proje sonunda)
 
-Kodda `// TODO [tarih HH:MM]: ...` formatında bırakılmış notlar. Tarih sırasıyla:
+Projenin **en son geliştirilecek servisi**. Detaylı feature ve mimari için `SERVICE-WORK.md` "AI Engine FastAPI" bölümüne bak.
 
-### Early (2025)
-- `UserController.uploadProfileImage` — [11.12.2025 18:54] ImageService common jar'a taşı (profile/product/tenant ortak). Stage 6.2 ile birleştir.
-- `UserController.me` — [29.12.2025 06:48] Optional kullanımı standardize et.
-- `PaymentController.processPayment` — [29.12.2025 00:33] `@CurrentUser` ile token doğrulaması ekle (şu an body'deki `customerId` güveniliyor, güvenlik açığı).
-
-### Payment / Iyzico
-- `PaymentServiceImpl.saveTransactionLogs` — [28.12.2025 06:04] **Kart bilgileri maskelenecek** (rawRequest string'i). Compliance için **öncelikli**. **M**
-- `ProductPaymentStrategy` — tüm metotları mock. order-service devreye girince doldur. **L** (order-service yazılınca)
-- `SubscriptionPaymentStrategy.calculatePrice` — [08.02.2026 22:28] planId doğrulaması
-- `SubscriptionRenewalServiceImpl.processDailyRenewals` — [08.02.2026 22:30] `@Transactional` self-invocation bug'ı (`processSingleRenewal` aynı sınıfta, proxy'den geçmez → transaction açılmıyor). Çözüm: method'u ayrı bean'e al, veya `AopContext.currentProxy()`. **M**
-- `PaymentServiceClientAdapter.processPayment` — [09.02.2026 23:54] Feign hata detay analizi
-- `PaymentServiceFallback` — tüm dosya yorum satırında + tip hatası (String dönmeli SubMerchantResponse dönüyor). Düzelt ve aktifleştir — Resilience4j circuit breaker'ı için fallback şart. **M**
-
-### UTS
-- `TenantController` — [10.02.2026 11:33] CQRS değerlendirme
-- `TenantController.addMember` — [06.02.2026 14:50] Davet tablosu v2
-- `TenantLifecycleService.createTenant` — [10.02.2026 15:04] Yarım ödeme için retry endpoint'i (kısmen `retryTenantPayment` ile çözüldü, senaryolar kapalı mı teyit)
-- `TenantLifecycleService.createTenant` — [10.02.2026 11:21] **Idempotency** (aynı kart ile iki POST → iki tenant). `@Idempotent` AOP ekle. **M**
-
-### Diğer
-- `basket-service ProductClientAdapter.validateAndGetProduct` — yorumdaki stok kontrol blok'u. Product response'a `stockQuantity` eklenince aç. **S**
-- Birden fazla servisin `application.yml`'inde `resource server` (boşluklu) — `resource-server` olarak düzelt. **S**
-
----
-
-## 🏗️ Mimari boşluklar (Stage'lerin dışında, genel)
-
-### Event pipeline sağlamlığı
-- [ ] **DLQ (Dead Letter Queue)** Kafka consumer'larında yok. Spring Kafka `ErrorHandlingDeserializer` + `DeadLetterPublishingRecoverer`. **M**
-- [ ] **Consumer inbox idempotency** search-service'te kullanılmıyor. İki seçenek: (a) search-service'e minimal Postgres DB sadece inbox için, (b) Elasticsearch `processed_messages` index'i. Kullanıcıya danış. **L**
-- [ ] **Outbox cleanup scheduler** payment-service'te YOK (product, stock'ta var). Outbox tablosu sonsuz şişer. **S**
-
-### Auth/security
-- [ ] **`/api/v1/internal/**` endpoint'leri network-level korunmuyor.** Servis hesabı / role check veya mTLS. **M**
-- [ ] **authz cache evict edilmeyen durumlar**: createTenant sonrası ilk OWNER, tenant SUSPENDED/CLOSED. **S**
-- [ ] **Gateway + backend JWT double-decode.** Tutarlı bir strateji seç (tek noktada decode). **M**
-
-### Config
-- [ ] **`.env.example` ÇOK EKSİK.** Dosyada 7 değişken, kodda 20+ kullanılıyor. Eklenecekler:
-  ```
-  REDIS_PASSWORD
-  KEYCLOAK_CLIENT_ID
-  REALM_NAME
-  PAYMENT_DB_NAME / USERNAME / PASSWORD
-  PRODUCT_DB_NAME / USERNAME / PASSWORD
-  STOCK_DB_NAME / USERNAME / PASSWORD
-  USER_DB_NAME / USERNAME / PASSWORD
-  USER_TENANT_SERVICE_URL
-  PRODUCT_SERVICE_URL
-  MINIO_ACCESS_KEY / SECRET_KEY
-  USER_MINIO_BUCKET
-  IYZICO_API_KEY / SECRET_KEY / BASE_URL
-  MY_SPI_KEYCLOAK_TOKEN_URL / CLIENT_ID / CLIENT_SECRET / USER_SERVICE_HEALTH_URL
-  ```
-  **S** — devops-infra ajanı için ideal görev
-- [ ] stock-service `application.yml`'inde `application.clients.user-tenant.url` var ama stock hiç UTS'ye gitmiyor — gereksiz, temizle. **S**
-
-### Resilience
-- [ ] Resilience4j **sadece UTS → payment-service** için config'li. Diğer Feign çağrılarında yok. En azından şu linkler için ekle: stock → product, basket → product. **M**
-- [ ] `PaymentServiceFallback` aktifleştir (yukarıda).
-
-### Observability
-- [ ] **Zipkin, Prometheus, Grafana** ana `docker-compose.yml`'de yok. `infrastructure/devops/docker-compose.yml` ayrı, merge et. **M** — devops-infra ajanı için ideal görev
-
-### Frontend (notlar)
-- [ ] `.env` yorum satırları temizlenmeli
-- [ ] `data/mockOrders.ts`, `data/mockProducts.ts` prod'a sızmamalı — lint rule veya import guard
-
----
-
-## 🧪 Eksik testler
-
-### Hiç test yok
-- `api-gateway` — routing smoke test
-- `common-lib` — `IdempotencyAspect`, `TenantSecurityEvaluator`, `JwtAuthConverter`, `FeignClientInterceptor`, `GlobalExceptionHandler`. Kritik yol, test yok. **L**
-- `event-contracts` — sadece record'lar, gerek minimal
-- `keycloak-spi` — `UserServiceIntegration` HTTP mock (MockWebServer). **M**
-- `basket-service` — `BasketService.addItemToBasket` concurrent (Redisson lock), `ProductClientAdapter` WireMock, `Basket.addItem` unit. **M**
-- `product-service` — `TenantProductServiceImpl` mutation + cache evict, `ReviewServiceImpl` edge case'ler, `OutboxServiceImpl` JSON serialization, `CategoryServiceImpl.toInfo` recursive mapping. **L**
-- `search-service` — `ProductEventConsumer` (`EmbeddedKafka` + Testcontainers ES), `ProductSearchServiceImpl` DSL query. **L**
-- `user-tenant-service` — `TenantLifecycleService.createTenant` full flow (payment mock), `AuthzCacheService`, `TenantMemberService` rol geçişleri, `Address.validateOwnership` @PrePersist. **L**
-- `payment-service` — `PaymentStrategy` dispatch, `SubscriptionRenewalService.processSingleRenewal`, iyzico response handling. **XL** — iyzico mock zor
-
-### Test var ama eksik
-- `stock-service`:
-  - `StockControllerIdempotencyTest`, `StockControllerTest` — auth senaryoları (OWNER değil → 403) eksik
-  - `StockServiceTest` — `reserveStockForOrder` full flow (outbox + movement) yok
-  - `ProductClientAdapterIT` — downstream error edge case'leri ekle
-  - End-to-end outbox → Debezium → Kafka → consumer test yok (Testcontainers ile yapılabilir ama overhead)
-
-### Test altyapısı
-- `AbstractBaseIntegrationTest` zaten var, extend et
-- `@AutoConfigureWireMock(port = 0)` Feign test'leri için standart
-- `@MockitoBean JwtDecoder` security bypass
-- `application-test.yml` gerekliyse ekle (stock'ta var)
-
----
-
-## 🚀 İleride yapılacaklar (README'de vaat edilen + v2)
-
-### README'de vaat edilen planlı servisler
-- [ ] **order-service (SAGA Orchestrator)** — **XL**
-  - Saga adımları: Order Create → Stock Reserve → Payment Process → Order Confirm, her biri için compensating action.
-  - Orchestration pattern (choreography değil). State machine (Spring StateMachine veya manuel).
-  - `saga_orchestrator_db` hazır, `AGGREGATE_ORDER` sabiti var, `ProductPaymentStrategy` mock'u doldurulacak.
-- [ ] **mail-service (Notification)** — **L**
-  - Event-driven consumer: `PaymentFailed`, `PaymentSuccess`, `OrderShipped`, `TenantActivated` vb.
-  - Mailhog dev'de hazır, prod SMTP config'lenebilir.
-  - Stage 5.3 notu: `TENANT_ACTIVATED_EVENT`, `PAYMENT_SUCCESS_EVENT` dinleyen bir MVP makul bir adım olabilir.
-- [ ] **AI Engine (FastAPI)** — **XL**
-  - İzole Python servisi.
-  - NLP ürün yorum özetleme (`Product.aiReviewReport` field hazır).
-  - Öneri sistemi (collaborative filtering? content-based?).
-  - LLM-powered virtual assistant.
-  - Main stack Java olduğu için Python tarafı ayrı build/deploy.
-
-### E-ticaret akışının diğer eksikleri
-- [ ] **Ürün varyantları** UI (`Product.parentProductId` altyapısı hazır)
-- [ ] **Discount/Coupon** yönetim endpoint'i (`discount_percentage`, `discounted_price` kolonları var)
-- [ ] **Review moderasyon akışı** — `PENDING → APPROVED` endpoint yok
-- [ ] **Subscription upgrade/downgrade** + pro-rata
-- [ ] **Kullanıcı sipariş geçmişi** (order-service gelince)
-- [ ] **Mağaza davetiyesi** kabul akışı
-- [ ] **Sepet stok doğrulaması** (basket-service yorumdaki blok)
-- [ ] **i18n** (UI şu an Türkçe)
-
-### Teknik iyileştirmeler
-- [ ] **Parent POM** — her servis ayrı parent-less, versiyonlar hardcoded. Tek parent POM'a al. **M**
-- [ ] **Service discovery** — URL'ler env'den hardcoded. Eureka/Consul/k8s. **L**
-- [ ] **API versioning stratejisi** — `/api/v2/` nasıl olacak?
-- [ ] **OpenAPI/Swagger** — sadece UTS'de config var, yayılacak. **M**
-- [ ] **Rate limiting** — gateway'de yok. Redis + Bucket4j. **M**
-- [ ] **Structured logging** — JSON format + correlation id + Loki
+**Şimdilik sadece not:**
+- Stack: FastAPI + Pydantic + asyncpg + aiokafka + Redis + Transformers + LLM API
+- Konum: `backend-ai/` (Java toolchain'den ayrı)
+- Yeni event'ler gerekecek (additive): `PRODUCT_VIEWED_EVENT`, `REVIEW_CREATED_EVENT`, `RECOMMENDATION_FEEDBACK_EVENT`
+- Geliştirilme sırası: sentiment → öneri → chatbot MVP → full chatbot → mağaza asistanı → tahmin
+- Şu an yazma — Java servisler tracer bullet'tan geçince başla.
 
 ---
 
 ## 🎯 Doğrulama komutları
 
-İş bitince "bitti" demeden önce en azından ilgili komutları çalıştır:
+İş bitince doğrulamadan kapatma:
 
 ```bash
-# Debezium connector listesi
+# Hızlı doğrulama: /verify-event-pipeline slash command
+# Manuel:
+
 curl -s http://localhost:8083/connectors | jq
-
-# Connector aktif config'i — push edilen mi yoksa eski mi teyit
-curl -s http://localhost:8083/connectors/<connector-name>/config | jq
-
-# Connector status
-curl -s http://localhost:8083/connectors/<connector-name>/status | jq
-
-# Replication slotlar
-docker exec -it postgres psql -U $POSTGRES_USER -c "SELECT * FROM pg_replication_slots;"
-
-# Replication slot drop (migration sırasında)
-docker exec -it postgres psql -U $POSTGRES_USER -d <db_name> \
-  -c "SELECT pg_drop_replication_slot('<slot_name>');"
-
-# Kafka topic listesi
-docker exec -it kafka kafka-topics --bootstrap-server kafka:9092 --list
-
-# Kafka mesaj (header'larıyla) — message_type header'ını görmelisin
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server kafka:9092 --topic PRODUCT \
-  --from-beginning --property print.headers=true \
-  --property print.key=true --max-messages 3
-
-# Elasticsearch index sayısı
+curl -s http://localhost:8083/connectors/<name>/status | jq
+docker exec -it kafka kafka-console-consumer --bootstrap-server kafka:9092 \
+    --topic <TOPIC> --from-beginning --property print.headers=true --max-messages 3
 curl -s localhost:9200/products/_count | jq
-
-# Elasticsearch tek dokuman
-curl -s localhost:9200/products/_doc/<id> | jq
-
-# Flyway migration durumu
-docker logs <service-name> 2>&1 | grep -iE 'migrat|flyway' | head
-
-# Kafdrop UI görsel doğrulama: http://localhost:9000
+docker logs <service> 2>&1 | grep -iE 'migrat|flyway' | head
 ```
 
 ---
 
-## ⚠️ Tuzaklar (geçmişte takıldığımız yerler)
+## ⚠️ Geçmiş tuzaklar (kısa hatırlatma — detay CONVENTIONS §16)
 
-Detay için `CONVENTIONS.md` §16'ya bak. Özet:
-
-- **Debezium `additional.placement`** olmadan sessizce çalışmaz (default `type` kolonu arar)
-- **`@Builder` vs `@SuperBuilder`** parent + subclass uyumlu olmalı, karışım → parent field'lar kaybolur
-- **`JpaRepository<Inbox, Long>` bug** — PK `String` olmalı (`BaseInbox.messageId @Id VARCHAR`)
-- **Feign client URL env default** — test'te `application.clients.X.url` yoksa context load fail
-- **`envsubst` whitelist** — Debezium JSON'daki `${routedByValue}` gibi placeholder'ları expand etme
-- **Replication slot UUID→BIGINT geçişi** — connector silmek yetmez, slot'u da drop et
-- **`@Transactional` self-invocation** — aynı sınıf metot çağrısı proxy'den geçmez, tx açılmaz
-- **Hibernate lazy + `@Cacheable`** — entity cache'leme → `LazyInitializationException`, sadece `*Info` döndür
+- Debezium `additional.placement` olmadan event sessizce kırılır
+- `@Builder` vs `@SuperBuilder` parent + subclass uyumlu
+- `JpaRepository<Inbox, Long>` bug — String olmalı
+- Replication slot UUID→BIGINT geçişinde manuel drop
+- `@Transactional` self-invocation proxy atlatmaz
+- Hibernate lazy + `@Cacheable` entity = LazyInitializationException
+- Build kullanıcı çalıştırır, ajan değil
+- AI imza commit mesajına ekleme — `~/.claude/settings.json` `includeCoAuthoredBy: false`
+- SAGA'da tüm zinciri tek `@Transactional`'a sarma — her adım kendi transaction'ında olmalı
 
 ---
 
 ## Update protokolü
 
-Claude Code bu dosyayı her iş başında **okur**, bitirdiği işi işaretler (`- [x]`) veya "Tamamlanmış" bölümüne taşır, yeni bulduğu borcu ekler. Kullanıcıya danışmadan **silme**. Format bozma (başlık hiyerarşisi, zorluk etiketi S/M/L/XL, tarih formatı).
-
-"Aktif" bölümündeki bir item tamamen bittiğinde (test dahil, verify dahil), top-level `✅ Tamamlanmış` bölümüne taşı. Üzerine dönme.
+- Yeni iş ekleme: kategoriye uygun yere — cross-cutting/debt → `TECHNICAL-DEBT.md`, servis-spesifik → `SERVICE-WORK.md`, aktif sprint → buraya
+- Aktif iş bittiğinde: `- [x]` veya `✅ Tamamlanmış`a taşı
+- Birden fazla bağımsız iş varsa Claude öncelik sıralayıp kullanıcıya sorsun, kendi başına seçmesin
+- "Aktif"te 5'ten fazla item olmamalı — fazlaysa SERVICE-WORK'e geri taşı

@@ -156,6 +156,27 @@ Token tasarrufu için proje rol bazlı ajanlar ve ihtiyaç-üzerine-yüklenen sk
 
 **Sonraki turda gelecek:** `devops-infra` (compose/yml/healthcheck), `test-writer` (Testcontainers + JUnit), `frontend-refactor` (React/TS).
 
+### Branch ve PR kuralları
+
+Proje **feature branch + PR** akışıyla yönetiliyor. Claude push yapmaz, PR kullanıcı açar.
+
+**Branch isimlendirme:** `<tip>/<kısa-açıklama>` (kebab-case)
+
+| Tip | Kullanım |
+|---|---|
+| `feat/` | Yeni özellik (ör. `feat/order-service`) |
+| `fix/` | Bug fix (ör. `fix/basket-delete`) |
+| `devops/` | Dockerfile, compose, CI, infra (ör. `devops/stage9-containerization`) |
+| `refactor/` | Yapısal değişiklik, özellik yok |
+| `docs/` | Sadece dokümantasyon |
+
+**Akış:**
+1. `git checkout -b <branch-adı>` — kullanıcı oluşturur
+2. Claude kod yazar, `/commit-by-service` ile servis bazında commit'ler
+3. Kullanıcı `git push` + GitHub'da PR açar → `master`'a
+4. CI (`ci.yml`) otomatik çalışır — backend matrix build + frontend lint/build
+5. Yeşil ✅ → merge
+
 ### Skills (ihtiyaca göre yüklenen referanslar)
 
 `.claude/skills/` altında:

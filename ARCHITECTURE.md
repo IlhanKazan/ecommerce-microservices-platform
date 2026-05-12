@@ -314,7 +314,9 @@ application:
 
 1. Frontend (`react-oidc-context`) Keycloak'a redirect eder → kullanıcı login olur.
 2. Keycloak **access token (JWT)** döner. Frontend her isteğe `Authorization: Bearer ...` ekler.
-3. API Gateway ve her backend servisi JWT'yi `issuer-uri` üzerinden Keycloak'ın public key'i ile doğrular (`oauth2ResourceServer.jwt`).
+3. API Gateway ve her backend servisi JWT'yi Keycloak'ın public key'i ile doğrular (`GlobalSecurityConfig` → `jwtDecoder()`).
+   - **Dev profile** (`issuer-uri` set): OIDC discovery yapılır (`JwtDecoders.fromIssuerLocation`). Keycloak'a erişim `localhost:8080` üzerinden.
+   - **Prod/container profile** (`jwk-set-uri` + `issuer-uri` set): OIDC discovery YAPILMAZ. JWK'lar container DNS'inden direkt çekilir (`NimbusJwtDecoder.withJwkSetUri`). `issuer-uri` ise sadece token içindeki `iss` claim'ini doğrulamak için kullanılır (public URL: `http://localhost:8080/realms/...`). Bu ayrım kritik — tek başına `jwk-set-uri` issuer doğrulaması yapmaz, token sahteciliğine kapı açar.
 4. `JwtAuthConverter` (common-lib) JWT claim'lerinden rolleri çıkarır — Keycloak `resource_access.<clientId>.roles` altındaki rolleri `ROLE_xxx` olarak `GrantedAuthority`'e ekler.
 5. Principal (`sub` claim → UUID) → `AuthUser` record'u `CurrentUserArgumentResolver` ile controller metoduna `@CurrentUser AuthUser user` olarak inject edilir.
 
