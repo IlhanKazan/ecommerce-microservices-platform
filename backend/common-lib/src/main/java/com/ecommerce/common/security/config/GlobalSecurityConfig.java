@@ -15,12 +15,9 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtDecoders;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
@@ -30,8 +27,15 @@ public class GlobalSecurityConfig {
     @Autowired
     private JwtAuthConverter jwtAuthConverter;
 
-    @Value("${security.oauth2.resourceserver.jwt.issuer-uri}")
+    // Dev: sadece issuer-uri yeterli (OIDC discovery yapar).
+    // Prod/container: jwk-set-uri + issuer-uri birlikte kullanılır —
+    //   jwk-set-uri container DNS'inden JWK'ları çeker (discovery atlanır),
+    //   issuer-uri dışa açık public URL olarak iss claim doğrulamasında kullanılır.
+    @Value("${security.oauth2.resourceserver.jwt.issuer-uri:}")
     private String issuerUri;
+
+    @Value("${security.oauth2.resourceserver.jwt.jwk-set-uri:}")
+    private String jwkSetUri;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -65,14 +69,20 @@ public class GlobalSecurityConfig {
 
     @Bean
     public JwtDecoder jwtDecoder() {
+        if (jwkSetUri != null && !jwkSetUri.isBlank()) {
+            NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+            if (issuerUri != null && !issuerUri.isBlank()) {
+                // iss claim + exp/nbf validation — imza doğrulaması NimbusJwtDecoder içinde zaten var
+                decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuerUri));
+            }
+            return decoder;
+        }
         return JwtDecoders.fromIssuerLocation(issuerUri);
     }
 
     @PostConstruct
     public void enableSecurityContextPropagation() {
-        // Alt threadlere token yani auth bilgisini miras bırakıyoruz.
         SecurityContextHolder.setStrategyName(SecurityContextHolder.MODE_INHERITABLETHREADLOCAL);
     }
 
 }
-
