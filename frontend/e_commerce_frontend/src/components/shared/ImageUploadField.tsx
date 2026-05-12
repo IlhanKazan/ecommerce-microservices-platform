@@ -21,9 +21,10 @@ interface SingleImageUploadProps {
     value: ImagePreview | null;
     onChange: (img: ImagePreview | null) => void;
     onError: (msg: string) => void;
+    tenantId: number;
 }
 
-export function SingleImageUpload({ label, value, onChange, onError }: SingleImageUploadProps) {
+export function SingleImageUpload({ label, value, onChange, onError, tenantId }: SingleImageUploadProps) {
     const inputRef = useRef<HTMLInputElement>(null);
 
     const handleFile = useCallback(async (file: File) => {
@@ -34,7 +35,7 @@ export function SingleImageUpload({ label, value, onChange, onError }: SingleIma
         onChange(placeholder);
 
         try {
-            const url = await productService.uploadProductImage(file);
+            const url = await productService.uploadProductImage(tenantId, file);
             URL.revokeObjectURL(placeholder.previewUrl);
             onChange(createImagePreviewFromUrl(url));
         } catch {
@@ -104,9 +105,10 @@ interface MultiImageUploadProps {
     onChange: (imgs: ImagePreview[]) => void;
     onError: (msg: string) => void;
     max?: number;
+    tenantId: number;
 }
 
-export function MultiImageUpload({ label, values, onChange, onError, max = 8 }: MultiImageUploadProps) {
+export function MultiImageUpload({ label, values, onChange, onError, max = 8, tenantId }: MultiImageUploadProps) {
     // Internal state — upload süresince parent closure stale kalmaması için
     const [items, setItems] = useState<ImagePreview[]>(values);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -137,7 +139,7 @@ export function MultiImageUpload({ label, values, onChange, onError, max = 8 }: 
         toProcess.forEach(async (file, i) => {
             const ph = placeholders[i];
             try {
-                const url = await productService.uploadProductImage(file);
+                const url = await productService.uploadProductImage(tenantId, file);
                 URL.revokeObjectURL(ph.previewUrl);
                 setItems((prev) => prev.map((item) =>
                     item.id === ph.id ? createImagePreviewFromUrl(url) : item,

@@ -191,6 +191,7 @@ const MerchantProductForm: React.FC<MerchantProductFormProps> = ({
                                 value={values.mainImage}
                                 onChange={setMainImage}
                                 onError={(msg) => toast.error(msg)}
+                                tenantId={tenantId}
                             />
                         </Grid>
                         <Grid size={{ xs: 12, sm: 8 }}>
@@ -200,6 +201,7 @@ const MerchantProductForm: React.FC<MerchantProductFormProps> = ({
                                 onChange={setExtraImages}
                                 onError={(msg) => toast.error(msg)}
                                 max={8}
+                                tenantId={tenantId}
                             />
                         </Grid>
 
@@ -239,6 +241,94 @@ const MerchantProductForm: React.FC<MerchantProductFormProps> = ({
                                 </Stack>
                             </Grid>
                         ))}
+
+                        {/* ── Fiziksel Özellikler ──────────────────────── */}
+                        <Grid size={{ xs: 12 }}>
+                            <Divider sx={{ mt: 1, mb: 0.5 }} />
+                            <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                                Fiziksel Özellikler
+                            </Typography>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField label="Ağırlık (gram)" fullWidth type="number"
+                                       value={values.weightGrams}
+                                       onChange={(e) => set('weightGrams', e.target.value)}
+                                       slotProps={{ htmlInput: { min: 0 } }}
+                                       helperText="Kargo hesabı için (opsiyonel)" />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField label="Boyutlar (cm)" fullWidth
+                                       value={values.dimensionsCm}
+                                       onChange={(e) => set('dimensionsCm', e.target.value)}
+                                       placeholder="Örn: 30x20x10" />
+                        </Grid>
+
+                        {/* ── Sipariş Ayarları ─────────────────────────── */}
+                        <Grid size={{ xs: 12 }}>
+                            <Divider sx={{ mt: 1, mb: 0.5 }} />
+                            <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                                Sipariş Ayarları
+                            </Typography>
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField label="Min. Sipariş Adedi" fullWidth type="number"
+                                       value={values.minOrderQty}
+                                       onChange={(e) => set('minOrderQty', e.target.value)}
+                                       slotProps={{ htmlInput: { min: 1 } }}
+                                       helperText="Boş bırakılırsa 1 kabul edilir" />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                            <TextField label="Maks. Sipariş Adedi" fullWidth type="number"
+                                       value={values.maxOrderQty}
+                                       onChange={(e) => set('maxOrderQty', e.target.value)}
+                                       slotProps={{ htmlInput: { min: 1 } }}
+                                       helperText="Boş bırakılırsa limit yok" />
+                        </Grid>
+
+                        {/* ── Etiketler ────────────────────────────────── */}
+                        <Grid size={{ xs: 12 }}>
+                            <Divider sx={{ mt: 1, mb: 0.5 }} />
+                            <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                                Etiketler
+                            </Typography>
+                        </Grid>
+
+                        <Grid size={{ xs: 12 }}>
+                            <TextField label="Etiketler" fullWidth
+                                       value={values.tags}
+                                       onChange={(e) => set('tags', e.target.value)}
+                                       placeholder="Örn: elektronik, telefon, apple"
+                                       helperText="Virgülle ayırın — arama ve filtreleme için kullanılır" />
+                        </Grid>
+
+                        {/* ── SEO ──────────────────────────────────────── */}
+                        <Grid size={{ xs: 12 }}>
+                            <Divider sx={{ mt: 1, mb: 0.5 }} />
+                            <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                                SEO
+                            </Typography>
+                        </Grid>
+
+                        <Grid size={{ xs: 12 }}>
+                            <TextField label="SEO Başlığı" fullWidth
+                                       value={values.seoTitle}
+                                       onChange={(e) => set('seoTitle', e.target.value)}
+                                       helperText="Boş bırakılırsa ürün adı kullanılır" />
+                        </Grid>
+                        <Grid size={{ xs: 12 }}>
+                            <TextField label="SEO Açıklaması" fullWidth multiline rows={2}
+                                       value={values.seoDescription}
+                                       onChange={(e) => set('seoDescription', e.target.value)} />
+                        </Grid>
+                        <Grid size={{ xs: 12 }}>
+                            <TextField label="SEO Anahtar Kelimeler" fullWidth
+                                       value={values.seoKeywords}
+                                       onChange={(e) => set('seoKeywords', e.target.value)}
+                                       placeholder="Örn: akıllı telefon, ios, apple"
+                                       helperText="Virgülle ayırın" />
+                        </Grid>
                     </Grid>
                 )}
             </DialogContent>
