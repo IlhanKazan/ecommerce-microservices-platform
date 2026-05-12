@@ -1,0 +1,62 @@
+server:
+  port: 8089
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/${MAIL_DB_NAME}
+    username: ${MAIL_DB_USERNAME}
+    password: ${MAIL_DB_PASSWORD}
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  flyway:
+    connect-retries: 10
+    connect-retries-interval: 3
+
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: mail-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+  mail:
+    host: ${SMTP_HOST}
+    port: ${SMTP_PORT}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
+
+  thymeleaf:
+    cache: true
+
+  devtools:
+    restart:
+      enabled: false
+
+mail:
+  from: ${MAIL_FROM_ADDRESS}
+
+app:
+  scheduling:
+    enabled: true
+
+management:
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+
+logging:
+  level:
+    root: WARN
+    com.ecommerce.mailservice: INFO
