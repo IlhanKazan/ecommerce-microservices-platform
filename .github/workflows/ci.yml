@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [master]
+
+jobs:
+  backend:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - user-tenant-service
+          - payment-service
+          - product-service
+          - stock-service
+          - search-service
+          - basket-service
+          - mail-service
+          - api-gateway
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Install common-lib
+        run: cd backend/common-lib && mvn install -DskipTests -q
+
+      - name: Install event-contracts
+        run: cd backend/event-contracts && mvn install -DskipTests -q
+
+      - name: Build ${{ matrix.service }}
+        run: cd backend/${{ matrix.service }} && mvn clean package -DskipTests -q
+
+  frontend:
+    name: Frontend lint & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/e_commerce_frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/e_commerce_frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
