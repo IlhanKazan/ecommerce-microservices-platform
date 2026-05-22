@@ -37,6 +37,7 @@ public class TenantProductController {
     private final ProductMapper productMapper;
     private final ImageService imageService;
 
+    @Idempotent(cachePrefix = "idempotency:product-create:", ttlSeconds = 300)
     @PostMapping
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<ProductResponse> createProduct(
