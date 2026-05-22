@@ -4,14 +4,19 @@ import com.ecommerce.usertenantservice.tenant.controller.dto.response.PaymentRes
 
 public record PaymentResult(
         boolean isSuccess,
+        boolean isInfrastructureError,
         String errorMessage,
         PaymentResponse payload
 ) {
     public static PaymentResult success(PaymentResponse payload) {
-        return new PaymentResult(true, null, payload);
+        return new PaymentResult(true, false, null, payload);
     }
 
-    public static PaymentResult failure(String errorMessage) {
-        return new PaymentResult(false, errorMessage, null);
+    public static PaymentResult businessFailure(String errorMessage) {
+        return new PaymentResult(false, false, errorMessage, null);
+    }
+
+    public static PaymentResult infrastructureFailure(String errorMessage) {
+        return new PaymentResult(false, true, errorMessage, null);
     }
 }
