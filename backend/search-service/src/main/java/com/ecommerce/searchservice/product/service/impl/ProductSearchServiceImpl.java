@@ -6,6 +6,7 @@ import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders;
 import com.ecommerce.searchservice.product.document.ProductDocument;
 import com.ecommerce.searchservice.product.controller.dto.ProductSearchRequest;
+import com.ecommerce.searchservice.product.query.AutocompleteSuggestionInfo;
 import com.ecommerce.searchservice.product.service.ProductSearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,11 +52,13 @@ public class ProductSearchServiceImpl implements ProductSearchService {
             );
         }
 
-        // Keyword — name, tags, description'da arar
+        // Keyword — name, tags, description'da arar; AUTO fuzziness ile tek harf hatası tolere edilir
         if (request.keyword() != null && !request.keyword().isBlank()) {
             boolQueryBuilder.must(QueryBuilders.multiMatch(m -> m
                     .fields("name^3", "description", "tags^2")
                     .query(request.keyword())
+                    .fuzziness("AUTO")
+                    .prefixLength(1)
             ));
         }
 
@@ -115,6 +118,53 @@ public class ProductSearchServiceImpl implements ProductSearchService {
                 .toList();
 
         return new PageImpl<>(documents, pageable, searchHits.getTotalHits());
+    }
+
+    @Override
+    public List<AutocompleteSuggestionInfo> autocomplete(String q, int size) {
+        if (q == null || q.isBlank() || q.length() < 2) return List.of();
+
+        // name: phrase_prefix (tam prefix) + fuzzy match (typo toleransı) ikisi birden
+        // brand: keyword field → prefix query (phrase_prefix çalışmaz keyword alanda)
+        Query query = QueryBuilders.bool(b -> b
+                .should(QueryBuilders.matchPhrasePrefix(m -> m
+                        .field("name")
+                        .query(q)
+                        .maxExpansions(10)
+                ))
+                .should(QueryBuilders.match(m -> m
+                        .field("name")
+                        .query(q)
+                        .fuzziness("AUTO")
+                        .prefixLength(1)
+                ))
+                .should(QueryBuilders.prefix(p -> p
+                        .field("brand")
+                        .value(q.toLowerCase())
+                ))
+                .minimumShouldMatch("1")
+        );
+
+        NativeQuery nativeQuery = NativeQuery.builder()
+                .withQuery(query)
+                .withPageable(PageRequest.of(0, Math.min(size, 10)))
+                .build();
+
+        return elasticsearchOperations
+                .search(nativeQuery, ProductDocument.class)
+                .getSearchHits()
+                .stream()
+                .map(hit -> {
+                    ProductDocument d = hit.getContent();
+                    return new AutocompleteSuggestionInfo(
+                            d.getId(),
+                            d.getName(),
+                            d.getMainImageUrl(),
+                            d.getPrice(),
+                            d.getCurrency()
+                    );
+                })
+                .toList();
     }
 
     private List<co.elastic.clients.elasticsearch._types.SortOptions> buildSort(String sortBy) {

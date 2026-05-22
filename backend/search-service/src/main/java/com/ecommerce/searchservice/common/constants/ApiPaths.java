@@ -10,6 +10,8 @@ public class ApiPaths {
 
     @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class PublicProduct {
-        public static final String PUBLIC_SEARCH_PRODUCTS = BASE_PATH_V1 + "/public/search/products";
+        public static final String BASE         = BASE_PATH_V1 + "/public/search";
+        public static final String PRODUCTS     = "/products";
+        public static final String AUTOCOMPLETE = "/autocomplete";
     }
 }
