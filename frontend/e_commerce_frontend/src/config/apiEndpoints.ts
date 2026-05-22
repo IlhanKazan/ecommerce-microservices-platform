@@ -39,6 +39,7 @@ export const API_ENDPOINTS = {
     PAYMENT: {},
     SEARCH: {
         PRODUCTS: '/public/search/products',
+        AUTOCOMPLETE: '/public/search/autocomplete',
     },
     PRODUCT: {
         BY_ID_PUBLIC: (id: number) => `/public/products/${id}`,
@@ -74,6 +75,7 @@ export const API_ENDPOINTS = {
         GET:         '/baskets/me',
         ADD:         '/baskets/me/items',
         REMOVE_ITEM: (productId: number) => `/baskets/me/items/${productId}`,
+        UPDATE_ITEM: (productId: number) => `/baskets/me/items/${productId}`,
         CLEAR:       '/baskets/me'
     },
     ORDER: {
@@ -82,6 +84,7 @@ export const API_ENDPOINTS = {
     STOCK: {
         WAREHOUSES: (tenantId: number) => `/stocks/tenant/${tenantId}/warehouses`,
         MANUAL_ADD: (tenantId: number) => `/stocks/tenant/${tenantId}/manual-add`,
+        MANUAL_REMOVE: (tenantId: number) => `/stocks/tenant/${tenantId}/manual-remove`,
         SUMMARY: (tenantId: number) => `/stocks/tenant/${tenantId}`,
     },
 } as const;

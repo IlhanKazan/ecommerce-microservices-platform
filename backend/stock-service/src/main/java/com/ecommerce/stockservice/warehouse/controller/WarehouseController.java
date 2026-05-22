@@ -1,5 +1,6 @@
 package com.ecommerce.stockservice.warehouse.controller;
 
+import com.ecommerce.common.annotation.Idempotent;
 import com.ecommerce.stockservice.common.constants.ApiPaths;
 import com.ecommerce.stockservice.warehouse.controller.dto.request.WarehouseCreateRequest;
 import com.ecommerce.stockservice.warehouse.controller.dto.response.WarehouseResponse;
@@ -23,6 +24,7 @@ public class WarehouseController {
     private final WarehouseService warehouseService;
     private final WarehouseMapper warehouseMapper;
 
+    @Idempotent(cachePrefix = "idempotency:warehouse-create:", ttlSeconds = 300)
     @PostMapping
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<WarehouseResponse> createWarehouse(

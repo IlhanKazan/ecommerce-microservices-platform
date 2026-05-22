@@ -1,6 +1,7 @@
 package com.ecommerce.productservice.review.controller;
 
 import com.ecommerce.common.annotation.CurrentUser;
+import com.ecommerce.common.annotation.Idempotent;
 import com.ecommerce.common.dto.PageResponse;
 import com.ecommerce.common.security.dto.AuthUser;
 import com.ecommerce.productservice.common.constants.ApiPaths;
@@ -48,6 +49,7 @@ public class ReviewController {
     }
 
     // POST /api/v1/public/products/{productId}/reviews — auth gerekli
+    @Idempotent(cachePrefix = "idempotency:review-create:", ttlSeconds = 300)
     @PostMapping(ApiPaths.PublicProduct.PUBLIC_PRODUCTS + "/{productId}/reviews")
     public ResponseEntity<ReviewResponse> createReview(
             @PathVariable Long productId,

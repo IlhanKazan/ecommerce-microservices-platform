@@ -1,5 +1,6 @@
 package com.ecommerce.basketservice.entity;
 
+import com.ecommerce.common.exception.BusinessException;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,7 +17,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@RedisHash(value = "Basket", timeToLive = 604800)
+@RedisHash(value = "Basket", timeToLive = 2592000)
 public class Basket {
 
     @Id
@@ -37,6 +38,25 @@ public class Basket {
                 .ifPresentOrElse(
                         existingItem -> existingItem.setQuantity(existingItem.getQuantity() + newItem.getQuantity()),
                         () -> this.items.add(newItem)
+                );
+    }
+
+    public void removeItem(Long productId) {
+        if (this.items == null) return;
+        boolean removed = this.items.removeIf(item -> item.getProductId().equals(productId));
+        if (!removed) {
+            throw new BusinessException("Ürün sepette bulunamadı.", "ITEM_NOT_FOUND");
+        }
+    }
+
+    public void setItemQuantity(Long productId, int newQuantity) {
+        if (this.items == null) return;
+        this.items.stream()
+                .filter(item -> item.getProductId().equals(productId))
+                .findFirst()
+                .ifPresentOrElse(
+                        item -> item.setQuantity(newQuantity),
+                        () -> { throw new BusinessException("Ürün sepette bulunamadı.", "ITEM_NOT_FOUND"); }
                 );
     }
 

@@ -89,6 +89,16 @@ export interface CategoryResponse {
     subCategories: CategoryResponse[];
 }
 
+// ─── Autocomplete ────────────────────────────────────────────────────────────
+
+export interface AutocompleteSuggestion {
+    id: string;
+    name: string;
+    mainImageUrl: string | null;
+    price: number;
+    currency: string;
+}
+
 // ─── Search Payload ───────────────────────────────────────────────────────────
 
 export interface ProductSearchPayload {

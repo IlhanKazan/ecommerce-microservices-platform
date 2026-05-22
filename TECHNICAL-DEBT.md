@@ -83,7 +83,7 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
   - `react-hooks/exhaustive-deps` (5 warning): `App.tsx:82`, `ImageUploadField.tsx:46,153`, `CartPage.tsx:98`, `MerchantDashboard.tsx:44`
   - `@typescript-eslint/no-empty-object-type` (1 instance): `types/product.ts:197`
 - **Çözüm:** `any` → `unknown` veya proper tip, kullanılmayan import'ları sil, `NotificationProvider`'da context export'u ayır, hook dep array'lerini düzelt.
-- **Blokaj:** Bu branch merge edilemez, diğer branch'ler de frontend değişikliği içeriyorsa aynı hatayı taşır.
+- **Blokaj:** Her PR'da CI fail ediyor — frontend içersin içermesin lint job her seferinde çalışıyor.
 
 ---
 

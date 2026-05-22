@@ -45,6 +45,25 @@ public class StockController {
         return ResponseEntity.ok("Stok başarıyla eklendi.");
     }
 
+    @Idempotent(cachePrefix = "idempotency:manual-remove:")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    @PostMapping(ApiPaths.Stocks.TENANT_STOCKS_PATH + "/manual-remove")
+    public ResponseEntity<String> removeManualStock(
+            @PathVariable Long tenantId,
+            @CurrentUser AuthUser user,
+            @Valid @RequestBody AddStockRequest request) {
+
+        stockService.removeManualStock(
+                tenantId,
+                request.warehouseId(),
+                request.productId(),
+                request.amount(),
+                user.keycloakId()
+        );
+
+        return ResponseEntity.ok("Stok başarıyla düşüldü.");
+    }
+
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
     @GetMapping(ApiPaths.Stocks.TENANT_STOCKS_PATH)
     public ResponseEntity<List<StockSummaryResponse>> getTenantStockSummary(

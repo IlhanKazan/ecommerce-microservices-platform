@@ -68,4 +68,10 @@ public class Stock extends BaseEntity {
         if (amount <= 0) throw new BusinessException("Eklenecek stok 0'dan büyük olmalı!", "INVALID_AMOUNT");
         this.availableQuantity += amount;
     }
+
+    public void removeStock(int amount) {
+        if (amount <= 0) throw new BusinessException("Düşülecek stok 0'dan büyük olmalı!", "INVALID_AMOUNT");
+        if (this.availableQuantity < amount) throw new BusinessException("Mevcut stok yetersiz!", "INSUFFICIENT_STOCK");
+        this.availableQuantity -= amount;
+    }
 }

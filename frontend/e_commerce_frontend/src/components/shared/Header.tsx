@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     AppBar, Toolbar, Typography, Button, IconButton, Box, Drawer,
     List, ListItem, ListItemText, ListItemButton, ListItemIcon,
-    useMediaQuery, useTheme, Divider, Badge, InputBase, Paper
+    useMediaQuery, useTheme, Divider, Badge, InputBase, Paper,
+    Autocomplete, Avatar, ListItemAvatar,
 } from '@mui/material';
 import {
     Menu as MenuIcon,
@@ -18,6 +19,9 @@ import { useAuth } from 'react-oidc-context';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useCartStore } from '../../store/useCartStore';
 import { useBasketItemCount } from '../../query/useBasketQueries';
+import { useAutocomplete } from '../../query/useProductQueries';
+import { useDebounce } from '../../hooks/useDebounce';
+import type { AutocompleteSuggestion } from '../../types/product';
 
 const Header: React.FC = () => {
     const auth = useAuth();
@@ -27,7 +31,12 @@ const Header: React.FC = () => {
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-    const [searchValue, setSearchValue] = useState('');
+    const [inputValue, setInputValue] = useState('');
+    // freeSolo Enter'da onChange + onSubmit çift ateşlenir — bu flag ile ikincisi engellenir
+    const navigatedRef = useRef(false);
+
+    const debouncedQ = useDebounce(inputValue, 300);
+    const { data: suggestions = [] } = useAutocomplete(debouncedQ);
 
     // --- SEPET SAYISI MANTIĞINI DEĞİŞTİRDİK ---
     const localItemCount = useCartStore((state) => state.getItemCount());
@@ -39,15 +48,27 @@ const Header: React.FC = () => {
         post_logout_redirect_uri: window.location.origin
     });
 
-    const handleSearch = (e: React.FormEvent) => {
+    const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!searchValue.trim()) return;
-        navigate(`${AppRoutes.PRODUCT_LIST}?keyword=${encodeURIComponent(searchValue.trim())}`);
-        setSearchValue('');
+        if (navigatedRef.current) {
+            navigatedRef.current = false;
+            return;
+        }
+        if (!inputValue.trim()) return;
+        navigate(`${AppRoutes.PRODUCT_LIST}?keyword=${encodeURIComponent(inputValue.trim())}`);
+        setInputValue('');
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') handleSearch(e as any);
+    const handleOptionChange = (_: unknown, option: AutocompleteSuggestion | string | null) => {
+        if (!option) return;
+        if (typeof option === 'object') {
+            navigate(`/product/${option.id}`);
+            setInputValue('');
+        } else if (option.trim()) {
+            navigatedRef.current = true;
+            navigate(`${AppRoutes.PRODUCT_LIST}?keyword=${encodeURIComponent(option.trim())}`);
+            setInputValue('');
+        }
     };
 
     const publicNavItems = [
@@ -208,38 +229,73 @@ const Header: React.FC = () => {
                         mx: 'auto',
                     }}
                 >
-                    <Paper
-                        component="form"
-                        onSubmit={handleSearch}
-                        elevation={0}
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            width: '100%',
-                            border: '1.5px solid',
-                            borderColor: 'divider',
-                            borderRadius: 2,
-                            px: 1.5,
-                            py: 0.25,
-                            transition: 'border-color 0.2s, box-shadow 0.2s',
-                            '&:focus-within': {
-                                borderColor: 'primary.main',
-                                boxShadow: '0 0 0 3px rgba(125,85,37,0.08)',
-                            },
+                    <Autocomplete<AutocompleteSuggestion, false, false, true>
+                        freeSolo
+                        disableClearable
+                        filterOptions={(x) => x}
+                        options={suggestions}
+                        getOptionLabel={(opt) => (typeof opt === 'string' ? opt : opt.name)}
+                        inputValue={inputValue}
+                        onInputChange={(_, val, reason) => {
+                            if (reason !== 'reset') setInputValue(val);
                         }}
-                    >
-                        <InputBase
-                            value={searchValue}
-                            onChange={(e) => setSearchValue(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder={isMobile ? 'Ara...' : 'Ürün, kategori veya marka ara...'}
-                            sx={{ flex: 1, fontSize: '0.9rem' }}
-                            inputProps={{ 'aria-label': 'ürün ara' }}
-                        />
-                        <IconButton type="submit" size="small" color="primary" aria-label="ara">
-                            <SearchIcon fontSize="small" />
-                        </IconButton>
-                    </Paper>
+                        onChange={handleOptionChange}
+                        renderOption={(props, option) => {
+                            const { key, ...rest } = props as { key: React.Key } & React.HTMLAttributes<HTMLLIElement>;
+                            return (
+                                <ListItem key={key} {...rest} dense disablePadding sx={{ px: 1.5, py: 0.5 }}>
+                                    <ListItemAvatar sx={{ minWidth: 44 }}>
+                                        <Avatar
+                                            src={option.mainImageUrl ?? undefined}
+                                            alt={option.name}
+                                            sx={{ width: 32, height: 32, fontSize: '0.8rem' }}
+                                        >
+                                            {option.name[0]?.toUpperCase()}
+                                        </Avatar>
+                                    </ListItemAvatar>
+                                    <ListItemText
+                                        primary={option.name}
+                                        secondary={`${option.price.toLocaleString('tr-TR')} ${option.currency}`}
+                                        primaryTypographyProps={{ variant: 'body2', noWrap: true }}
+                                        secondaryTypographyProps={{ variant: 'caption' }}
+                                    />
+                                </ListItem>
+                            );
+                        }}
+                        renderInput={(params) => (
+                            <Paper
+                                component="form"
+                                onSubmit={handleSearchSubmit}
+                                ref={params.InputProps.ref}
+                                elevation={0}
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    width: '100%',
+                                    border: '1.5px solid',
+                                    borderColor: 'divider',
+                                    borderRadius: 2,
+                                    px: 1.5,
+                                    py: 0.25,
+                                    transition: 'border-color 0.2s, box-shadow 0.2s',
+                                    '&:focus-within': {
+                                        borderColor: 'primary.main',
+                                        boxShadow: '0 0 0 3px rgba(125,85,37,0.08)',
+                                    },
+                                }}
+                            >
+                                <InputBase
+                                    inputProps={params.inputProps}
+                                    placeholder={isMobile ? 'Ara...' : 'Ürün, kategori veya marka ara...'}
+                                    sx={{ flex: 1, fontSize: '0.9rem' }}
+                                />
+                                <IconButton type="submit" size="small" color="primary" aria-label="ara">
+                                    <SearchIcon fontSize="small" />
+                                </IconButton>
+                            </Paper>
+                        )}
+                        sx={{ width: '100%' }}
+                    />
                 </Box>
 
                 <Box

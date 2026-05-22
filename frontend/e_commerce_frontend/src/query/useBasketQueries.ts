@@ -102,6 +102,36 @@ export const useRemoveFromBasket = () => {
     });
 };
 
+export const useUpdateBasketItem = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (payload: { productId: number; quantity: number }) =>
+            basketService.updateCartItem(payload),
+        onMutate: async (payload) => {
+            await queryClient.cancelQueries({ queryKey: BASKET_QUERY_KEY });
+            const previousBasket = queryClient.getQueryData(BASKET_QUERY_KEY);
+            queryClient.setQueryData(BASKET_QUERY_KEY, (old: any) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    items: old.items.map((i: any) =>
+                        i.productId === payload.productId ? { ...i, quantity: payload.quantity } : i
+                    ),
+                };
+            });
+            return { previousBasket };
+        },
+        onError: (_err: unknown, _vars: unknown, context: any) => {
+            if (context?.previousBasket) {
+                queryClient.setQueryData(BASKET_QUERY_KEY, context.previousBasket);
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: BASKET_QUERY_KEY });
+        },
+    });
+};
+
 export const useClearBasket = () => {
     const queryClient = useQueryClient();
     return useMutation({

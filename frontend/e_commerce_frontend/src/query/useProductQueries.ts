@@ -12,6 +12,16 @@ import type { ReviewCreateRequest } from '../types/product';
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────
 
+export const useAutocomplete = (q: string) => {
+    return useQuery({
+        queryKey: ['autocomplete', q],
+        queryFn: () => productService.autocomplete(q),
+        enabled: q.trim().length >= 2,
+        staleTime: 1000 * 30,
+        placeholderData: [],
+    });
+};
+
 export const useSearchProducts = (body: SearchPayload) => {
     return useQuery({
         queryKey: QueryKeys.SEARCH_PRODUCTS(body),
@@ -231,6 +241,24 @@ export const useAddManualStock = (tenantId: number) => {
             queryClient.invalidateQueries({ queryKey: ['productDetail'] });
         },
         // Stok için retry — ağ hatası olursa aynı key ile tekrar dene
+        retry: 2,
+    });
+};
+
+export const useRemoveManualStock = (tenantId: number) => {
+    const queryClient = useQueryClient();
+    const idempotencyKey = useRef(generateIdempotencyKey());
+
+    return useMutation({
+        mutationFn: (payload: { warehouseId: number; productId: number; amount: number }) =>
+            tenantService.removeManualStock(tenantId, payload, idempotencyKey.current),
+        onSuccess: () => {
+            idempotencyKey.current = generateIdempotencyKey();
+            queryClient.invalidateQueries({ queryKey: QueryKeys.WAREHOUSES(tenantId) });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.TENANT_STOCKS(tenantId) });
+            queryClient.invalidateQueries({ queryKey: ['searchProducts'] });
+            queryClient.invalidateQueries({ queryKey: ['productDetail'] });
+        },
         retry: 2,
     });
 };

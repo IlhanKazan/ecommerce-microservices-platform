@@ -217,6 +217,18 @@ export const tenantService = {
         );
     },
 
+    removeManualStock: async (
+        tenantId: number,
+        payload: { warehouseId: number; productId: number; amount: number },
+        idempotencyKey: string,
+    ): Promise<void> => {
+        await api.post(
+            API_ENDPOINTS.STOCK.MANUAL_REMOVE(tenantId),
+            payload,
+            { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+        );
+    },
+
     getStockSummary: async (tenantId: number): Promise<StockSummaryItem[]> => {
         const response = await api.get(API_ENDPOINTS.STOCK.SUMMARY(tenantId));
         return response.data;
