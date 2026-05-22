@@ -2,7 +2,9 @@ package com.ecommerce.stockservice.stock.service;
 
 import com.ecommerce.stockservice.stock.entity.Stock;
 import com.ecommerce.stockservice.stock.query.StockInfo;
+import com.ecommerce.stockservice.stock.query.StockSummaryInfo;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface StockService {
@@ -10,4 +12,5 @@ public interface StockService {
     void addManualStock(Long tenantId, Long warehouseId, Long productId, int amount, UUID userId);
     Stock getStock(Long tenantId, Long warehouseId, Long productId);
     StockInfo getStockInfo(Long tenantId, Long warehouseId, Long productId);
+    List<StockSummaryInfo> getTenantStockSummary(Long tenantId);
 }

@@ -58,6 +58,16 @@ spring:
       enabled: false
 
 management:
+  server:
+    port: 9051
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   tracing:
     sampling:
       probability: 0.1

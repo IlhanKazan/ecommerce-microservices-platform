@@ -7,6 +7,7 @@ import com.ecommerce.stockservice.outbox.constant.TransactionType;
 import com.ecommerce.stockservice.outbox.service.OutboxService;
 import com.ecommerce.stockservice.stock.entity.Stock;
 import com.ecommerce.stockservice.stock.query.StockInfo;
+import com.ecommerce.stockservice.stock.query.StockSummaryInfo;
 import com.ecommerce.stockservice.stock.repository.StockRepository;
 import com.ecommerce.stockservice.stock.service.StockService;
 import com.ecommerce.stockservice.stockmovement.service.StockMovementService;
@@ -19,6 +20,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -96,12 +98,12 @@ public class StockServiceImpl implements StockService {
         stock = stockRepository.save(stock);
         movementService.recordMovement(stock, TransactionType.MANUAL_ADJUSTMENT, String.valueOf(userId), amount);
 
-        if (oldQty == 0 && stock.getAvailableQuantity() > 0) {
+        if (stock.getAvailableQuantity() > 0) {
             outboxService.publishStockStatusChangedEvent(
                     stock.getId().toString(),
                     productId,
                     true,
-                    "RESTOCKED"
+                    oldQty == 0 ? "RESTOCKED" : "IN_STOCK"
             );
         }
     }
@@ -127,5 +129,20 @@ public class StockServiceImpl implements StockService {
                 stock.getAvailableQuantity(),
                 stock.getReservedQuantity()
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StockSummaryInfo> getTenantStockSummary(Long tenantId) {
+        return stockRepository.findAllByTenantIdWithWarehouse(tenantId).stream()
+                .map(s -> new StockSummaryInfo(
+                        s.getProductId(),
+                        s.getSku(),
+                        s.getWarehouse().getId(),
+                        s.getWarehouse().getName(),
+                        s.getAvailableQuantity(),
+                        s.getReservedQuantity()
+                ))
+                .toList();
     }
 }

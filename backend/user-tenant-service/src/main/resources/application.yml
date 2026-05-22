@@ -20,13 +20,13 @@ spring:
       enabled: true
   cloud:
     openfeign:
-      circuit breaker:
-        enabled: true
+      circuitbreaker:
+        enabled: false
       client:
         config:
           default:
             connectTimeout: 5000
-            readTimeout: 15000
+            readTimeout: 30000
   data:
     redis:
       host: localhost
@@ -37,7 +37,7 @@ spring:
     import: optional:file:.env[.properties]
 
 resilience4j:
-  circuit breaker:
+  circuitbreaker:
     instances:
       payment-service:
         registerHealthIndicator: true
@@ -47,15 +47,10 @@ resilience4j:
         automaticTransitionFromOpenToHalfOpenEnabled: true
         waitDurationInOpenState: 5s
         failureRateThreshold: 50
-  retry:
+  timelimiter:
     instances:
       payment-service:
-        maxAttempts: 3
-        waitDuration: 2s
-  time limiter:
-    instances:
-      payment-service:
-        timeoutDuration: 10s
+        timeoutDuration: 30s
 
 jwt:
   auth:

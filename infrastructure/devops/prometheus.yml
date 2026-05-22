@@ -1,6 +1,6 @@
 global:
   scrape_interval: 15s
-  scrape_timeout: 10s
+  evaluation_interval: 15s
 
 scrape_configs:
   - job_name: 'prometheus'
@@ -9,11 +9,16 @@ scrape_configs:
 
   - job_name: 'spring-boot-services'
     metrics_path: '/actuator/prometheus'
-    scrape_timeout: 10s
     static_configs:
       - targets:
-        - '172.23.0.1:8081'
-        - '172.23.0.1:8082'
+          - 'user-tenant-service:8081'
+          - 'payment-service:8082'
+          - 'product-service:8084'
+          - 'search-service:8085'
+          - 'basket-service:8086'
+          - 'stock-service:8087'
+          - 'api-gateway:9051'
+          - 'mail-service:8089'
 
   - job_name: 'cadvisor'
     static_configs:

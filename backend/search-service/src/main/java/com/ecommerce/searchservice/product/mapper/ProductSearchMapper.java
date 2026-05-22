@@ -12,5 +12,6 @@ public interface ProductSearchMapper {
     @Mapping(target = "saleCount", constant = "0")
     @Mapping(target = "ratingAverage", constant = "0.0")
     @Mapping(target = "createdAt", expression = "java(java.time.LocalDateTime.now())")
+    @Mapping(target = "salesStatus", expression = "java(\"ON_SALE\")")
     ProductDocument toDocument(ProductCreatedEventPayload payload);
 }

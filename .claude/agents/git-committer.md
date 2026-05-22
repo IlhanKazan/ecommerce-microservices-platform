@@ -283,7 +283,25 @@ EOF
   e4f5g6h  refactor(product-service): make Inbox extend BaseInbox
 
 Push yapmadım, push sende.
+
+📌 Branch önerisi: refactor/base-inbox-enhancement
+   (IDE'den bu isimle yeni branch aç, sonra push et)
 ```
+
+Branch adını commitlerden türet. Format: `<type>/<kısa-kebab-case-açıklama>`
+
+| Commit type'ı | Branch prefix |
+|---|---|
+| `feat` | `feat/` |
+| `fix` | `fix/` |
+| `refactor` | `refactor/` |
+| `chore` / `docs` | `chore/` veya `docs/` |
+| `devops` (infra, docker, yml) | `devops/` |
+| Karma (birden fazla type) | en baskın type'ı kullan |
+
+Birden fazla servis aynı iş kapsamındaysa branch adına servis adı değil **iş adı** yaz:
+- ✅ `fix/tenant-payment-ghost-charge`
+- ❌ `fix/user-tenant-service`
 
 ## Tek tek onay modu
 

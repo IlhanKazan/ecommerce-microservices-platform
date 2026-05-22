@@ -176,7 +176,7 @@ spring:
 #### 9.7 Temizlik
 - [x] `connector-init` düzeltildi — `docker-init-connectors.sh` yazıldı, tüm 4 connector mount edildi, `service_healthy` ile bekleme, `restart: "no"` eklendi
 - [x] `.env.example`'ı tüm değişkenlerle yaz — tüm servisler, SMTP açıklaması, Keycloak SPI dahil
-- [ ] `application.yml`'lerdeki boşluklu YAML key'leri düzelt: `resource server` → `resource-server` (payment, product, search, basket dev yml'lerinde var)
+- [x] `application.yml`'lerdeki boşluklu YAML key'leri düzelt: `resource server` → `resourceserver` (basket, search, payment dev yml'lerinde düzeltildi)
 - [ ] Her servis için commit: `devops(<servis>): prod profile + Dockerfile + compose wiring`
 
 ---
@@ -196,6 +196,7 @@ spring:
 - [ ] Grafana data source otomatik provision: Prometheus + Loki için `provisioning/datasources.yml`
 - [ ] Grafana dashboard'ları: JVM (Spring Boot), Kafka consumer lag, Redis, cAdvisor container metrikler
 - [ ] `infrastructure/devops/prometheus.yml`'den `cadvisor` scrape'i zaten var — cAdvisor da aynı network'e taşınınca çalışır
+- [ ] **mail-service Prometheus fix** — `mail-service:8089/actuator/prometheus` text/html dönüyor. Neden: mail-service'de controller yok → `RequestMappingHandlerMapping` boş → Spring Security 6.x'in string-based `requestMatchers("/actuator/prometheus")` eşleşmiyor (MVC handler mapping boş servis için güvenilmez) → `anyRequest().authenticated()` kuralına düşüyor → deny. Fix: `ActuatorSecurityConfig.java` eklendi (`backend/mail-service/.../common/config/`), `EndpointRequest.toAnyEndpoint()` + `@Order(1)` kullanıyor. **Rebuild gerekiyor:** `docker compose build mail-service && docker compose up -d mail-service`
 - **L**
 
 ---

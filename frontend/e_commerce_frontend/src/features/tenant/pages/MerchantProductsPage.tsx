@@ -12,6 +12,7 @@ import {
     Delete as DeleteIcon,
     ToggleOn as ToggleOnIcon,
     ToggleOff as ToggleOffIcon,
+    Inventory2 as InventoryIcon,
 } from '@mui/icons-material';
 import { useMerchantStore } from '../../../store/useMerchantStore';
 import { useNotification } from '../../../components/shared/NotificationProvider';
@@ -21,9 +22,11 @@ import {
     useUpdateTenantProduct,
     useDeleteTenantProduct,
     useUpdateSalesStatus,
+    useGetTenantStocks,
 } from '../../../query/useProductQueries';
 import type { TenantProductResponse, ProductCreateRequest } from '../../../types/product';
 import MerchantProductForm from '../components/MerchantProductForm';
+import { AddStockModal } from '../components/AddStockModal';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -54,10 +57,11 @@ const MerchantProductsPage: React.FC = () => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(20);
 
-    // Form & delete dialog state
+    // Form & delete & stock dialog state
     const [formOpen, setFormOpen] = useState(false);
     const [editTarget, setEditTarget] = useState<TenantProductResponse | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<TenantProductResponse | null>(null);
+    const [stockTargetId, setStockTargetId] = useState<number | null>(null);
 
     // Tüm hook'lar koşulsuz çağrılmalı — Rules of Hooks
     // activeTenant yoksa tenantId=0 ile çağrılır; enabled: false koruması
@@ -69,6 +73,13 @@ const MerchantProductsPage: React.FC = () => {
     const { mutate: updateProduct, isPending: isUpdating } = useUpdateTenantProduct(tenantId);
     const { mutate: deleteProduct, isPending: isDeleting } = useDeleteTenantProduct(tenantId);
     const { mutate: updateStatus, isPending: isUpdatingStatus } = useUpdateSalesStatus(tenantId);
+    const { data: stockSummary } = useGetTenantStocks(tenantId);
+
+    // productId → toplam available quantity (tüm depolar)
+    const stockByProduct = new Map<number, number>();
+    stockSummary?.forEach((s) => {
+        stockByProduct.set(s.productId, (stockByProduct.get(s.productId) ?? 0) + s.availableQuantity);
+    });
 
     // ─── Erken return — hook'lardan SONRA ────────────────────────────────────
     if (!activeTenant) {
@@ -191,6 +202,7 @@ const MerchantProductsPage: React.FC = () => {
                                 <TableCell sx={{ fontWeight: 'bold' }}>SKU</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>Kategori</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }} align="right">Fiyat</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }} align="center">Stok</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }} align="center">Durum</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }} align="center">İşlemler</TableCell>
                             </TableRow>
@@ -199,13 +211,13 @@ const MerchantProductsPage: React.FC = () => {
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                                         <CircularProgress size={36} />
                                     </TableCell>
                                 </TableRow>
                             ) : data?.content.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                                    <TableCell colSpan={8} align="center" sx={{ py: 6, color: 'text.secondary' }}>
                                         Henüz ürün eklemediniz. "Yeni Ürün Ekle" butonuyla başlayın.
                                     </TableCell>
                                 </TableRow>
@@ -288,6 +300,25 @@ const MerchantProductsPage: React.FC = () => {
                                             </TableCell>
 
                                             <TableCell align="center">
+                                                {(() => {
+                                                    const qty = stockByProduct.get(product.id);
+                                                    if (qty === undefined) {
+                                                        return (
+                                                            <Typography variant="caption" color="text.disabled">—</Typography>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <Chip
+                                                            label={qty}
+                                                            size="small"
+                                                            color={qty === 0 ? 'error' : qty <= 5 ? 'warning' : 'success'}
+                                                            variant="outlined"
+                                                        />
+                                                    );
+                                                })()}
+                                            </TableCell>
+
+                                            <TableCell align="center">
                                                 <Chip
                                                     label={STATUS_LABELS[status] ?? status}
                                                     color={STATUS_COLORS[status] ?? 'default'}
@@ -298,6 +329,16 @@ const MerchantProductsPage: React.FC = () => {
 
                                             <TableCell align="center">
                                                 <Stack direction="row" spacing={0.5} justifyContent="center">
+                                                    <Tooltip title="Stok Gir">
+                                                        <IconButton
+                                                            size="small"
+                                                            color="info"
+                                                            onClick={() => setStockTargetId(product.id)}
+                                                        >
+                                                            <InventoryIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+
                                                     <Tooltip
                                                         title={isOnSale ? 'Satıştan Kaldır' : 'Satışa Aç'}
                                                     >
@@ -363,6 +404,16 @@ const MerchantProductsPage: React.FC = () => {
                     />
                 )}
             </Paper>
+
+            {/* Stok giriş dialog */}
+            {stockTargetId !== null && (
+                <AddStockModal
+                    open={stockTargetId !== null}
+                    onClose={() => setStockTargetId(null)}
+                    tenantId={tenantId}
+                    productId={stockTargetId}
+                />
+            )}
 
             {/* Create / Edit dialog */}
             <MerchantProductForm

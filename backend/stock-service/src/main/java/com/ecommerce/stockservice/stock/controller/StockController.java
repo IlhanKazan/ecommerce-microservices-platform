@@ -6,7 +6,9 @@ import com.ecommerce.common.security.dto.AuthUser;
 import com.ecommerce.stockservice.common.constants.ApiPaths;
 import com.ecommerce.stockservice.stock.controller.dto.request.AddStockRequest;
 import com.ecommerce.stockservice.stock.controller.dto.response.StockResponse;
+import com.ecommerce.stockservice.stock.controller.dto.response.StockSummaryResponse;
 import com.ecommerce.stockservice.stock.query.StockInfo;
+import com.ecommerce.stockservice.stock.query.StockSummaryInfo;
 import com.ecommerce.stockservice.stock.service.StockService;
 import com.ecommerce.stockservice.stock.entity.Stock;
 import jakarta.validation.Valid;
@@ -14,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping(ApiPaths.Stocks.STOCKS_PATH)
@@ -39,6 +43,25 @@ public class StockController {
         );
 
         return ResponseEntity.ok("Stok başarıyla eklendi.");
+    }
+
+    @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
+    @GetMapping(ApiPaths.Stocks.TENANT_STOCKS_PATH)
+    public ResponseEntity<List<StockSummaryResponse>> getTenantStockSummary(
+            @PathVariable Long tenantId) {
+
+        List<StockSummaryResponse> response = stockService.getTenantStockSummary(tenantId).stream()
+                .map(s -> new StockSummaryResponse(
+                        s.productId(),
+                        s.sku(),
+                        s.warehouseId(),
+                        s.warehouseName(),
+                        s.availableQuantity(),
+                        s.reservedQuantity()
+                ))
+                .toList();
+
+        return ResponseEntity.ok(response);
     }
 
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")

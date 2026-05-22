@@ -1,6 +1,7 @@
 package com.ecommerce.usertenantservice.tenant.service;
 
 import com.ecommerce.usertenantservice.exception.PaymentFailedException;
+import com.ecommerce.usertenantservice.exception.PaymentServiceUnreachableException;
 import com.ecommerce.usertenantservice.exception.TenantCreationException;
 import com.ecommerce.usertenantservice.integration.payment.PaymentServiceClientAdapter;
 import com.ecommerce.usertenantservice.integration.payment.dto.PaymentResult;
@@ -55,19 +56,24 @@ public class TenantLifecycleService {
                 log.info("Ödeme başarılı! Tenant ACTIVE statüsüne çekiliyor");
                 tenantStateService.activateTenant(tenant);
                 return true;
-            } else{
-                log.warn("Ödeme başarısız! Tenant FAILED statüsüne çekiliyor.");
+            } else if (paymentResult.isInfrastructureError()) {
+                // Ödeme servisi erişilemez veya timeout — ödemenin gerçekleşip gerçekleşmediği bilinmiyor.
+                // Tenant PENDING_PAYMENT'ta kalır; kullanıcı retry-payment endpoint'i ile devam edebilir.
+                log.error("Ödeme servisine ulaşılamadı. Ödeme durumu belirsiz. TenantId: {}", tenant.getId());
+                throw new PaymentServiceUnreachableException(paymentResult.errorMessage());
+            } else {
+                log.warn("Ödeme başarısız (iş kuralı reddi)! Tenant FAILED statüsüne çekiliyor.");
                 tenantStateService.markTenantAsPaymentFailed(tenant);
                 throw new PaymentFailedException(paymentResult.errorMessage(), tenant.getId());
             }
 
-        }catch(PaymentFailedException e){
+        } catch (PaymentFailedException | PaymentServiceUnreachableException e) {
             throw e;
-        }
-        catch(Exception e){
-            log.error("Kritik hata: Tenant oluşturuldu ancak süreç tamamlanamadı");
-            tenantStateService.markTenantAsPaymentFailed(tenant);
-            throw new TenantCreationException("İşlem sırasında hata oluştu");
+        } catch (Exception e) {
+            // activateTenant veya başka bir adım patladıysa — ödeme durumu bilinmiyor.
+            // Tenant PENDING_PAYMENT'ta kalır; ghost payment riskini önler.
+            log.error("Kritik hata: Tenant oluşturuldu ancak aktivasyon tamamlanamadı. TenantId: {}", tenant.getId(), e);
+            throw new TenantCreationException("İşlem sırasında beklenmedik bir hata oluştu. Lütfen ödeme durumunuzu kontrol edin.");
         }
     }
 

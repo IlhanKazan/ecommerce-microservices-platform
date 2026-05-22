@@ -197,3 +197,14 @@ export interface ProductCreateRequest {
 export interface ProductUpdateRequest extends ProductCreateRequest {
     // PUT body aynı alanları taşıyor
 }
+
+// ─── Stock ────────────────────────────────────────────────────────────────────
+
+export interface StockSummaryItem {
+    productId: number;
+    sku: string;
+    warehouseId: number;
+    warehouseName: string;
+    availableQuantity: number;
+    reservedQuantity: number;
+}

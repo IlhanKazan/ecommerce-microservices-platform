@@ -35,24 +35,22 @@ public class PaymentServiceClientAdapter {
             PaymentResponse response = paymentServiceClient.processPayment(request);
 
             if (response != null) {
-
                 if (response.success()) {
                     return PaymentResult.success(response);
                 } else {
                     log.warn("Payment Service returned business failure: {}", response.message());
-                    return PaymentResult.failure(response.message());
+                    return PaymentResult.businessFailure(response.message());
                 }
             } else {
-                return PaymentResult.failure("HTTP Error: PaymentResponse is null");
+                return PaymentResult.infrastructureFailure("HTTP Error: PaymentResponse is null");
             }
 
         } catch (FeignException e) {
             log.error("Feign communication error: Status: {}", e.status());
-            // TODO [09.02.2026 23:54]: Burada detaylı hata analizi yapılabilir, bakiye yetersiz vs
-            return PaymentResult.failure("Ödeme servisine ulaşılamadı veya hata aldı: " + e.status());
+            return PaymentResult.infrastructureFailure("Ödeme servisine ulaşılamadı: " + e.status());
         } catch (Exception e) {
             log.error("Unexpected error during payment process", e);
-            return PaymentResult.failure(UNEXPECTED_ERROR);
+            return PaymentResult.infrastructureFailure(UNEXPECTED_ERROR);
         }
     }
 
