@@ -35,6 +35,7 @@ SERVICE-WORK / TECHNICAL-DEBT  →  TODO.md "Aktif"  →  TODO.md "✅ Tamamlanm
 - **FB-4: Frontend ürün ekleme/düzenleme UI** ✅ — Edit formda `/detail` endpoint, tüm field'lar (weightGrams, seo, tags…) form state'te, veri kaybı yok
 - **Stage 8: mail-service MVP** ✅
 - **Stage 9.0: user-tenant-service container** ✅ — Dockerfile (BuildKit cache, non-root), prod.yml (HikariCP, JWT dual-mode, Flyway retry), compose wiring. "Started" logu doğrulandı. — Kafka consumer, Thymeleaf şablonları, inbox idempotency, docker-compose. TENANT_ACTIVATED + TENANT_PAYMENT_FAILED çalışıyor. Eksik event bağlantıları (VERIFIED, PAYMENT_SUCCESS, ORDER_*) → `SERVICE-WORK.md` "Mail Service" bölümüne taşındı.
+- **Stage 11: Observability** ✅ — Prometheus/Grafana/Zipkin/Loki/Promtail/cAdvisor ana compose'a taşındı, container DNS scrape, Grafana datasource+dashboard provisioning (4701 JVM + 14282 cAdvisor), Loki persistent volume, ES healthcheck, search-service timing fix.
 
 ---
 
@@ -188,16 +189,18 @@ spring:
 **Şu anki durum:** `infrastructure/devops/docker-compose.yml` ayrı dosyada — Prometheus, Grafana, Zipkin, Loki, Promtail, cAdvisor burada. Servisler `e-commerce-network`'e bağlı değil, scrape target'ları eski IP'ler (`172.23.0.1:8081` vb.).
 
 **Yapılacaklar:**
-- [ ] `infrastructure/devops/docker-compose.yml`'deki tüm servisleri ana `docker-compose.yml`'e taşı — volume path'leri `./infrastructure/devops/...` olarak güncelle
-- [ ] Tüm observability servislerine `e-commerce-network` ekle
-- [ ] `infrastructure/devops/prometheus.yml` scrape target'larını güncelle — `172.23.0.1:PORT` → `container-name:PORT` (7 servis: UTS, payment, product, stock, search, basket, gateway — hepsi `/actuator/prometheus` açık)
-- [ ] Zipkin: servisler zaten `http://zipkin:9411/api/v2/spans` yazıyor — sadece `zipkin` container'ı aynı network'te olunca çalışır
-- [ ] Loki + Promtail: `promtail-config.yml` Docker container log path'lerini doğru göstermeli (`/var/lib/docker/containers`)
-- [ ] Grafana data source otomatik provision: Prometheus + Loki için `provisioning/datasources.yml`
-- [ ] Grafana dashboard'ları: JVM (Spring Boot), Kafka consumer lag, Redis, cAdvisor container metrikler
-- [ ] `infrastructure/devops/prometheus.yml`'den `cadvisor` scrape'i zaten var — cAdvisor da aynı network'e taşınınca çalışır
-- [ ] **mail-service Prometheus fix** — `mail-service:8089/actuator/prometheus` text/html dönüyor. Neden: mail-service'de controller yok → `RequestMappingHandlerMapping` boş → Spring Security 6.x'in string-based `requestMatchers("/actuator/prometheus")` eşleşmiyor (MVC handler mapping boş servis için güvenilmez) → `anyRequest().authenticated()` kuralına düşüyor → deny. Fix: `ActuatorSecurityConfig.java` eklendi (`backend/mail-service/.../common/config/`), `EndpointRequest.toAnyEndpoint()` + `@Order(1)` kullanıyor. **Rebuild gerekiyor:** `docker compose build mail-service && docker compose up -d mail-service`
-- **L**
+- [x] `infrastructure/devops/docker-compose.yml`'deki tüm servisleri ana `docker-compose.yml`'e taşı — volume path'leri `./infrastructure/devops/...` olarak güncelle
+- [x] Tüm observability servislerine `e-commerce-network` ekle
+- [x] `infrastructure/devops/prometheus.yml` scrape target'larını güncelle — container DNS (container-name:PORT)
+- [x] Zipkin: servisler `http://zipkin:9411/api/v2/spans` yazıyor, aynı network'te ✅
+- [x] Loki + Promtail: `promtail-config.yml` Docker SD ile container loglarını otomatik topluyor ✅
+- [x] Grafana data source otomatik provision: `infrastructure/devops/provisioning/datasources/datasources.yml` (Prometheus + Loki)
+- [x] Grafana dashboard'ları: JVM (Spring Boot 4701), cAdvisor (14282) — `provisioning/dashboards/` klasöründe, `${DS_PROMETHEUS}` → `Prometheus` düzeltildi ✅
+- [x] `infrastructure/devops/prometheus.yml`'den `cadvisor` scrape'i zaten var — cAdvisor aynı network'te ✅
+- [x] Loki persistent volume eklendi (`loki_data`) — restart'ta log kaybı yok
+- [x] Eski `infrastructure/devops/docker-compose.yml` dead code silindi
+- [x] Elasticsearch healthcheck eklendi — `condition: service_healthy` ile search-service timing sorunu çözüldü
+- [x] **mail-service Prometheus fix** — `ActuatorSecurityConfig.java` mevcut, `EndpointRequest.toAnyEndpoint()` + `@Order(1)`. Rebuild: `docker compose build mail-service && docker compose up -d mail-service`
 
 ---
 
