@@ -5,9 +5,12 @@ import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -15,6 +18,10 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
 
     // MANUEL İŞLEMLER VE OKUMALAR İÇİN (Pessimistic Lock yok, sadece Optimistic @Version koruması var)
     Optional<Stock> findByTenantIdAndWarehouseIdAndProductId(Long tenantId, Long warehouseId, Long productId);
+
+    // Tenant'ın tüm stok kayıtları — JOIN FETCH ile N+1 önlendi
+    @Query("SELECT s FROM Stock s JOIN FETCH s.warehouse WHERE s.tenantId = :tenantId")
+    List<Stock> findAllByTenantIdWithWarehouse(@Param("tenantId") Long tenantId);
 
     // SADECE SAGA/SİPARİŞ İÇİN
     @Lock(LockModeType.PESSIMISTIC_WRITE)
