@@ -67,18 +67,24 @@ public class ProductEventConsumer {
                 .orElse(new ProductDocument());
 
         document.setId(payload.productId().toString());
+        document.setTenantId(payload.tenantId());
+        document.setCategoryId(payload.categoryId());
+        document.setSku(payload.sku());
         document.setName(payload.name());
         document.setDescription(payload.description());
+        document.setBrand(payload.brand());
         document.setPrice(payload.price());
+        document.setCurrency(payload.currency());
+        document.setMainImageUrl(payload.mainImageUrl());
+        document.setAttributes(payload.attributes());
+        document.setTags(payload.tags());
 
-        boolean isSellable = "ACTIVE".equals(payload.status()) && "ON_SALE".equals(payload.salesStatus());
-
-        if (!isSellable) {
-            document.setInStock(false);
-        }
+        // inStock'a dokunma — gerçek fiziksel stok durumunu yalnızca stock-service event'leri yönetir.
+        // salesStatus'ü ayrı tut; search query her iki alanı birlikte filtreler.
+        document.setSalesStatus(payload.salesStatus());
 
         searchRepository.save(document);
-        log.info("ES Ürün Güncellendi. ID: {}, isSellable: {}", payload.productId(), isSellable);
+        log.info("ES Ürün Güncellendi. ID: {}, salesStatus: {}", payload.productId(), payload.salesStatus());
     }
 
     private void handleProductDeleted(String json) throws JsonProcessingException {

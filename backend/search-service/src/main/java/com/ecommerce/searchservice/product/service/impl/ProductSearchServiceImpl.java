@@ -39,6 +39,16 @@ public class ProductSearchServiceImpl implements ProductSearchService {
             boolQueryBuilder.filter(
                     QueryBuilders.term(t -> t.field("inStock").value(true))
             );
+            // salesStatus filtresi: ON_SALE olanlar veya alan henüz set edilmemiş eski dokümanlar
+            boolQueryBuilder.filter(
+                    QueryBuilders.bool(b -> b
+                            .should(QueryBuilders.term(t -> t.field("salesStatus").value("ON_SALE")))
+                            .should(QueryBuilders.bool(b2 -> b2
+                                    .mustNot(QueryBuilders.exists(e -> e.field("salesStatus")))
+                            ))
+                            .minimumShouldMatch("1")
+                    )
+            );
         }
 
         // Keyword — name, tags, description'da arar

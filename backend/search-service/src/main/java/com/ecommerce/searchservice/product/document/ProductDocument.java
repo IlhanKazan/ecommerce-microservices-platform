@@ -61,6 +61,12 @@ public class ProductDocument {
     @Field(type = FieldType.Boolean)
     private boolean inStock;
 
+    // Ürünün satış durumu — search-service inStock'tan bağımsız olarak filtreler.
+    // inStock = gerçek fiziksel stok (stock-service event'leri yönetir)
+    // salesStatus = merchant'ın manuel kararı (product-service event'leri yönetir)
+    @Field(type = FieldType.Keyword)
+    private String salesStatus;
+
     @Field(type = FieldType.Double)
     private Double ratingAverage;
 
