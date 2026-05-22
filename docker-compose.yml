@@ -255,6 +255,12 @@ services:
       - e-commerce-network
     volumes:
       - ./infrastructure/elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -427,7 +433,7 @@ services:
       kafka:
         condition: service_healthy
       elasticsearch:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_started
       keycloak:
@@ -547,6 +553,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./infrastructure/devops/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
       - loki
@@ -563,6 +570,8 @@ services:
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki_data:/loki
     networks:
       - e-commerce-network
     deploy:
@@ -609,3 +618,4 @@ networks:
 
 volumes:
   grafana_data:
+  loki_data:
