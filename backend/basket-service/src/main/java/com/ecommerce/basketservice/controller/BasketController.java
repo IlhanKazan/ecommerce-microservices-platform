@@ -4,11 +4,13 @@ import com.ecommerce.basketservice.client.adapter.ProductClientAdapter;
 import com.ecommerce.basketservice.controller.dto.AddItemRequest;
 import com.ecommerce.basketservice.controller.dto.BasketItemResponse;
 import com.ecommerce.basketservice.controller.dto.BasketResponse;
+import com.ecommerce.basketservice.controller.dto.UpdateItemQuantityRequest;
 import com.ecommerce.basketservice.client.dto.ProductClientResponse;
 import com.ecommerce.basketservice.entity.Basket;
 import com.ecommerce.basketservice.entity.BasketItem;
 import com.ecommerce.basketservice.service.BasketService;
 import com.ecommerce.common.annotation.CurrentUser;
+import com.ecommerce.common.annotation.Idempotent;
 import com.ecommerce.common.security.dto.AuthUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class BasketController {
     private final BasketService basketService;
     private final ProductClientAdapter productClientAdapter;
 
+    @Idempotent(cachePrefix = "idempotency:basket-add:", ttlSeconds = 300)
     @PostMapping("/me/items")
     public ResponseEntity<String> addItemToBasket(
             @CurrentUser AuthUser user,
@@ -65,6 +68,23 @@ public class BasketController {
         );
 
         return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/me/items/{productId}")
+    public ResponseEntity<Void> removeItemFromBasket(
+            @CurrentUser AuthUser user,
+            @PathVariable Long productId) {
+        basketService.removeItemFromBasket(user.keycloakId(), productId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/me/items/{productId}")
+    public ResponseEntity<Void> updateItemQuantity(
+            @CurrentUser AuthUser user,
+            @PathVariable Long productId,
+            @Valid @RequestBody UpdateItemQuantityRequest request) {
+        basketService.setItemQuantity(user.keycloakId(), productId, request.quantity());
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/me")

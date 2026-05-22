@@ -4,6 +4,7 @@ import com.ecommerce.basketservice.entity.Basket;
 import com.ecommerce.basketservice.entity.BasketItem;
 import com.ecommerce.basketservice.repository.BasketRepository;
 import com.ecommerce.common.exception.BusinessException;
+import com.ecommerce.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -51,8 +52,64 @@ public class BasketService {
         }
     }
 
+    public void removeItemFromBasket(UUID userId, Long productId) {
+        String lockKey = "lock:basket:" + userId;
+        RLock lock = redissonClient.getLock(lockKey);
+        try {
+            if (lock.tryLock(10, 5, TimeUnit.SECONDS)) {
+                log.debug("Kilit alındı: {}. Ürün kaldırılıyor...", lockKey);
+                Basket basket = basketRepository.findById(String.valueOf(userId))
+                        .orElseThrow(() -> new ResourceNotFoundException("Sepet bulunamadı.", "BASKET_NOT_FOUND"));
+                basket.removeItem(productId);
+                basketRepository.save(basket);
+                log.debug("Ürün sepetten kaldırıldı. UserID: {}, ProductID: {}", userId, productId);
+            } else {
+                log.warn("Kilit alınamadı: {}", lockKey);
+                throw new BusinessException("Sepetiniz şu an güncelleniyor, lütfen bekleyip tekrar deneyin.", "BASKET_LOCKED");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException("Sistem hatası: Kilit beklenirken kesilme oldu.", "LOCK_INTERRUPTED");
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+                log.debug("Kilit bırakıldı: {}", lockKey);
+            }
+        }
+    }
+
+    public void setItemQuantity(UUID userId, Long productId, int newQuantity) {
+        String lockKey = "lock:basket:" + userId;
+        RLock lock = redissonClient.getLock(lockKey);
+        try {
+            if (lock.tryLock(10, 5, TimeUnit.SECONDS)) {
+                log.debug("Kilit alındı: {}. Miktar güncelleniyor...", lockKey);
+                Basket basket = basketRepository.findById(String.valueOf(userId))
+                        .orElseThrow(() -> new ResourceNotFoundException("Sepet bulunamadı.", "BASKET_NOT_FOUND"));
+                basket.setItemQuantity(productId, newQuantity);
+                basketRepository.save(basket);
+                log.debug("Ürün miktarı güncellendi. UserID: {}, ProductID: {}, NewQty: {}", userId, productId, newQuantity);
+            } else {
+                log.warn("Kilit alınamadı: {}", lockKey);
+                throw new BusinessException("Sepetiniz şu an güncelleniyor, lütfen bekleyip tekrar deneyin.", "BASKET_LOCKED");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException("Sistem hatası: Kilit beklenirken kesilme oldu.", "LOCK_INTERRUPTED");
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+                log.debug("Kilit bırakıldı: {}", lockKey);
+            }
+        }
+    }
+
     public Basket getBasket(UUID userId) {
         return basketRepository.findById(String.valueOf(userId))
+                .map(basket -> {
+                    basketRepository.save(basket);
+                    return basket;
+                })
                 .orElse(Basket.builder().userId(userId).build());
     }
 
