@@ -511,7 +511,101 @@ services:
         limits:
           memory: 512m
 
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/devops/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: promtail
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./infrastructure/devops/promtail-config.yml:/etc/promtail/config.yml:ro
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8090:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    privileged: true
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
 networks:
   e-commerce-network:
     driver: bridge
     name: e-commerce-network
+
+volumes:
+  grafana_data:
