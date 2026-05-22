@@ -318,22 +318,13 @@ Platform'un kalbindeki eksik parça. `order_db` ve `saga_orchestrator_db` init.s
 ### FB-3: MinIO prod reverse proxy (not, prod roadmap)
 Şu an dev'de doğrudan erişim. Prod'da signed URL + access control.
 
-### FB-5: Tenant depo & stok detay görünümü
+### FB-5: Tenant depo & stok detay görünümü ✅
 
-Mağaza sahibi depo sayfasında hangi ürünün ne kadar stoku olduğunu göremiyoruz.
-
-**Backend (stock-service):**
-- [ ] `GET /stocks/tenant/{tenantId}/summary` — tenant'ın tüm ürünleri + toplam stok (warehouse bazında breakdown ile)
-  - Response: `[{ productId, sku, productName, totalAvailable, totalReserved, warehouseBreakdown: [{warehouseId, warehouseName, available, reserved}] }]`
-  - Feign ile product-service'den ürün adını çek VEYA stock-service'te productName snapshotı tut (ikincisi daha sağlam — sipariş gibi snapshot pattern)
-- [ ] `GET /stocks/tenant/{tenantId}/warehouses/{warehouseId}/stocks` — tek depo için stok listesi
-
-**Frontend (MerchantWarehousePage):**
-- [ ] Depo listesinin altına her depo için "Stok Detayı" toggle veya expand açılır tablo
-- [ ] Stok durumu: yeşil (yeterli), sarı (eşik altı), kırmızı (sıfır)
-- [ ] Ürün bazında toplam stok özeti tablosu (tüm depolar, tüm ürünler)
-- [ ] Stok girişi butonunu ilgili ürüne pre-fill olarak aç (tablo satırından)
-- **M**
+- MerchantWarehousePage: depo satırları expand/collapse — her deponun ürünleri + stok miktarları (renk chip: yeşil/sarı/kırmızı)
+- Stok Ekle butonu (+ ikonu): warehouse + product pre-fill ile AddStockDialog açıyor
+- Stok Düş butonu (- ikonu): RemoveStockDialog — mevcut stok gösterir, sıfırın altına inemez
+- Backend: `POST /manual-remove` endpoint (stock-service) — `Stock.removeStock()` domain metodu, `@Idempotent`, OWNER auth
+- UX fix: depo satırındaki "Stok Gir" artık warehouseId pre-fill yapıyor
 
 ### FB-6: Arama çubuğu autocomplete + ürün görseli
 
