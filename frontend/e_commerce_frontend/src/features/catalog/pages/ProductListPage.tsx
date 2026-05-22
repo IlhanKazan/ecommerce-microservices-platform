@@ -50,6 +50,7 @@ const ProductListPage: React.FC = () => {
         size: ITEMS_PER_PAGE,
         categoryIds: resolvedCategoryIds,
         keyword: keyword === '' ? undefined : keyword,
+        inStock: true,
     });
 
     // ─── Handlers ────────────────────────────────────────────────────────────

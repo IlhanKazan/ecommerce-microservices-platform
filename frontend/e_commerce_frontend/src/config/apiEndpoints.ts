@@ -82,5 +82,6 @@ export const API_ENDPOINTS = {
     STOCK: {
         WAREHOUSES: (tenantId: number) => `/stocks/tenant/${tenantId}/warehouses`,
         MANUAL_ADD: (tenantId: number) => `/stocks/tenant/${tenantId}/manual-add`,
+        SUMMARY: (tenantId: number) => `/stocks/tenant/${tenantId}`,
     },
 } as const;

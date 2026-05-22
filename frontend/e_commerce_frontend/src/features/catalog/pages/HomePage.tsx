@@ -6,7 +6,7 @@ import ProductCard from '../../../components/customer/ProductCard';
 import { ArrowForward, LocalOffer } from '@mui/icons-material';
 
 const HomePage: React.FC = () => {
-    const { data, isLoading, isError } = useSearchProducts({ page: 0, size: 8 });
+    const { data, isLoading, isError } = useSearchProducts({ page: 0, size: 8, inStock: true });
     const theme = useTheme();
 
     const categories = [

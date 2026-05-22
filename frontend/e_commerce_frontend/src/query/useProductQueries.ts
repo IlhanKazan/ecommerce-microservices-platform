@@ -207,6 +207,15 @@ export const useCreateWarehouse = (tenantId: number) => {
  * Stok ekleme — en kritik idempotency noktası.
  * Duplicate stok girişi direkt envanter hatasına yol açar.
  */
+export const useGetTenantStocks = (tenantId: number) => {
+    return useQuery({
+        queryKey: QueryKeys.TENANT_STOCKS(tenantId),
+        queryFn: () => tenantService.getStockSummary(tenantId),
+        enabled: !!tenantId,
+        staleTime: 1000 * 30,
+    });
+};
+
 export const useAddManualStock = (tenantId: number) => {
     const queryClient = useQueryClient();
     const idempotencyKey = useRef(generateIdempotencyKey());
@@ -217,6 +226,7 @@ export const useAddManualStock = (tenantId: number) => {
         onSuccess: () => {
             idempotencyKey.current = generateIdempotencyKey();
             queryClient.invalidateQueries({ queryKey: QueryKeys.WAREHOUSES(tenantId) });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.TENANT_STOCKS(tenantId) });
             queryClient.invalidateQueries({ queryKey: ['searchProducts'] });
             queryClient.invalidateQueries({ queryKey: ['productDetail'] });
         },

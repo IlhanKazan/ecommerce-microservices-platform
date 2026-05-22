@@ -24,4 +24,8 @@ export const QueryKeys = {
     // Depolar
     WAREHOUSES: (tenantId: number) =>
         ['warehouses', tenantId] as const,
+
+    // Tenant stok özeti
+    TENANT_STOCKS: (tenantId: number) =>
+        ['tenant-stocks', tenantId] as const,
 };

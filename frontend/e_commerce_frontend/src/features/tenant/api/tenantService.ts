@@ -6,6 +6,7 @@ import type {
     UpdateTenantGeneralRequest, TenantAddress, TenantRole, PaymentCardInfo, SubscriptionDetail, PaymentHistoryResponse,
     PageResponse,  AddMemberRequest
 } from '../../../types/tenant.ts';
+import type { StockSummaryItem } from '../../../types/product';
 import type {CreateAddressRequest, Address} from "../../../types/user.ts";
 import { asRecord, getString, getNumber, getBoolean } from '../../../utils/normalizers.ts';
 import type { AddressType as EnumAddressType } from '../../../types/enums.ts';
@@ -214,5 +215,10 @@ export const tenantService = {
             payload,
             { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
         );
+    },
+
+    getStockSummary: async (tenantId: number): Promise<StockSummaryItem[]> => {
+        const response = await api.get(API_ENDPOINTS.STOCK.SUMMARY(tenantId));
+        return response.data;
     },
 };
