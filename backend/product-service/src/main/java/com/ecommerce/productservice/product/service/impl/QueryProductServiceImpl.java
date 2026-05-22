@@ -30,7 +30,7 @@ public class QueryProductServiceImpl implements QueryProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ürün bulunamadı.", "PRODUCT_NOT_FOUND"));
 
-        if (product.getStatus() != ProductStatus.ACTIVE || product.getSalesStatus() != SalesStatus.ON_SALE) {
+        if (product.getStatus() != ProductStatus.ACTIVE) {
             throw new BusinessException("Bu ürün şu an satışta değil.", "PRODUCT_NOT_AVAILABLE");
         }
 
