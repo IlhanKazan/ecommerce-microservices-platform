@@ -11,7 +11,8 @@ import { useAuth } from "react-oidc-context";
 import ProtectedRoute from "./components/shared/ProtectedRoute";
 import { MerchantProtectedRoute } from "./components/shared/MerchantProtectedRoute";
 import ToastContainer from "./components/shared/ToastContainer.tsx";
-import { useAddToBasket } from './query/useBasketQueries';
+import { basketService } from './features/catalog/api/productService';
+import { generateIdempotencyKey } from './utils/idempotencyUtils';
 import { useGetCategories } from './query/useProductQueries';
 import { useCategoryStore } from './store/useCategoryStore';
 
@@ -52,7 +53,6 @@ function App() {
     const setUser = useAuthStore((state) => state.setUser);
     const { data: userData } = useMe(isAuthenticated);
     const { items: localCartItems, clearCart } = useCartStore();
-    const { mutate: addToBasket } = useAddToBasket();
 
     useEffect(() => {
         if (userData) setUser(userData);
@@ -64,11 +64,14 @@ function App() {
 
             // GUEST CART SENKRONİZASYONU
             if (localCartItems.length > 0) {
-                // Localdeki her ürünü backend'e at
-                localCartItems.forEach(item => {
-                    addToBasket({ productId: item.productId, quantity: item.quantity });
-                });
-                clearCart(); // Backend'e geçince local'i sıfırla
+                Promise.allSettled(
+                    localCartItems.map(item =>
+                        basketService.addToCart(
+                            { productId: item.productId, quantity: item.quantity },
+                            generateIdempotencyKey()
+                        )
+                    )
+                ).finally(() => clearCart());
             }
         } else if (!auth.isLoading && !auth.isAuthenticated) {
             clearAuth();

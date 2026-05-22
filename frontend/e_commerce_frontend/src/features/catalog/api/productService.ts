@@ -13,6 +13,7 @@ import type {
     ProductDetailResponse,
     ProductCreateRequest,
     ProductUpdateRequest,
+    AutocompleteSuggestion,
 } from '../../../types/product';
 import type { BasketResponse, AddItemRequest } from '../../../types';
 
@@ -33,6 +34,14 @@ export const productService = {
         const response = await api.post<PageResponse<ProductSummary>>(
             API_ENDPOINTS.SEARCH.PRODUCTS,
             body,
+        );
+        return response.data;
+    },
+
+    autocomplete: async (q: string, size = 5): Promise<AutocompleteSuggestion[]> => {
+        const response = await api.get<AutocompleteSuggestion[]>(
+            API_ENDPOINTS.SEARCH.AUTOCOMPLETE,
+            { params: { q, size } },
         );
         return response.data;
     },
@@ -224,8 +233,8 @@ export const basketService = {
         await api.delete(API_ENDPOINTS.BASKET.REMOVE_ITEM(productId));
     },
 
-    updateCartItem: async (_payload: { productId: number; quantity: number }): Promise<void> => {
-        console.warn('updateCartItem: Backend endpoint henüz yok');
+    updateCartItem: async (payload: { productId: number; quantity: number }): Promise<void> => {
+        await api.patch(API_ENDPOINTS.BASKET.UPDATE_ITEM(payload.productId), { quantity: payload.quantity });
     },
 
     clearBasket: async (): Promise<void> => {

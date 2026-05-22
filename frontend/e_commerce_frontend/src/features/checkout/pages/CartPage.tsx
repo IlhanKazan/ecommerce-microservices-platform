@@ -11,7 +11,7 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { Link as RouterLink } from 'react-router-dom';
 import { AppRoutes } from '../../../utils/routes';
-import { useBasket, useRemoveFromBasket, useAddToBasket } from '../../../query/useBasketQueries';
+import { useBasket, useRemoveFromBasket, useUpdateBasketItem } from '../../../query/useBasketQueries';
 import { useToastStore } from '../../../store/useToastStore';
 import { useCartStore } from '../../../store/useCartStore';
 import { useAuthStore } from '../../../store/useAuthStore'; // Auth store eklendi
@@ -29,7 +29,7 @@ const CartPage: React.FC = () => {
     // API Hooks
     const { data: basket, isLoading: isApiLoading } = useBasket();
     const { mutate: removeItemApi, isPending: isRemoving, variables: removingId } = useRemoveFromBasket();
-    const { mutate: addToBasketApi, isPending: isAdding } = useAddToBasket();
+    const { mutate: updateItemApi, isPending: isUpdating } = useUpdateBasketItem();
 
     // Local Store & Toast
     const localCart = useCartStore();
@@ -42,9 +42,9 @@ const CartPage: React.FC = () => {
     // --- İŞLEM FONKSİYONLARI ---
     const handleIncrease = (productId: number, currentQuantity: number) => {
         if (isAuthenticated) {
-            addToBasketApi(
-                { productId, quantity: 1 },
-                { onError: () => toast.error('Stok yetersiz.') }
+            updateItemApi(
+                { productId, quantity: currentQuantity + 1 },
+                { onError: () => toast.error('Miktar artırılırken hata oluştu.') }
             );
         } else {
             localCart.updateQuantity(productId, currentQuantity + 1);
@@ -56,15 +56,11 @@ const CartPage: React.FC = () => {
             handleRemove(productId);
             return;
         }
-
         if (isAuthenticated) {
-            // TODO: Backend PUT endpoint hazır olunca burası güncellenir
-            removeItemApi(productId, {
-                onSuccess: () => {
-                    addToBasketApi({ productId, quantity: currentQuantity - 1 });
-                },
-                onError: () => toast.error('Miktar azaltılırken hata oluştu.')
-            });
+            updateItemApi(
+                { productId, quantity: currentQuantity - 1 },
+                { onError: () => toast.error('Miktar azaltılırken hata oluştu.') }
+            );
         } else {
             localCart.updateQuantity(productId, currentQuantity - 1);
         }
@@ -240,7 +236,7 @@ const CartPage: React.FC = () => {
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => handleDecrease(item.productId, item.quantity)}
-                                                        disabled={isAdding || isRemoving}
+                                                        disabled={isUpdating || isRemoving}
                                                     >
                                                         <RemoveIcon fontSize="small" />
                                                     </IconButton>
@@ -250,7 +246,7 @@ const CartPage: React.FC = () => {
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => handleIncrease(item.productId, item.quantity)}
-                                                        disabled={isAdding || isRemoving}
+                                                        disabled={isUpdating || isRemoving}
                                                     >
                                                         <AddIcon fontSize="small" />
                                                     </IconButton>
