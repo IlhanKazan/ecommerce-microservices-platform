@@ -56,9 +56,7 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 - [x] **Tamamlandı:** Kullanıcı tam içeriği gönderdi, devops-infra ajanı bu listeyle dosyayı güncelleyecek (TODO Stage'inde planla).
 
 ### docker-compose'da servisler eksik
-- [ ] Sadece `user-tenant-service` compose'da. Diğer servislerin (`product`, `payment`, `stock`, `search`, `basket`, `gateway`) eklenmesi lazım. Tracer bullet aşaması bittiğinde kritik.
-- `connector-init` container'ı bozuk (mount eksik, command hatalı). Düzeltilmeli veya kaldırılmalı.
-- Bkz. `devops-infra` ajanı.
+- [x] **Tamamlandı Stage 9:** Tüm 8 servis + mail-service compose'a eklendi. Connector init `docker-init-connectors.sh`'e taşındı.
 
 ### Application YAML'da boşluklu key'ler
 - [ ] Birkaç servisin `application.yml`'inde `circuit breaker`, `time limiter`, `resource server` (boşluklu) — `circuit-breaker`/`circuitbreaker`, `time-limiter`, `resource-server` olarak düzeltilmeli. Resilience4j binding'i kırılgan.
@@ -75,6 +73,17 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 - [ ] Tüm dosyalar aynı bucket'ta (`e-commerce-images`), tenant-bazlı izolasyon yok. Bir endpoint açığı varsa tüm dosyalar erişilebilir.
 - Çözüm: Tenant-bazlı object key prefix (`tenants/<tenantId>/products/...`) veya tenant başına bucket.
 - Notion'da iki yerde geçiyor: "DevOps" ve "user-tenant-service"
+
+### Frontend lint — CI blocker (42 error, 5 warning)
+- [ ] `npm run lint` (`--max-warnings 0`) CI'da fail ediyor. PR `devops/stage9-containerization` merge edilemez.
+- **Dosyalar ve kategoriler:**
+  - `@typescript-eslint/no-explicit-any` (30+ instance): `Header.tsx:50`, `HomePage.tsx:127`, `ProductDetailPage.tsx:124,441`, `CartPage.tsx:177`, `AddStockModal.tsx:54`, `TeamManagementSection.tsx:58`, `WarehouseManagement.tsx:56`, `CreateStorePage.tsx:192`, `MerchantSettings.tsx` (8 satır), `MerchantSubscription.tsx:136`, `MerchantWarehousePage.tsx:156,333`, `userService.ts` (5 satır), `AccountAddresses.tsx:89,109`, `useBasketQueries.ts:50,52,54`, `useProductQueries.ts:116,131`, `types/common.ts:7`
+  - `@typescript-eslint/no-unused-vars` (5 instance): `KcPageLayout.tsx:2` (`Paper`), `Login.tsx:4` (`RouterLink`), `productService.ts:227` (`_payload`), `CreateStorePage.tsx:60` (`setActiveTenant`), `MerchantDashboard.tsx:75` (`prettyAddressType`), `main.tsx:43` (`_user`), `useBasketQueries.ts:5` (`IDEMPOTENCY_KEY_HEADER`)
+  - `react-refresh/only-export-components` (1 instance): `NotificationProvider.tsx:51` — context export ayrı dosyaya taşınmalı
+  - `react-hooks/exhaustive-deps` (5 warning): `App.tsx:82`, `ImageUploadField.tsx:46,153`, `CartPage.tsx:98`, `MerchantDashboard.tsx:44`
+  - `@typescript-eslint/no-empty-object-type` (1 instance): `types/product.ts:197`
+- **Çözüm:** `any` → `unknown` veya proper tip, kullanılmayan import'ları sil, `NotificationProvider`'da context export'u ayır, hook dep array'lerini düzelt.
+- **Blokaj:** Bu branch merge edilemez, diğer branch'ler de frontend değişikliği içeriyorsa aynı hatayı taşır.
 
 ---
 
@@ -125,6 +134,16 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 
 ### keycloak-spi tenantId payload'da yok
 - [ ] Tenant izolasyonu için JWT payload'a `tenantId` enjekte etmek mantıklı olur. Şu an URL'den tenantId alınıp `TenantSecurityEvaluator` ile DB'den kontrol ediliyor — ekstra DB hit. JWT'de gelse cache'leme + cost düşer.
+
+### PostgreSQL Row Level Security (RLS) — multi-tenant izolasyon katmanı
+- [ ] Uygulama katmanı bug'larına karşı ek güvence olarak PostgreSQL RLS eklenebilir. Her tenant sadece kendi satırlarını görür; `tenantId` eşleşmezse DB query sonuç döndürmez.
+- **Gerekli değişiklikler:**
+  - Her `@Transactional` açılışında `SET LOCAL app.tenant_id = ?` çalıştıracak JDBC interceptor (Spring `TransactionSynchronizationManager` veya `DataSourceWrapper`)
+  - Tenant-izole her tabloya Flyway migration'da `ALTER TABLE x ENABLE ROW LEVEL SECURITY; CREATE POLICY tenant_isolation ON x USING (tenant_id = current_setting('app.tenant_id')::bigint);`
+  - Superuser/migration user policy'den muaf tutulmalı (`BYPASSRLS`)
+  - Feign client'lar tenant context'i taşımıyor → iç servis çağrılarında RLS kırabileceği durumlar analiz edilmeli
+- **Risk:** Mevcut `StockRepository` sorguları, Debezium CDC replication user'ı, ve inbox/outbox tabloları RLS ile etkileşime girebilir — kapsamlı test şart.
+- **Öneri:** Order-service tamamlandıktan sonra, E2E testler yerleşince ele al.
 
 ### Frontend idempotency-key her isteğe
 - [ ] Şu an sadece bazı endpoint'ler `@Idempotent`. Notion'da: "Frontendden her isteğe idempotency key header olarak gelecek". `@Idempotent` tüm POST/PUT'a yayılmalı.
