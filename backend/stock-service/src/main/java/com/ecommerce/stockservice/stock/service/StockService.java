@@ -10,6 +10,7 @@ import java.util.UUID;
 public interface StockService {
     void reserveStockForOrder(Long tenantId, Long warehouseId, Long productId, int amount, String orderId);
     void addManualStock(Long tenantId, Long warehouseId, Long productId, int amount, UUID userId);
+    void removeManualStock(Long tenantId, Long warehouseId, Long productId, int amount, UUID userId);
     Stock getStock(Long tenantId, Long warehouseId, Long productId);
     StockInfo getStockInfo(Long tenantId, Long warehouseId, Long productId);
     List<StockSummaryInfo> getTenantStockSummary(Long tenantId);

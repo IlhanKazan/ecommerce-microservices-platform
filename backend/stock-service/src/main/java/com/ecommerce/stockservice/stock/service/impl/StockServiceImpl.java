@@ -109,6 +109,37 @@ public class StockServiceImpl implements StockService {
     }
 
     @Override
+    @Transactional
+    @CacheEvict(cacheNames = "stock", key = "#tenantId + ':' + #warehouseId + ':' + #productId")
+    public void removeManualStock(Long tenantId, Long warehouseId, Long productId, int amount, UUID userId) {
+
+        log.info("Manuel stok düşürme işlemi. Tenant: {}, Product: {}, Amount: {}", tenantId, productId, amount);
+
+        warehouseService.findByTenantIdAndId(tenantId, warehouseId)
+                .orElseThrow(() -> new BusinessException("Geçersiz depo veya bu depoda yetkiniz yok!", "WAREHOUSE_NOT_FOUND"));
+
+        Stock stock = stockRepository.findByTenantIdAndWarehouseIdAndProductId(tenantId, warehouseId, productId)
+                .orElseThrow(() -> new BusinessException("Stok kaydı bulunamadı!", "STOCK_NOT_FOUND"));
+
+        int oldQty = stock.getAvailableQuantity();
+        stock.removeStock(amount);
+
+        stock = stockRepository.save(stock);
+        movementService.recordMovement(stock, TransactionType.MANUAL_ADJUSTMENT, String.valueOf(userId), -amount);
+
+        if (oldQty > 0 && stock.getAvailableQuantity() == 0) {
+            outboxService.publishStockStatusChangedEvent(
+                    stock.getId().toString(),
+                    productId,
+                    false,
+                    "OUT_OF_STOCK"
+            );
+        }
+
+        log.info("Stok başarıyla düşürüldü. Tenant: {}, Product: {}, YeniMiktar: {}", tenantId, productId, stock.getAvailableQuantity());
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Stock getStock(Long tenantId, Long warehouseId, Long productId) {
         return stockRepository.findByTenantIdAndWarehouseIdAndProductId(tenantId, warehouseId, productId)
