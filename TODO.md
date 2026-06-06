@@ -50,14 +50,14 @@ SERVICE-WORK / TECHNICAL-DEBT  →  TODO.md "Aktif"  →  TODO.md "✅ Tamamlanm
 ### Sprint 1: Borç temizleme
 
 #### S1-1: Bekleyen commit'ler
-- [ ] Stage 9 + Stage 10 değişikliklerini `/commit-by-service` ile servis bazında commit et
+- [x] Stage 9 + Stage 10 değişikliklerini `/commit-by-service` ile servis bazında commit et
 
 #### S1-2: Frontend lint fix (CI blocker)
-- [ ] `no-explicit-any` → proper types (15+ satır, 14 dosya — detay: `TECHNICAL-DEBT.md`)
-- [ ] `no-unused-vars` → kullanılmayan import'ları sil (7 satır)
-- [ ] `NotificationProvider` — context export'u ayrı `NotificationContext.ts` dosyasına taşı
-- [ ] `exhaustive-deps` uyarıları düzelt (5 satır)
-- [ ] `npm run lint` → 0 error, 0 warning ✓
+- [x] `no-explicit-any` → proper types (15+ satır, 14 dosya — detay: `TECHNICAL-DEBT.md`)
+- [x] `no-unused-vars` → kullanılmayan import'ları sil (7 satır)
+- [x] `NotificationProvider` — context export'u ayrı `NotificationContext.ts` dosyasına taşı
+- [x] `exhaustive-deps` uyarıları düzelt (5 satır)
+- [x] `npm run lint` → 0 error, 0 warning ✓
 
 #### S1-3: mail-service rebuild + verify
 - [ ] `docker compose up -d --build mail-service`
@@ -65,15 +65,15 @@ SERVICE-WORK / TECHNICAL-DEBT  →  TODO.md "Aktif"  →  TODO.md "✅ Tamamlanm
 - [ ] TENANT_ACTIVATED şablon içeriği kontrol — yanlışsa düzelt
 
 #### S1-4: activateTenant bug fix
-- [ ] `TenantLifecycleService.createTenant` — `activateTenant` çağrısını try bloğu **dışına** taşı
-- [ ] Try bloğu yalnızca `processPayment` Feign çağrısını sarsın
+- [x] `TenantLifecycleService.createTenant` — `activateTenant` çağrısını try bloğu **dışına** taşı
+- [x] Try bloğu yalnızca `processPayment` Feign çağrısını sarsın
 - [ ] Test: createTenant → TENANT_ACTIVATED maili gelsin (PAYMENT_FAILED değil)
-- [ ] Detay: `TECHNICAL-DEBT.md` "createTenant catch-all" maddesi
+- [x] Detay: `TECHNICAL-DEBT.md` "createTenant catch-all" maddesi
 
 #### S1-5: Outbox cleanup scheduler
-- [ ] payment-service: `@Scheduled(cron = "0 0 3 * * *")` + `deleteByCreatedAtBefore` ekle
-- [ ] basket-service: outbox tablosu var mı kontrol et — varsa aynı pattern
-- [ ] Pattern referans: `product-service/OutboxCleanupScheduler` veya `OutboxRepository.deleteByCreatedAtBefore`
+- [x] payment-service: `@Scheduled(cron = "0 0 3 * * *")` + `deleteByCreatedAtBefore` ekle
+- [x] basket-service: outbox tablosu var mı kontrol et — varsa aynı pattern (DB yok, skip)
+- [x] Pattern referans: `product-service/OutboxCleanupScheduler` veya `OutboxRepository.deleteByCreatedAtBefore`
 
 ---
 
