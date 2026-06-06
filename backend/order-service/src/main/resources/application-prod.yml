@@ -1,0 +1,80 @@
+server:
+  port: 8088
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/${ORDER_DB_NAME}
+    username: ${ORDER_DB_USERNAME}
+    password: ${ORDER_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  flyway:
+    connect-retries: 5
+
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: order-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+  data:
+    redis:
+      host: redis
+      port: 6379
+      password: ${REDIS_PASSWORD}
+
+  devtools:
+    restart:
+      enabled: false
+
+security:
+  oauth2:
+    resource-server:
+      jwt:
+        jwk-set-uri: http://keycloak:8080/realms/${REALM_NAME}/protocol/openid-connect/certs
+        issuer-uri: http://localhost:8080/realms/${REALM_NAME}
+
+application:
+  clients:
+    user-tenant:
+      url: ${USER_TENANT_SERVICE_URL}
+    product:
+      url: ${PRODUCT_SERVICE_URL}
+    stock:
+      url: ${STOCK_SERVICE_URL}
+    payment:
+      url: ${PAYMENT_SERVICE_URL}
+    basket:
+      url: ${BASKET_SERVICE_URL}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 0.1
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+
+app:
+  scheduling:
+    enabled: true
+
+logging:
+  level:
+    root: WARN
+    com.ecommerce.orderservice: INFO
