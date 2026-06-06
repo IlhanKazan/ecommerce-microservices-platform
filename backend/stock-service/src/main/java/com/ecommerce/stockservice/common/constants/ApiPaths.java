@@ -19,4 +19,9 @@ public class ApiPaths {
         public static final String WAREHOUSES_PATH = Stocks.STOCKS_PATH + "/tenant/{tenantId}/warehouses";
     }
 
+    @NoArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class Internal {
+        public static final String INTERNAL_STOCKS = BASE_PATH_V1 + "/stocks/internal";
+    }
+
 }

@@ -1,0 +1,39 @@
+server:
+  port: 0
+
+security:
+  oauth2:
+    resource-server:
+      jwt:
+        issuer-uri: http://localhost:8080/realms/test
+
+jwt:
+  auth:
+    converter:
+      resource-id: test-client
+      principal-attribute: preferred_username
+
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ""
+
+  kafka:
+    consumer:
+      group-id: stock-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+app:
+  scheduling:
+    enabled: false
+
+application:
+  clients:
+    product:
+      url: http://localhost:8084
+    user-tenant:
+      url: http://localhost:8081
