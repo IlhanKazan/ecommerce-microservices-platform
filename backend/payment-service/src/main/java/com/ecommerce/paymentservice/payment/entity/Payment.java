@@ -69,4 +69,7 @@ public class Payment extends BaseEntity {
     private LocalDateTime failedAt;
     private String failureReason;
     private String failureCode;
+
+    @Column(name = "iyzico_transaction_id")
+    private String iyzicoTransactionId;
 }
