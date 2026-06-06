@@ -8,24 +8,23 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 
 ## 🔴 Güvenlik
 
-### IDOR — payment-service ⚠️ Stage 10 öncesi kapatılmalı
-- [ ] **Ödeme işleminde body'deki `customerId` güveniliyor.** `@CurrentUser` ile JWT'den alınmalı, body'deki kontrolsüz değer **kullanılmamalı**. Kötü niyetli kullanıcı başkası adına ödeme başlatabilir.
-- Dosya: `PaymentController.processPayment` — TODO yorumu var [29.12.2025 00:33]
-- **Blokaj:** Stage 10'da `processOrderPayment` endpoint'i yazılmadan önce bu kapatılmalı; aksi hâlde yeni sipariş akışı da IDOR içerir.
+### IDOR — payment-service ✅ Stage 10'da kapatıldı
+- [x] `InternalPaymentController.processOrderPayment` — customerId artık `@CurrentUser`'dan alınıyor, body'den gelmiyor.
+- ⚠️ Kısmi: `Payment.customerId` Long tipinde, `@CurrentUser.keycloakId()` UUID. Şimdilik `tenantId` geçiliyor. Gerçek fix: kolonu String/UUID'ye çevir (migration gerektirir) — TECHNICAL-DEBT olarak kalıyor.
 
-### IDOR — stock-service ⚠️ Stage 10 öncesi kapatılmalı
-- [ ] **Product sahipliği kontrolü eksik.** Stock endpoint'inde productId geliyor, ama product gerçekten o tenant'a ait mi kontrolü yapılmıyor. Üye başkasının ürününe stok atayabilir.
-- Çözüm: `ProductClientAdapter.validateAndGetProduct` her stok mutasyonunda çağrılmalı, response'taki `tenantId` ile path'teki `tenantId` karşılaştırılmalı.
-- **Blokaj:** SAGA reserve/rollback/commit endpoint'leri açılmadan önce bu kapatılmalı.
+### IDOR — stock-service ✅ Stage 10'da kapatıldı
+- [x] Internal endpoint'lerde tenantId path'ten alınıyor, sadece o tenant'ın stoklarına erişilebiliyor (`tenantId + productId` filtreli sorgu).
 
-### Kart bilgisi maskelenmesi — payment-service ⚠️ Stage 10 öncesi kapatılmalı
-- [ ] **iyzico request raw string'i transaction log'da düz haliyle saklanıyor.** Compliance riski (PCI-DSS).
-- Dosya: `PaymentServiceImpl.saveTransactionLogs` — TODO [28.12.2025 06:04]
-- Çözüm: Log'a yazmadan önce kart no/CVV/expiry mask'le. `processOrderPayment` canlıya alınmadan önce zorunlu.
+### Kart bilgisi maskelenmesi — payment-service ✅ Stage 10'da kapatıldı
+- [x] `PaymentServiceImpl.saveTransactionLogs` → `maskCardData()` helper eklendi. `cardNumber` son 4 hane, `cvc` `***` olarak loglanıyor.
 
-### Fiyat manipülasyonu — order-service tasarım kuralı
-- [ ] **Frontend'den veya basket'ten gelen fiyata GÜVENİLMEZ.** Sipariş oluşturulurken `unitPrice` product-service'ten taze snapshot ile alınır. Bu bir tasarım kuralı — order-service yazılırken şaşılmamalı.
-- Çözüm: `ProductServiceClient.getProductSnapshot(productId)` → fiyat oradan. `OrderItem.unitPrice` = snapshot fiyatı.
+### Fiyat manipülasyonu — order-service ✅ Stage 10'da çözüldü (tasarım kuralı uygulandı)
+- [x] `OrderSagaServiceImpl`: fiyat product-service snapshot'tan hesaplanıyor, basket/frontend fiyatı kullanılmıyor. `OrderItem.unitPrice` = snapshot.
+
+### Payment.customerId UUID→Long tip uyumsuzluğu 🟡
+- [ ] PRODUCT_ORDER ödemelerinde `customerId` alanı şimdilik `tenantId` ile dolduruluyor (çünkü `@CurrentUser.keycloakId()` UUID, `Payment.customerId` Long).
+- Çözüm: `payments` tablosunda `customer_id` kolonunu VARCHAR/UUID'ye çevir (Flyway migration + entity + repository değişikliği).
+- Dosya: `InternalPaymentController`, `Payment.java`
 
 ### `/api/v1/internal/**` network koruması yok
 - [ ] Mantıksal "internal" path'i ama network seviyesinde herhangi bir korumayla ayrılmamış. Servis hesabı role check veya k8s'te NetworkPolicy/mTLS gerekli (prod için).
@@ -34,6 +33,35 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 ### Concurrent sipariş — race condition
 - [ ] **Aynı anda iki kullanıcı son birimi satın alırsa:** Stock entity'de `@Version` (optimistic lock) var — ikincisi `OptimisticLockException` alır. Bu exception order-service'te yakalanıp `STOCK_RESERVATION_FAILED` olarak işlenmeli; stack trace değil, kullanıcıya "stok tükendi" dönmeli.
 - Şu an `@Version` var ama exception handling planlanmamış.
+
+---
+
+## Order Service — Bilinen Teknik Borç (Stage 10 sonrası)
+
+### 🟡 Checkout idempotency gap
+- [ ] `saveOrderWithItems` DB yazımı başarısız olursa (`reserve ✅ → pay ✅ → DB ❌`): `IdempotencyAspect` exception'da Redis key siliyor → retry double-charge eder.
+- Çözüm: payment-service'te orderId bazlı idempotency VEYA aspect'te exception tipine göre key silme kararı.
+
+### 🟡 Payment refund stub — gerçek iyzico çağrısı yok
+- [ ] `POST /api/v1/payments/internal/refund` şimdilik sadece `PaymentStatus.REFUNDED` set ediyor.
+- Çözüm: `com.iyzipay.model.Cancel` ile iyzico refund API entegrasyonu.
+- Dosya: `InternalPaymentController`, `PaymentServiceImpl`
+
+### 🟡 shippingAddressJson parse edilmiyor
+- [ ] `OrderSagaServiceImpl.parseShippingAddress` stub — `billingAddress` fallback kullanılıyor.
+- Etki: Farklı shipping/billing adresi desteklenmiyor.
+- Dosya: `OrderSagaServiceImpl.java`
+
+### 🟢 Product snapshot N+1 Feign pattern
+- [ ] Sepetteki her item için ayrı `GET /internal/products/{productId}/tenants/{tenantId}/validate` çağrısı.
+- Çözüm: product-service'e batch endpoint ekle `POST /internal/products/batch-validate`.
+
+### 🟢 STOCK_COMMIT_FAILED sonrası reservedQuantity serbest kalmıyor
+- [ ] ORDER_CONFIRMED → async stok commit başarısız → order REFUNDED ama stok hâlâ `reservedQuantity`'de bekliyor.
+- Çözüm: compensation sırasında stock-service'e rollback çağrısı ekle.
+
+### 🟢 api-gateway ORDER route eksik
+- [x] Stage 10.6'da eklendi — dev + prod yml güncel.
 
 ---
 
@@ -180,7 +208,7 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 TODO yorumları (kod içi):
 - `UserController.uploadProfileImage` — ImageService common-lib'e (Stage 6 ile ele alındı, üçüncü servis ekleme zamanı)
 - `UserController.me` — Optional standardize
-- `ProductPaymentStrategy` — order-service yazılınca doldurulacak (mock)
+- `ProductPaymentStrategy` — order-service canlıya alındı, mock TODO kaldırıldı ✅
 - `SubscriptionPaymentStrategy.calculatePrice` — planId doğrulaması
 - `PaymentServiceClientAdapter.processPayment` — Feign hata detay analizi
 - `TenantController` — CQRS değerlendirme (büyük iş, ileride)
