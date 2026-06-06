@@ -54,6 +54,7 @@ register_connector "user-tenant-connector.json" "user-tenant-service-connector"
 register_connector "product-connector.json"     "product-service-connector"
 register_connector "stock-connector.json"       "stock-service-connector"
 register_connector "payment-connector.json"     "payment-service-connector"
+register_connector "order-connector.json"       "order-service-connector"
 
 echo ""
 echo "Tüm Connector'lar yüklendi!"
