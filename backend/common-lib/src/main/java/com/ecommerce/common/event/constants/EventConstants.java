@@ -28,4 +28,12 @@ public final class EventConstants {
     public static final String EVENT_TENANT_ACTIVATED = "TENANT_ACTIVATED_EVENT";
     public static final String EVENT_TENANT_PAYMENT_FAILED = "TENANT_PAYMENT_FAILED_EVENT";
 
+    public static final String EVENT_ORDER_CREATED          = "ORDER_CREATED_EVENT";
+    public static final String EVENT_ORDER_CONFIRMED        = "ORDER_CONFIRMED_EVENT";
+    public static final String EVENT_ORDER_CANCELLED        = "ORDER_CANCELLED_EVENT";
+    public static final String EVENT_ORDER_SHIPPED          = "ORDER_SHIPPED_EVENT";
+    public static final String EVENT_ORDER_REFUNDED         = "ORDER_REFUNDED_EVENT";
+
+    public static final String EVENT_STOCK_COMMIT_FAILED    = "STOCK_COMMIT_FAILED_EVENT";
+
 }
