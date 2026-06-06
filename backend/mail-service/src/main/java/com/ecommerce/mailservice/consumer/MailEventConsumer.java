@@ -1,9 +1,14 @@
 package com.ecommerce.mailservice.consumer;
 
 import com.ecommerce.common.event.constants.EventConstants;
+import com.ecommerce.contracts.event.order.OrderCancelledEventPayload;
+import com.ecommerce.contracts.event.order.OrderConfirmedEventPayload;
+import com.ecommerce.contracts.event.order.OrderRefundedEventPayload;
+import com.ecommerce.contracts.event.order.OrderShippedEventPayload;
 import com.ecommerce.contracts.event.tenant.TenantActivatedEventPayload;
 import com.ecommerce.contracts.event.tenant.TenantPaymentFailedEventPayload;
 import com.ecommerce.mailservice.inbox.service.InboxService;
+import com.ecommerce.mailservice.mail.handler.OrderMailHandler;
 import com.ecommerce.mailservice.mail.handler.TenantMailHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +27,7 @@ public class MailEventConsumer {
 
     private final InboxService inboxService;
     private final TenantMailHandler tenantMailHandler;
+    private final OrderMailHandler orderMailHandler;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = EventConstants.AGGREGATE_TENANT, groupId = "mail-service-group")
@@ -61,6 +67,59 @@ public class MailEventConsumer {
                     eventType, messageId, e.getMessage(), e);
             // Exception fırlatılmıyor — Kafka'da sonsuz retry'a düşmesin.
             // Kritik teslimat gerekliyse DLQ publish eklenebilir.
+        }
+    }
+
+    @KafkaListener(topics = EventConstants.AGGREGATE_ORDER, groupId = "mail-service-group")
+    public void consumeOrderEvents(ConsumerRecord<String, String> record) {
+        String eventType = extractHeader(record, "message_type");
+        String messageId = record.topic() + ":" + record.partition() + ":" + record.offset();
+
+        log.info("ORDER event alındı — eventType: {}, messageId: {}", eventType, messageId);
+
+        try {
+            String json = objectMapper.readValue(record.value(), String.class);
+
+            if (inboxService.isAlreadyProcessed(messageId, eventType, json)) {
+                return;
+            }
+
+            switch (eventType) {
+                case EventConstants.EVENT_ORDER_CONFIRMED -> {
+                    OrderConfirmedEventPayload payload =
+                            objectMapper.readValue(json, OrderConfirmedEventPayload.class);
+                    if (payload.recipientEmail() != null) {
+                        orderMailHandler.handleOrderConfirmed(payload, messageId);
+                    }
+                }
+                case EventConstants.EVENT_ORDER_CANCELLED -> {
+                    OrderCancelledEventPayload payload =
+                            objectMapper.readValue(json, OrderCancelledEventPayload.class);
+                    if (payload.recipientEmail() != null) {
+                        orderMailHandler.handleOrderCancelled(payload, messageId);
+                    }
+                }
+                case EventConstants.EVENT_ORDER_SHIPPED -> {
+                    OrderShippedEventPayload payload =
+                            objectMapper.readValue(json, OrderShippedEventPayload.class);
+                    if (payload.recipientEmail() != null) {
+                        orderMailHandler.handleOrderShipped(payload, messageId);
+                    }
+                }
+                case EventConstants.EVENT_ORDER_REFUNDED -> {
+                    OrderRefundedEventPayload payload =
+                            objectMapper.readValue(json, OrderRefundedEventPayload.class);
+                    if (payload.recipientEmail() != null) {
+                        orderMailHandler.handleOrderRefunded(payload, messageId);
+                    }
+                }
+                case null, default ->
+                        log.debug("Mail-service için ORDER event ilgisiz: {}", eventType);
+            }
+
+        } catch (Exception e) {
+            log.error("ORDER event işlenirken hata — eventType: {}, messageId: {}, hata: {}",
+                    eventType, messageId, e.getMessage(), e);
         }
     }
 
