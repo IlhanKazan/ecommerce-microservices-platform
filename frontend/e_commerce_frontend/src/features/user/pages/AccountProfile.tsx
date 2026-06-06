@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Box, Typography, TextField, Button, Grid, Avatar, Select, MenuItem, FormControl, InputLabel, Alert, CircularProgress, Stack, Badge, IconButton, type SelectChangeEvent, Paper, Divider
 } from '@mui/material';
-import { useNotification } from '../../../components/shared/NotificationProvider';
+import { useNotification } from '../../../components/shared/NotificationContext';
 import {
     Person as PersonIcon,
     Security as SecurityIcon,

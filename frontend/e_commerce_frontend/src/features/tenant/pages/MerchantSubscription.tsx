@@ -17,7 +17,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMerchantStore } from '../../../store/useMerchantStore';
-import { useNotification } from '../../../components/shared/NotificationProvider';
+import { useNotification } from '../../../components/shared/NotificationContext';
 import { tenantService } from '../api/tenantService.ts';
 import type { SubscriptionPlan, PaymentCardInfo, PaymentStatus, PaymentType } from '../../../types/tenant';
 
@@ -133,8 +133,8 @@ const MerchantSubscription: React.FC = () => {
             setRetryPlanId(null);
             notify('İşlem başarıyla tamamlandı!', 'success');
         },
-        onError: (error: any) => {
-            const message = error.message || "İşlem başarısız oldu. Lütfen kart bilgilerinizi kontrol edin.";
+        onError: (error: unknown) => {
+            const message = (error as { message?: string })?.message || "İşlem başarısız oldu. Lütfen kart bilgilerinizi kontrol edin.";
             notify(message, 'error');
         }
     });

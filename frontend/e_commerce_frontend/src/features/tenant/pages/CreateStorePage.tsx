@@ -3,7 +3,9 @@ import {
     Box, Stepper, Step, StepLabel, Button, Typography, TextField,
     Paper, MenuItem, Grid, Radio, RadioGroup, FormControlLabel,
     CircularProgress, Alert, Stack, Divider
-} from '@mui/material';import { useNotification } from '../../../components/shared/NotificationProvider';import {
+} from '@mui/material';
+import { useNotification } from '../../../components/shared/NotificationContext';
+import {
     CreditCard as CardIcon,
     CheckCircle as CheckIcon,
     Business as BusinessIcon,
@@ -26,7 +28,6 @@ import AddressSelectionGrid from '../../../components/shared/address/AddressSele
 import { AddressType, BusinessType } from '../../../types/enums';
 import type { CreateAddressRequest } from '../../../types/user';
 import type {ApiErrorResponse} from "../../../types/common.ts";
-import { useMerchantStore } from "../../../store/useMerchantStore.ts";
 import { useInvalidateMyTenants } from '../../../query/useTenantQueries';
 import { useInvalidateMe } from '../../../query/useUserQueries';
 
@@ -57,7 +58,6 @@ interface CardInputRefs {
 
 const CreateStorePage: React.FC = () => {
     const navigate = useNavigate();
-    const { setActiveTenant } = useMerchantStore();
     const invalidateMyTenants = useInvalidateMyTenants();
     const invalidateMe = useInvalidateMe();
     const [activeStep, setActiveStep] = useState(0);
@@ -189,11 +189,12 @@ const CreateStorePage: React.FC = () => {
             invalidateMe();
             navigate(AppRoutes.MERCHANT_SELECT);
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
 
-            if (error.response && error.response.data) {
-                const apiError = error.response.data as ApiErrorResponse;
+            const axiosError = error as { response?: { data?: ApiErrorResponse } };
+            if (axiosError.response && axiosError.response.data) {
+                const apiError = axiosError.response.data as ApiErrorResponse;
 
                 if (apiError.errorCode === 'PAYMENT_FAILED') {
                     const createdTenantId = apiError.details?.tenantId;
@@ -210,7 +211,7 @@ const CreateStorePage: React.FC = () => {
                     return;
                 }
 
-                notify(`Hata: ${apiError.message}`, 'error');
+                notify(`Hata: ${apiError?.message}`, 'error');
             } else {
                 notify('Beklenmeyen bir hata oluştu. Lütfen bağlantınızı kontrol ediniz.', 'error');
             }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, Grid, Alert, CircularProgress, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
-import { useNotification } from '../../../components/shared/NotificationProvider';
+import { useNotification } from '../../../components/shared/NotificationContext';
 import { Add as AddIcon } from '@mui/icons-material';
 import { userService } from '../api/userService.ts';
 import type { Address, CreateAddressRequest } from '../../../types/user';
@@ -86,7 +86,7 @@ const AccountAddresses: React.FC = () => {
             setAddresses(prev => prev.filter(addr => addr.id !== addressToDelete));
             notify('Adres başarıyla silindi.', 'success');
         } catch (err) {
-            notify('Silinemedi. ' + (err as any)?.message || String(err), 'error');
+            notify('Silinemedi. ' + (err as { message?: string })?.message || String(err), 'error');
         } finally {
             setAddressToDelete(null);
             setDeleteDialogOpen(false);
@@ -106,7 +106,7 @@ const AccountAddresses: React.FC = () => {
             fetchAddresses();
             notify('Varsayılan adres olarak ayarlandı.', 'success');
         } catch (err) {
-            notify('Güncellenemedi. ' + (err as any)?.message || String(err), 'error');
+            notify('Güncellenemedi. ' + (err as { message?: string })?.message || String(err), 'error');
         } finally { setSettingDefaultId(null); }
     };
 

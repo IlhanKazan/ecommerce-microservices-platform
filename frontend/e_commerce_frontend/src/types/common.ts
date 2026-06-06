@@ -4,5 +4,5 @@ export interface ApiErrorResponse {
     statusCode: number;
     timestamp: string;
     errorCode: string;
-    details?: Record<string, any>;
+    details?: Record<string, unknown>;
 }

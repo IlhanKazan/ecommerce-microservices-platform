@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Box, Paper, Container } from '@mui/material';
+import { Box, Container } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import customTheme from './theme/customTheme';
 import { GetKcContext } from 'keycloakify';

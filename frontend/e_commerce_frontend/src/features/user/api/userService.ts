@@ -1,13 +1,13 @@
 import { api } from '../../../lib/axios.ts';
 import { API_ENDPOINTS } from '../../../config/apiEndpoints.ts';
-import type { User, UpdateProfileRequest, Address, CreateAddressRequest } from "../../../types/user.ts";
+import type { User, UpdateProfileRequest, Address, CreateAddressRequest, AddressType } from "../../../types/user.ts";
 import { asRecord, getString, getNumber, getBoolean } from '../../../utils/normalizers.ts';
 
 const mapAddress = (raw: unknown): Address => {
     const r = asRecord(raw);
     return {
         id: getNumber(r, 'id') ?? 0,
-        addressType: (getString(r, 'addressType', 'type') ?? 'SHIPPING') as any,
+        addressType: (getString(r, 'addressType', 'type') ?? 'SHIPPING') as AddressType,
         label: getString(r, 'label', 'title') ?? '',
         recipientName: getString(r, 'recipientName', 'contactName') ?? '',
         phoneNumber: getString(r, 'phoneNumber', 'phone') ?? '',
@@ -39,17 +39,17 @@ export const userService = {
     },
 
     getAddresses: async (): Promise<Address[]> => {
-        const response = await api.get<any[]>(API_ENDPOINTS.USER.ADDRESSES);
+        const response = await api.get<unknown[]>(API_ENDPOINTS.USER.ADDRESSES);
         return response.data.map(mapAddress);
     },
 
     addAddress: async (data: CreateAddressRequest): Promise<Address> => {
-        const response = await api.post<any>(API_ENDPOINTS.USER.ADDRESSES, data);
+        const response = await api.post<unknown>(API_ENDPOINTS.USER.ADDRESSES, data);
         return mapAddress(response.data);
     },
 
     updateAddress: async (id: number, data: CreateAddressRequest): Promise<Address> => {
-        const response = await api.put<any>(API_ENDPOINTS.USER.ADDRESS_BY_ID(id), data);
+        const response = await api.put<unknown>(API_ENDPOINTS.USER.ADDRESS_BY_ID(id), data);
         return mapAddress(response.data);
     },
 
@@ -65,7 +65,7 @@ export const userService = {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await api.post<any>(API_ENDPOINTS.USER.UPLOAD_PROFILE_IMAGE, formData, {
+        const response = await api.post<{ profileImageUrl: string }>(API_ENDPOINTS.USER.UPLOAD_PROFILE_IMAGE, formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },

@@ -124,7 +124,7 @@ const HomePage: React.FC = () => {
 
                 {data?.content && (
                     <Grid container spacing={3}>
-                        {data.content.map((product: any) => (
+                        {data.content.map((product) => (
                             <Grid size={{ xs: 6, sm: 4, md: 3 }} key={product.id}>
                                 <ProductCard product={product} />
                             </Grid>

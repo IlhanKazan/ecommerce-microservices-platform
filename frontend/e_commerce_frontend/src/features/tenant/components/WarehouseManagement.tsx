@@ -53,7 +53,7 @@ export const WarehouseManagement = ({ tenantId }: { tenantId: number }) => {
             <Typography variant="subtitle2" color="textSecondary">Mevcut Depolarınız:</Typography>
             {isLoading ? <CircularProgress size={20} sx={{ mt: 1 }} /> : (
                 <ul>
-                    {warehouses?.map((w: any) => (
+                    {warehouses?.map((w) => (
                         <li key={w.id}>{w.code} - {w.name} ({w.locationDetails})</li>
                     ))}
                 </ul>

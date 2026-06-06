@@ -12,7 +12,7 @@ import {
     Send as SendIcon,
 } from '@mui/icons-material';
 import { useMerchantStore } from '../../../store/useMerchantStore';
-import { useNotification } from '../../../components/shared/NotificationProvider';
+import { useNotification } from '../../../components/shared/NotificationContext';
 import {
     useGetTenantProducts,
     useGetProductReviews,

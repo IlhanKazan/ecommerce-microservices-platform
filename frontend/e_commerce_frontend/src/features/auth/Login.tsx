@@ -1,7 +1,6 @@
 import React from 'react';
 import { Typography, Box, Paper, TextField, Button, Checkbox, FormControlLabel, Link } from '@mui/material';
 import { useI18n, useKcContext } from 'keycloakify';
-import { Link as RouterLink } from 'react-router-dom';
 
 const Login: React.FC = () => {
     const { t } = useI18n();

@@ -91,7 +91,7 @@ const CartPage: React.FC = () => {
         const remainingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
         const shippingProgress = Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100);
         return { subtotal, total, shipping, remainingForFreeShipping, shippingProgress };
-    }, [basket, localCart.items, isAuthenticated]);
+    }, [basket, localCart, isAuthenticated]);
 
     // RENDER BLOKLARI
     if (isLoading) {
@@ -170,7 +170,7 @@ const CartPage: React.FC = () => {
                         )}
 
                         <Stack spacing={2}>
-                            {displayItems.map((item: any) => {
+                            {displayItems.map((item) => {
                                 const isThisRemoving = isRemoving && removingId === item.productId;
                                 // Hem backend (productName/imageUrl) hem local (name/mainImageUrl) tiplerini tolere et
                                 const itemName = item.productName || item.name;

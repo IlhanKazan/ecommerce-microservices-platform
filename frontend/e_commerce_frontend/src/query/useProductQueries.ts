@@ -8,7 +8,7 @@ import {
 import { tenantService } from '../features/tenant/api/tenantService';
 import { QueryKeys } from './queryKeys';
 import { generateIdempotencyKey, IDEMPOTENCY_KEY_HEADER } from '../utils/idempotencyUtils';
-import type { ReviewCreateRequest } from '../types/product';
+import type { ReviewCreateRequest, ProductCreateRequest, ProductUpdateRequest } from '../types/product';
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────
 
@@ -123,7 +123,7 @@ export const useCreateTenantProduct = (tenantId: number) => {
     const idempotencyKey = useRef(generateIdempotencyKey());
 
     return useMutation({
-        mutationFn: (body: any) =>
+        mutationFn: (body: ProductCreateRequest) =>
             productService.createTenantProduct(tenantId, body, idempotencyKey.current),
         onSuccess: () => {
             idempotencyKey.current = generateIdempotencyKey();
@@ -138,7 +138,7 @@ export const useUpdateTenantProduct = (tenantId: number) => {
     const idempotencyKey = useRef(generateIdempotencyKey());
 
     return useMutation({
-        mutationFn: ({ productId, body }: { productId: number; body: any }) =>
+        mutationFn: ({ productId, body }: { productId: number; body: ProductUpdateRequest }) =>
             productService.updateTenantProduct(tenantId, productId, body, idempotencyKey.current),
         onSuccess: () => {
             idempotencyKey.current = generateIdempotencyKey();

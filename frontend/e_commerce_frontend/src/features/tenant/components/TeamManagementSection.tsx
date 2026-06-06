@@ -17,7 +17,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { tenantService } from '../api/tenantService.ts';
 import { TENANT_ROLES, type TenantMember, type AddMemberRequest, type TenantRole } from '../../../types/tenant';
-import { useNotification } from '../../../components/shared/NotificationProvider';
+import { useNotification } from '../../../components/shared/NotificationContext';
 
 interface TeamManagementSectionProps {
     tenantId: number;
@@ -55,8 +55,8 @@ const TeamManagementSection: React.FC<TeamManagementSectionProps> = ({ tenantId,
             setAddErrorMsg(null);
             notify('Personel başarıyla eklendi.', 'success');
         },
-        onError: (err: any) => {
-            const message = err.response?.data?.message || "Ekleme sırasında hata oluştu.";
+        onError: (err: unknown) => {
+            const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Ekleme sırasında hata oluştu.";
             setAddErrorMsg(message);
         }
     });

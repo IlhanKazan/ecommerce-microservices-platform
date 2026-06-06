@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, CircularProgress } from '@mui/material';
 import { useGetWarehouses, useAddManualStock } from '../../../query/useProductQueries';
-import { useNotification } from '../../../components/shared/NotificationProvider';
+import { useNotification } from '../../../components/shared/NotificationContext';
 
 interface AddStockModalProps {
     open: boolean;
@@ -51,7 +51,7 @@ export const AddStockModal = ({ open, onClose, tenantId, productId }: AddStockMo
                                 {warehouses?.length === 0 && (
                                     <MenuItem disabled value="">Önce bir depo oluşturmalısınız.</MenuItem>
                                 )}
-                                {warehouses?.map((w: any) => (
+                                {warehouses?.map((w) => (
                                     <MenuItem key={w.id} value={w.id}>
                                         {w.name} ({w.code})
                                     </MenuItem>

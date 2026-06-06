@@ -121,10 +121,10 @@ const ProductDetailPage: React.FC = () => {
                         setSnackbar({ open: true, message: `${quantity} adet ürün sepete eklendi!`, severity: 'success' });
                         setQuantity(1);
                     },
-                    onError: (error: any) =>
+                    onError: (error: unknown) =>
                         setSnackbar({
                             open: true,
-                            message: error.response?.data?.message || 'Hata oluştu.',
+                            message: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Hata oluştu.',
                             severity: 'error',
                         }),
                 }
@@ -438,7 +438,7 @@ const ProductDetailPage: React.FC = () => {
                                         // Kendi yorumunu silebilmek için sub claim karşılaştırması
                                         const isOwn =
                                             isAuthenticated &&
-                                            (currentUser as any)?.sub === review.userId;
+                                            currentUser?.sub === review.userId;
 
                                         return (
                                             <Box key={review.id} sx={{ pb: 3, borderBottom: '1px solid #eee' }}>
