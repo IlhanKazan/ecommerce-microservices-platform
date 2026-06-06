@@ -49,7 +49,8 @@ public class InternalProductServiceImpl implements InternalProductService {
                 product.getPrice(),
                 product.getCurrency(),
                 product.getStatus().name(),
-                product.getSalesStatus().name()
+                product.getSalesStatus().name(),
+                product.getMainImageUrl()
         );
     }
 }

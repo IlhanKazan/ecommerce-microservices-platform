@@ -53,6 +53,11 @@ spring:
           predicates:
             - Path=/api/v1/stocks/**
 
+        - id: order-service
+          uri: http://order-service:8088
+          predicates:
+            - Path=/api/v1/orders/**
+
   devtools:
     restart:
       enabled: false

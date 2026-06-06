@@ -11,4 +11,3 @@
 export { default as MerchantProducts } from './MerchantProductsPage';
 export { default as MerchantWarehouse } from './MerchantWarehousePage';
 export { default as MerchantReviews } from './MerchantReviewsPage';
-export { MerchantOrders } from './MerchantOrdersStub';

@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Service
@@ -52,6 +53,39 @@ public class MailServiceImpl implements MailService {
         ctx.setVariable("currency", currency);
         ctx.setVariable("paymentType", paymentType);
         send(toEmail, "Ödemeniz Alındı", "mail/payment-success", ctx, inboxMessageId, "PAYMENT_SUCCESS_EVENT");
+    }
+
+    @Override
+    public void sendOrderConfirmed(String toEmail, Long orderId, BigDecimal totalAmount, String currency, String messageId) {
+        Context ctx = new Context();
+        ctx.setVariable("orderId", orderId);
+        ctx.setVariable("totalAmount", totalAmount.toPlainString());
+        ctx.setVariable("currency", currency);
+        send(toEmail, "Siparişiniz Onaylandı — #" + orderId, "mail/order-confirmed", ctx, messageId, "ORDER_CONFIRMED_EVENT");
+    }
+
+    @Override
+    public void sendOrderCancelled(String toEmail, Long orderId, String reason, String messageId) {
+        Context ctx = new Context();
+        ctx.setVariable("orderId", orderId);
+        ctx.setVariable("reason", reason != null ? reason : "Belirtilmedi");
+        send(toEmail, "Siparişiniz İptal Edildi — #" + orderId, "mail/order-cancelled", ctx, messageId, "ORDER_CANCELLED_EVENT");
+    }
+
+    @Override
+    public void sendOrderShipped(String toEmail, Long orderId, String trackingNumber, String messageId) {
+        Context ctx = new Context();
+        ctx.setVariable("orderId", orderId);
+        ctx.setVariable("trackingNumber", trackingNumber != null ? trackingNumber : "—");
+        send(toEmail, "Siparişiniz Kargoya Verildi — #" + orderId, "mail/order-shipped", ctx, messageId, "ORDER_SHIPPED_EVENT");
+    }
+
+    @Override
+    public void sendOrderRefunded(String toEmail, Long orderId, String reason, String messageId) {
+        Context ctx = new Context();
+        ctx.setVariable("orderId", orderId);
+        ctx.setVariable("reason", reason != null ? reason : "Belirtilmedi");
+        send(toEmail, "İadeniz İşleme Alındı — #" + orderId, "mail/order-refunded", ctx, messageId, "ORDER_REFUNDED_EVENT");
     }
 
     private void send(String toEmail, String subject, String templateName, Context ctx,

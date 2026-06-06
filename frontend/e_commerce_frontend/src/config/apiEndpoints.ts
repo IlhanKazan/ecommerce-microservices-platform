@@ -79,7 +79,13 @@ export const API_ENDPOINTS = {
         CLEAR:       '/baskets/me'
     },
     ORDER: {
-        CREATE: '/orders',
+        CHECKOUT:        (tenantId: number) => `/orders/tenants/${tenantId}`,
+        MY_ORDERS:       '/orders/me',
+        MY_ORDER_DETAIL: (orderId: number) => `/orders/me/${orderId}`,
+        CANCEL:          (orderId: number) => `/orders/me/${orderId}/cancel`,
+        TENANT_ORDERS:   (tenantId: number) => `/orders/tenants/${tenantId}`,
+        UPDATE_STATUS:   (tenantId: number, orderId: number) =>
+            `/orders/tenants/${tenantId}/${orderId}/status`,
     },
     STOCK: {
         WAREHOUSES: (tenantId: number) => `/stocks/tenant/${tenantId}/warehouses`,

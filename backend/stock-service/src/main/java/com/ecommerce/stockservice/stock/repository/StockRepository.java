@@ -31,4 +31,17 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     })
     Optional<Stock> findWithLockingByTenantIdAndWarehouseIdAndProductId(Long tenantId, Long warehouseId, Long productId);
 
+    // INTERNAL: Otomatik warehouse seçimi — yeterli stoğa sahip kaydı döndürür (en yüksek qty önce)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000")})
+    @Query("SELECT s FROM Stock s WHERE s.tenantId = :tenantId AND s.productId = :productId " +
+           "AND s.availableQuantity >= :amount ORDER BY s.availableQuantity DESC")
+    List<Stock> findWithSufficientStockLocked(
+            @Param("tenantId") Long tenantId,
+            @Param("productId") Long productId,
+            @Param("amount") int amount);
+
+    // INTERNAL: Rollback için — ürünün tüm stok kayıtlarını döndürür
+    List<Stock> findAllByTenantIdAndProductId(Long tenantId, Long productId);
+
 }

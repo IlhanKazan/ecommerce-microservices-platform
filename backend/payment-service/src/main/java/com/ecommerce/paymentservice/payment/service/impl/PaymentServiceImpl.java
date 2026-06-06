@@ -13,6 +13,7 @@ import com.ecommerce.paymentservice.payment.strategy.PaymentStrategy;
 import com.ecommerce.paymentservice.subscription.constant.TenantSubscriptionStatus;
 import com.ecommerce.paymentservice.subscription.entity.TenantSubscription;
 import com.ecommerce.paymentservice.subscription.service.TenantSubscriptionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iyzipay.Options;
 import com.iyzipay.request.CreatePaymentRequest;
 import jakarta.transaction.Transactional;
@@ -36,6 +37,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final Options iyzicoOptions;
     private final IyzicoTransactionService iyzicoTransactionService;
     private final OutboxService outboxService;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -58,7 +60,12 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         PaymentStrategy strategy = findStrategy(context.getType());
-        BigDecimal amount = strategy.calculatePrice(context.getReferenceId());
+        BigDecimal amount;
+        if (context.getAmount() != null && context.getType() == PaymentType.PRODUCT_ORDER) {
+            amount = context.getAmount();
+        } else {
+            amount = strategy.calculatePrice(context.getReferenceId());
+        }
 
         Payment payment = Payment.builder()
                 .tenantId(context.getTenantId())
@@ -108,6 +115,19 @@ public class PaymentServiceImpl implements PaymentService {
         return handleIyzicoResponse(payment, iyzicoResponse, null);
     }
 
+    @Override
+    @Transactional
+    public void refundByOrderId(Long orderId, String transactionId) {
+        paymentRepository.findByOrderId(orderId).ifPresentOrElse(payment -> {
+            payment.setPaymentStatus(PaymentStatus.REFUNDED);
+            payment.setFailureReason("İade edildi");
+            payment.setFailedAt(LocalDateTime.now());
+            paymentRepository.save(payment);
+            log.info("[REFUND] OrderID: {} için ödeme REFUNDED olarak işaretlendi. PaymentID: {}",
+                    orderId, payment.getId());
+        }, () -> log.warn("[REFUND] OrderID: {} için ödeme kaydı bulunamadı — iade atlandı.", orderId));
+    }
+
     private PaymentStrategy findStrategy(PaymentType type) {
         return strategies.stream()
                 .filter(s -> s.supports(type))
@@ -119,6 +139,7 @@ public class PaymentServiceImpl implements PaymentService {
         if ("success".equalsIgnoreCase(iyzicoResponse.getStatus())) {
             payment.setPaymentStatus(PaymentStatus.SUCCESS);
             payment.setPaidAt(LocalDateTime.now());
+            payment.setIyzicoTransactionId(iyzicoResponse.getPaymentId());
 
             if (context != null && context.getType() == PaymentType.SUBSCRIPTION) {
                 TenantSubscription sub = tenantSubscriptionService.createActiveSubscription(
@@ -159,9 +180,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .status(iyzicoResponse.getStatus())
                 .errorCode(iyzicoResponse.getErrorCode())
                 .errorMessage(iyzicoResponse.getErrorMessage())
-                // ToString yerine JSON çevirici kullanılabilir
-                // TODO [28.12.2025 06:04]: requestteki kart bilgileri gibi hassas veriler maskelenecek !!!!!!
-                .rawRequest(request.toString())
+                .rawRequest(maskCardData(request))
                 .rawResponse("iyzico entitysinde rawresponse degiskeni olmadigindan dolayi burasi bos")
 
                 // Kartın son 4 hanesi
@@ -174,11 +193,27 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
 
-    // Tek bir yerden yönetildiği için loglama unutulmuyor
+    private String maskCardData(CreatePaymentRequest request) {
+        try {
+            String json = objectMapper.writeValueAsString(request);
+            return json.replaceAll("\"cardNumber\"\\s*:\\s*\"(\\d{6})\\d+(\\d{4})\"",
+                                   "\"cardNumber\":\"$1******$2\"")
+                       .replaceAll("\"cvc\"\\s*:\\s*\"\\d+\"", "\"cvc\":\"***\"");
+        } catch (Exception e) {
+            log.warn("Kart verisi maskeleme hatası: {}", e.getMessage());
+            return "[MASKED - serialization error]";
+        }
+    }
+
     private com.iyzipay.model.Payment callIyzico(Payment payment, CreatePaymentRequest request) {
         com.iyzipay.model.Payment response = com.iyzipay.model.Payment.create(request, iyzicoOptions);
-        saveTransactionLogs(payment, request, response);
-
+        log.info("iyzico yanıtı — status: {}, paymentId: {}, error: {}",
+                response.getStatus(), response.getPaymentId(), response.getErrorMessage());
+        try {
+            saveTransactionLogs(payment, request, response);
+        } catch (Exception e) {
+            log.error("IyzicoTransaction log kaydı başarısız (ödeme etkilenmez): {}", e.getMessage(), e);
+        }
         return response;
     }
 }

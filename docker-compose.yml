@@ -159,6 +159,7 @@ services:
       - ./infrastructure/debezium/product-connector.json:/connectors/product-connector.json:ro
       - ./infrastructure/debezium/stock-connector.json:/connectors/stock-connector.json:ro
       - ./infrastructure/debezium/payment-connector.json:/connectors/payment-connector.json:ro
+      - ./infrastructure/debezium/order-connector.json:/connectors/order-connector.json:ro
     command: ["/bin/sh", "/init-connectors.sh"]
 
   minio:
@@ -388,6 +389,8 @@ services:
         condition: service_started
       basket-service:
         condition: service_started
+      order-service:
+        condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: prod
       REALM_NAME: ${REALM_NAME}
@@ -476,6 +479,42 @@ services:
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
     ports:
       - "8087:8087"
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  order-service:
+    build:
+      context: ./backend
+      dockerfile: order-service/Dockerfile
+    container_name: order-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      keycloak:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ORDER_DB_NAME: ${ORDER_DB_NAME}
+      ORDER_DB_USERNAME: ${ORDER_DB_USERNAME}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REALM_NAME: ${REALM_NAME}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      USER_TENANT_SERVICE_URL: http://user-tenant-service:8081
+      PRODUCT_SERVICE_URL: http://product-service:8084
+      STOCK_SERVICE_URL: http://stock-service:8087
+      PAYMENT_SERVICE_URL: http://payment-service:8082
+      BASKET_SERVICE_URL: http://basket-service:8086
+    ports:
+      - "8088:8088"
     networks:
       - e-commerce-network
     deploy:

@@ -8,4 +8,5 @@ import java.math.BigDecimal;
 public interface PaymentService {
     Payment processPayment(PaymentContext context);
     Payment processRenewalPayment(Long tenantId, String cardToken, BigDecimal amount);
+    void refundByOrderId(Long orderId, String transactionId);
 }

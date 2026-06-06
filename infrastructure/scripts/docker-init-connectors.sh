@@ -29,6 +29,7 @@ register /connectors/user-tenant-connector.json
 register /connectors/product-connector.json
 register /connectors/stock-connector.json
 register /connectors/payment-connector.json
+register /connectors/order-connector.json
 
 echo ""
 echo "All connectors registered!"

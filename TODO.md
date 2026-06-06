@@ -34,278 +34,46 @@ SERVICE-WORK / TECHNICAL-DEBT  →  TODO.md "Aktif"  →  TODO.md "✅ Tamamlanm
 - **FB-2: Tenant product detail endpoint'i** ✅ — `ProductDetailInfo` + `GET /tenants/{tenantId}/{productId}/detail`
 - **FB-4: Frontend ürün ekleme/düzenleme UI** ✅ — Edit formda `/detail` endpoint, tüm field'lar (weightGrams, seo, tags…) form state'te, veri kaybı yok
 - **Stage 8: mail-service MVP** ✅
-- **Stage 9.0: user-tenant-service container** ✅ — Dockerfile (BuildKit cache, non-root), prod.yml (HikariCP, JWT dual-mode, Flyway retry), compose wiring. "Started" logu doğrulandı. — Kafka consumer, Thymeleaf şablonları, inbox idempotency, docker-compose. TENANT_ACTIVATED + TENANT_PAYMENT_FAILED çalışıyor. Eksik event bağlantıları (VERIFIED, PAYMENT_SUCCESS, ORDER_*) → `SERVICE-WORK.md` "Mail Service" bölümüne taşındı.
+- **Stage 9: Tüm servisler containerize edildi** ✅ — Her servis için Dockerfile (BuildKit cache mount, non-root user) + application-prod.yml (HikariCP, JWT dual-mode, Flyway retry, Zipkin) + docker-compose wiring. connector-init `docker-init-connectors.sh`'e taşındı, `.env.example` tüm değişkenlerle yazıldı, boşluklu YAML key'ler (`resource server` → `resourceserver`) düzeltildi.
 - **Stage 11: Observability** ✅ — Prometheus/Grafana/Zipkin/Loki/Promtail/cAdvisor ana compose'a taşındı, container DNS scrape, Grafana datasource+dashboard provisioning (4701 JVM + 14282 cAdvisor), Loki persistent volume, ES healthcheck, search-service timing fix.
+- **Stage 10: Order Service (backend)** ✅ — Pay-First Choreography SAGA. Checkout (reserve → pay → save+outbox), cancel akışı, async stok commit/rollback (Kafka), compensation (STOCK_COMMIT_FAILED → refund), mail entegrasyonu (4 ORDER event şablonu), Debezium connector, Dockerfile + prod.yml + compose. Detay: `ORDER-SAGA-DESIGN.md`
+  - Tests: `*ApplicationTests` boilerplate testleri `@Disabled` (dev ortamı gerektirir, CI'da çalışır); stock-service Testcontainers ile düzeltildi
+  - Bilinen teknik borç: `TECHNICAL-DEBT.md` "Order Service" bölümüne taşındı
+- **Stage 10.6 / FB-7: Order Service Frontend** ✅ — Checkout 3-adım stepper (adres→kart→onay), AccountOrders (liste+pagination+StatusChip), OrderDetailModal (items+iptal akışı), MerchantOrdersPage (tablo+filtre+kargoya ver/teslim), MerchantOrderDetailModal. React Query hooks (useCreateOrder idempotency, useCancelOrder, useGetTenantOrders, useUpdateOrderStatus). api-gateway route eklendi (dev+prod). iyzico subMerchantKey pipeline'a eklendi.
+- **FB-5: Tenant depo & stok detay görünümü** ✅ — MerchantWarehousePage expand/collapse, AddStockDialog, RemoveStockDialog. Backend: `POST /manual-remove` (stock-service).
+- **FB-6: Arama autocomplete + ürün görseli** ✅ — search-service `GET /public/search/autocomplete` endpoint, frontend Header.tsx MUI Autocomplete (debounced 300ms, görsel avatar, Enter korumalı).
 
 ---
 
 ## ⏭️ Aktif
 
-### Stage 9: Tüm servisleri container'a çekme (prod profili geçişi)
+### Sprint 1: Borç temizleme
 
-#### Kritik bilgi — okumadan başlama
+#### S1-1: Bekleyen commit'ler
+- [ ] Stage 9 + Stage 10 değişikliklerini `/commit-by-service` ile servis bazında commit et
 
-**Dockerfile pattern** (UTS'den öğrenildi, tüm servisler aynı):
-```dockerfile
-# syntax=docker/dockerfile:1
-FROM maven:3.9.6-eclipse-temurin-21 AS builder
-WORKDIR /app
-COPY common-lib/pom.xml ./common-lib/pom.xml
-COPY common-lib/src ./common-lib/src
-RUN --mount=type=cache,target=/root/.m2 cd common-lib && mvn install -DskipTests -q
-COPY event-contracts/pom.xml ./event-contracts/pom.xml
-COPY event-contracts/src ./event-contracts/src
-RUN --mount=type=cache,target=/root/.m2 cd event-contracts && mvn install -DskipTests -q
-COPY <servis-adi>/pom.xml ./<servis-adi>/pom.xml
-COPY <servis-adi>/src ./<servis-adi>/src
-RUN --mount=type=cache,target=/root/.m2 cd <servis-adi> && mvn clean package -DskipTests -q
-FROM eclipse-temurin:21-jre-alpine
-WORKDIR /app
-RUN addgroup -S spring && adduser -S spring -G spring
-COPY --from=builder --chown=spring:spring /app/<servis-adi>/target/*.jar app.jar
-USER spring
-ENV SPRING_PROFILES_ACTIVE=prod
-ENTRYPOINT ["java","-XX:+UseContainerSupport","-XX:MaxRAMPercentage=75.0","-Djava.security.egd=file:/dev/./urandom","-jar","app.jar"]
-```
+#### S1-2: Frontend lint fix (CI blocker)
+- [ ] `no-explicit-any` → proper types (15+ satır, 14 dosya — detay: `TECHNICAL-DEBT.md`)
+- [ ] `no-unused-vars` → kullanılmayan import'ları sil (7 satır)
+- [ ] `NotificationProvider` — context export'u ayrı `NotificationContext.ts` dosyasına taşı
+- [ ] `exhaustive-deps` uyarıları düzelt (5 satır)
+- [ ] `npm run lint` → 0 error, 0 warning ✓
 
-**JWT dual-mode pattern** (tüm prod.yml'lere — detay: `ARCHITECTURE.md §5.1`):
-```yaml
-security:
-  oauth2:
-    resourceserver:
-      jwt:
-        jwk-set-uri: http://keycloak:8080/realms/${REALM_NAME}/protocol/openid-connect/certs
-        issuer-uri: http://localhost:8080/realms/${REALM_NAME}
-```
-> Gateway WebFlux kullanıyor — aynı key'ler ama `spring.security.oauth2.resourceserver.jwt.*` altında.
+#### S1-3: mail-service rebuild + verify
+- [ ] `docker compose up -d --build mail-service`
+- [ ] Sipariş ver → Mailhog UI'da (http://localhost:8025) ORDER_CONFIRMED maili gör
+- [ ] TENANT_ACTIVATED şablon içeriği kontrol — yanlışsa düzelt
 
-**prod.yml Flyway retry** (DB hazır olmadan başlarsa):
-```yaml
-spring:
-  flyway:
-    connect-retries: 10
-    connect-retries-interval: 3
-```
+#### S1-4: activateTenant bug fix
+- [ ] `TenantLifecycleService.createTenant` — `activateTenant` çağrısını try bloğu **dışına** taşı
+- [ ] Try bloğu yalnızca `processPayment` Feign çağrısını sarsın
+- [ ] Test: createTenant → TENANT_ACTIVATED maili gelsin (PAYMENT_FAILED değil)
+- [ ] Detay: `TECHNICAL-DEBT.md` "createTenant catch-all" maddesi
 
-**HikariCP minimum** (tüm DB'li servislere):
-```yaml
-spring:
-  datasource:
-    hikari:
-      minimum-idle: 2
-      maximum-pool-size: 10
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-```
-
-**application-prod.yml yazma metodolojisi** — her servis için:
-1. `application.yml` + `application-dev.yml`'i oku (gerçek config buradadır)
-2. Host'ları container DNS'e çevir:
-   - `localhost:5432` → `postgres:5432`
-   - `localhost:29092` → `kafka:9092`
-   - `localhost:6379` → Redis için `host: redis`
-   - `localhost:8080` (jwk-set-uri'de) → `keycloak:8080` (sadece JWK fetch için)
-   - `issuer-uri` **localhost kalır** — token'daki `iss` claim localhost URL taşıyor, değiştirme
-   - Feign URL'ler: `${USER_TENANT_SERVICE_URL}` → `http://user-tenant-service:8081` vb.
-3. Boşluklu YAML key'leri düzelt: `resource server` → `resourceserver`, `time limiter` → `time-limiter`
-4. Ekle: HikariCP, Flyway retry, JWT dual-mode, `devtools.restart.enabled: false`, log seviyeleri, zipkin endpoint
-5. Sil: `spring.config.import: optional:file:.env[.properties]` (prod'da env var'lar compose'dan gelir)
-
-**⚠️ init.sql'e `stock_db` eksik** — docker-compose'da postgres bloğunun volumes mount'u `init.sql`'i çalıştırıyor ama `stock_db` yok. `infrastructure/postgres/init.sql`'e `CREATE DATABASE stock_db;` ekle. Postgres volume'ü varsa `docker compose down -v postgres` ile sil, yeniden başlat.
-
----
-
-#### 9.0 user-tenant-service ✅
-- [x] Dockerfile (BuildKit cache mount, non-root user)
-- [x] application-prod.yml (HikariCP, Kafka, Redis, MinIO, JWT dual-mode, Flyway retry, Zipkin)
-- [x] docker-compose: SPRING_PROFILES_ACTIVE=prod, tüm env var'lar map edildi
-- [x] Container ayağa kalkıyor, "Started" logu görüldü
-
----
-
-#### 9.1 payment-service ✅
-- [x] Dockerfile yaz
-- [x] application-prod.yml yaz
-- [x] docker-compose servis bloğu ekle
-- [x] Build + `docker compose up -d payment-service` + log kontrol — "Started" logu görüldü ✅
-
----
-
-#### 9.2 product-service ✅
-- [x] Dockerfile yaz
-- [x] application-prod.yml yaz
-- [x] docker-compose servis bloğu ekle
-- [x] Build + test — "Started" logu görüldü, ürün ekleme + görsel upload çalışıyor ✅
-- **Not:** Anasayfada ürün görünmüyor — search-service henüz container'da değil, Kafka event'lerini consume edemiyor. 9.4 tamamlanınca düzelecek.
-
----
-
-#### 9.3 stock-service ✅
-- [x] `infrastructure/postgres/init.sql`'e `CREATE DATABASE stock_db;` eklendi (zaten vardı, dokümantasyon eksikti)
-- [x] Dockerfile yaz
-- [x] application-prod.yml yaz
-- [x] docker-compose servis bloğu ekle
-- [x] Build + test — "Started" logu görüldü ✅
-
----
-
-#### 9.4 search-service ✅
-- [x] Dockerfile yaz
-- [x] application-prod.yml yaz
-- [x] docker-compose servis bloğu ekle
-- [x] Build + test — "Started" logu görüldü ✅
-
----
-
-#### 9.5 basket-service ✅
-- [x] Dockerfile yaz
-- [x] application-prod.yml yaz
-- [x] docker-compose servis bloğu ekle
-- [x] Build + test — "Started" logu görüldü ✅
-
----
-
-#### 9.6 api-gateway ✅
-- [x] Dockerfile yaz (common-lib yok, direkt build)
-- [x] application-prod.yml yaz — JWT dual-mode, tüm route'lar container DNS, CORS korundu
-- [x] docker-compose servis bloğu ekle
-- [x] Build + test — "Started" logu görüldü ✅
-
----
-
-#### 9.7 Temizlik
-- [x] `connector-init` düzeltildi — `docker-init-connectors.sh` yazıldı, tüm 4 connector mount edildi, `service_healthy` ile bekleme, `restart: "no"` eklendi
-- [x] `.env.example`'ı tüm değişkenlerle yaz — tüm servisler, SMTP açıklaması, Keycloak SPI dahil
-- [x] `application.yml`'lerdeki boşluklu YAML key'leri düzelt: `resource server` → `resourceserver` (basket, search, payment dev yml'lerinde düzeltildi)
-- [ ] Her servis için commit: `devops(<servis>): prod profile + Dockerfile + compose wiring`
-
----
-
-### Stage 11: Observability — tek compose hedefi
-
-**Amaç:** `docker compose up -d` tek komutla tüm sistem + monitoring ayağa kalksın.
-
-**Şu anki durum:** `infrastructure/devops/docker-compose.yml` ayrı dosyada — Prometheus, Grafana, Zipkin, Loki, Promtail, cAdvisor burada. Servisler `e-commerce-network`'e bağlı değil, scrape target'ları eski IP'ler (`172.23.0.1:8081` vb.).
-
-**Yapılacaklar:**
-- [x] `infrastructure/devops/docker-compose.yml`'deki tüm servisleri ana `docker-compose.yml`'e taşı — volume path'leri `./infrastructure/devops/...` olarak güncelle
-- [x] Tüm observability servislerine `e-commerce-network` ekle
-- [x] `infrastructure/devops/prometheus.yml` scrape target'larını güncelle — container DNS (container-name:PORT)
-- [x] Zipkin: servisler `http://zipkin:9411/api/v2/spans` yazıyor, aynı network'te ✅
-- [x] Loki + Promtail: `promtail-config.yml` Docker SD ile container loglarını otomatik topluyor ✅
-- [x] Grafana data source otomatik provision: `infrastructure/devops/provisioning/datasources/datasources.yml` (Prometheus + Loki)
-- [x] Grafana dashboard'ları: JVM (Spring Boot 4701), cAdvisor (14282) — `provisioning/dashboards/` klasöründe, `${DS_PROMETHEUS}` → `Prometheus` düzeltildi ✅
-- [x] `infrastructure/devops/prometheus.yml`'den `cadvisor` scrape'i zaten var — cAdvisor aynı network'te ✅
-- [x] Loki persistent volume eklendi (`loki_data`) — restart'ta log kaybı yok
-- [x] Eski `infrastructure/devops/docker-compose.yml` dead code silindi
-- [x] Elasticsearch healthcheck eklendi — `condition: service_healthy` ile search-service timing sorunu çözüldü
-- [x] **mail-service Prometheus fix** — `ActuatorSecurityConfig.java` mevcut, `EndpointRequest.toAnyEndpoint()` + `@Order(1)`. Rebuild: `docker compose build mail-service && docker compose up -d mail-service`
-
----
-
-### Stage 10: Order Service — satın alma akışı
-
-Platform'un kalbindeki eksik parça. `order_db` ve `saga_orchestrator_db` init.sql'de zaten var. Şu an backend kodu sıfır.
-
-#### Genel mimari
-
-```
-[Frontend Checkout]
-     │  POST /api/v1/orders
-     ▼
-[order-service — port 8088]
-     │  SAGA Orchestrator
-     ├──► [stock-service Feign] reserve()
-     │        ↓ başarısız → BusinessException → OrderCancelled
-     ├──► [payment-service Feign] processPayment()
-     │        ↓ başarısız → compensation: stock.rollback() → OrderCancelled
-     └──► Order CONFIRMED
-          │  outbox → Debezium → ORDER topic
-          ▼
-     [mail-service] ORDER_CONFIRMED_EVENT → sipariş onay maili
-     [stock-service] stok commit (rezerveden gerçek düşmeye)
-```
-
-**SAGA tipi:** Senkron orkestrasyon (Feign) + outbox event. Faz 1'de async SAGA değil — Feign zinciri + compensation yeterli. Async SAGA (event-driven) ikinci iterasyonda.
-
-#### 10.0 event-contracts genişletme
-- [ ] `OrderCreatedEventPayload` record — orderId, userId, tenantId, items (snapshot), totalAmount
-- [ ] `OrderConfirmedEventPayload` — orderId, userId, tenantId
-- [ ] `OrderCancelledEventPayload` — orderId, userId, reason
-- [ ] `OrderShippedEventPayload` — orderId, trackingNumber
-- [ ] `EventConstants`'a `AGGREGATE_ORDER`, `ORDER_CREATED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED`, `ORDER_SHIPPED` sabitleri
-- Kural: additive only, breaking change yok
-
-#### 10.1 order-service iskelet + entity
-- [ ] Spring Boot 3.5.9, Java 21 proje oluştur — `backend/order-service/`
-- [ ] `pom.xml`: common-lib + event-contracts dependency, MapStruct, Lombok, Feign, Flyway, PostgreSQL
-- [ ] `OrderStatus` enum: `DRAFT → SUBMITTED → CONFIRMED → SHIPPED → DELIVERED → CANCELLED`
-- [ ] `Order` entity (BaseEntity extend): userId (UUID), tenantId, status, totalAmount, currency, shippingAddressJson (TEXT), paymentTransactionId
-- [ ] `OrderItem` entity: orderId (FK), productId, sku, productName (**snapshot**), productImageUrl (**snapshot**), unitPrice (**snapshot**), quantity
-- [ ] `SagaState` entity: sagaId (UUID PK), orderId (FK), currentStep (enum), status, compensationData (JSON), errorMessage
-- [ ] Flyway V1: orders, order_items, saga_states tablolar + index'ler
-- [ ] `OrderRepository`, `OrderItemRepository`, `SagaStateRepository`
-- [ ] REPLICA IDENTITY FULL outbox için (V1'de)
-- **M**
-
-#### 10.2 Feign client'lar
-- [ ] `StockServiceClient` — `reserve(tenantId, productId, amount)`, `rollback(tenantId, productId, amount)`, `commit(tenantId, productId, amount)`, `getStock(tenantId, productId, warehouseId)`
-- [ ] `PaymentServiceClient` — `processOrderPayment(OrderPaymentRequest)` → `PaymentResult`
-- [ ] `BasketServiceClient` — `getMyBasket()` → basket items (checkout için)
-- [ ] `ProductServiceClient` — `getProductSnapshot(productId)` → fiyat + isim + stok snapshot
-- [ ] Her client için `FeignConfig` (FeignClientInterceptor'dan geliyor, JWT forward)
-- [ ] Fallback stub'ları (`@FallbackFactory` pattern) — circuit breaker hazır olsun
-- **M**
-
-#### 10.3 SAGA orchestrator servisi
-- [ ] `OrderSagaService.execute(Order)` — tek transaction değil, her adım ayrı transaction
-  - Adım 1: `StockServiceClient.reserve()` → başarısız → `ORDER_CANCELLED` at, RuntimeException throw etme
-  - Adım 2: `PaymentServiceClient.processOrderPayment()` → başarısız → `StockServiceClient.rollback()` + `ORDER_CANCELLED`
-  - Adım 3: Order `CONFIRMED`, outbox'a `ORDER_CONFIRMED_EVENT` at
-- [ ] `SagaState` her adımda güncellenir (idempotency için sagaId üzerinden tekrar çalıştırılabilir)
-- [ ] Compensation işlemlerinde ayrıca `SagaState.status = COMPENSATING` set et
-- [ ] `@Transactional` boundary: her SAGA adımı kendi transaction'ında — tüm zincir TEK transaction değil
-- **L**
-
-#### 10.4 Order API endpoint'leri
-- [ ] `POST /api/v1/orders` — sepetten sipariş oluştur
-  - `@CurrentUser` ile userId, `BasketServiceClient.getMyBasket()` ile items
-  - Her item için `ProductServiceClient.getProductSnapshot()` → fiyat snapshot
-  - `OrderCreateContext` service'e geçer (DTO değil)
-  - Service: Order + OrderItem kaydet, SAGA başlat
-  - Response: `OrderSummaryResponse` (id, status, totalAmount, itemCount)
-  - Idempotency-Key zorunlu
-- [ ] `GET /api/v1/orders/me` — kullanıcının sipariş geçmişi (sayfalandırılmış)
-- [ ] `GET /api/v1/orders/me/{orderId}` — sipariş detayı + item'lar
-- [ ] `POST /api/v1/orders/me/{orderId}/cancel` — iptal (sadece SUBMITTED veya CONFIRMED, SHIPPED değil)
-  - Cancellation logic: stok rollback + ödeme refund (payment-service Feign)
-- [ ] `GET /api/v1/orders/tenants/{tenantId}` — mağaza sahibi için gelen siparişler (OWNER)
-- [ ] `PUT /api/v1/orders/tenants/{tenantId}/{orderId}/status` — mağaza sahibi durum güncelle (SHIPPED, DELIVERED)
-  - SHIPPED → `ORDER_SHIPPED_EVENT` outbox'a at (mail-service kargo takip maili atar)
-- **L**
-
-#### 10.5 Outbox + Debezium
-- [ ] `Outbox` entity, `OutboxService`, `OutboxRepository` — mevcut pattern (BaseOutbox extend)
-- [ ] Flyway V1'e outbox tablosu + REPLICA IDENTITY FULL ekle
-- [ ] `order-service-connector.json` — Debezium connector (ORDER topic)
-- [ ] `register_connector.sh`'a ekle
-- [ ] Runtime verify: ORDER topic'te ORDER_CONFIRMED_EVENT mesajı gözüküyor mu
-- **M**
-
-#### 10.6 Frontend checkout akışı
-- [ ] `CartPage` → "Siparişi Tamamla" butonu aktif hale getir
-- [ ] Checkout adımları: Sepet özeti → Teslimat adresi seç → Ödeme onay → Sipariş tamamlandı
-- [ ] `useCreateOrder` mutation (idempotency key ile)
-- [ ] `useGetMyOrders`, `useGetOrderDetail` query hook'ları
-- [ ] Sipariş geçmişi sayfası (`/orders`) — `MyOrdersPage`
-- [ ] Sipariş detay sayfası (`/orders/{orderId}`)
-- [ ] "Siparişi İptal Et" butonu (sadece iptal edilebilir statüslerde)
-- [ ] `types/order.ts` — `OrderSummaryResponse`, `OrderDetailResponse`, `OrderItemResponse`
-- [ ] `config/apiEndpoints.ts`'e ORDER endpoint'leri
-- **L**
-
-> **Bağımlılıklar:** stock-service'te `POST reserve`, `POST rollback`, `POST commit` endpoint'leri yazılmalı (şu an sadece manual-add var). payment-service'te `processOrderPayment` endpoint'i.
+#### S1-5: Outbox cleanup scheduler
+- [ ] payment-service: `@Scheduled(cron = "0 0 3 * * *")` + `deleteByCreatedAtBefore` ekle
+- [ ] basket-service: outbox tablosu var mı kontrol et — varsa aynı pattern
+- [ ] Pattern referans: `product-service/OutboxCleanupScheduler` veya `OutboxRepository.deleteByCreatedAtBefore`
 
 ---
 
@@ -314,36 +82,36 @@ Platform'un kalbindeki eksik parça. `order_db` ve `saga_orchestrator_db` init.s
 ### FB-1: Ürün görseli upload endpoint'i ✅
 ### FB-2: Tenant product detail endpoint'i ✅
 ### FB-4: Frontend ürün ekleme/düzenleme UI ✅
+### FB-5: Tenant depo & stok detay görünümü ✅
+### FB-6: Arama autocomplete + ürün görseli ✅
+### FB-7: Sipariş akışı frontend ✅
 
 ### FB-3: MinIO prod reverse proxy (not, prod roadmap)
-Şu an dev'de doğrudan erişim. Prod'da signed URL + access control.
+Şu an dev'de doğrudan erişim. Prod'da signed URL + access control gerekecek.
 
-### FB-5: Tenant depo & stok detay görünümü ✅
+---
 
-- MerchantWarehousePage: depo satırları expand/collapse — her deponun ürünleri + stok miktarları (renk chip: yeşil/sarı/kırmızı)
-- Stok Ekle butonu (+ ikonu): warehouse + product pre-fill ile AddStockDialog açıyor
-- Stok Düş butonu (- ikonu): RemoveStockDialog — mevcut stok gösterir, sıfırın altına inemez
-- Backend: `POST /manual-remove` endpoint (stock-service) — `Stock.removeStock()` domain metodu, `@Idempotent`, OWNER auth
-- UX fix: depo satırındaki "Stok Gir" artık warehouseId pre-fill yapıyor
+## 📚 Dokümantasyon & Portfolio
 
-### FB-6: Arama çubuğu autocomplete + ürün görseli
+### OpenAPI / Swagger UI
+- [ ] Her Spring Boot servisine `springdoc-openapi-starter-webmvc-ui` ekle (`pom.xml`)
+- [ ] Her servis `application-dev.yml`'e: `springdoc.api-docs.path=/v3/api-docs`, `springdoc.swagger-ui.path=/swagger-ui.html`
+- [ ] Controller'lara `@Tag`, `@Operation`, `@ApiResponse` annotation'ları ekle
+- [ ] Checkout + order endpoint'leri öncelikli (portfolio için en etkileyici)
+- [ ] Erişim: `http://localhost:808x/swagger-ui/index.html` servis bazında
 
-Header arama çubuğu şu an sadece Enter'da product list sayfasına yönlendiriyor. Ürün görseli yok, autocomplete yok.
+### Postman Collection (portfolio için kritik)
+- [ ] Tüm platform için tek Postman collection oluştur (`IlhanKazan_ECommerce.postman_collection.json`)
+- [ ] Environment değişkenleri: `{{baseUrl}}`, `{{token}}`, `{{tenantId}}`, `{{orderId}}` vb.
+- [ ] Klasörler: Auth → Tenant → Product → Stock → Basket → Order → Search → Payment
+- [ ] Her endpoint için örnek request body + beklenen response
+- [ ] Pre-request script: token otomatik refresh
+- [ ] GitHub'a commit et — README'de "Import this collection" bağlantısı ekle
 
-**Backend (search-service):**
-- [ ] `GET /public/search/autocomplete?q={term}&size=5` endpoint — hızlı öneri
-  - ES `multi_match` query (name, brand, tags), sadece `name + mainImageUrl + price + id` döner
-  - Debounce için hafif endpoint (ağır arama değil)
-
-**Frontend:**
-- [ ] `Header.tsx`'te MUI `Autocomplete` component — debounced (300ms) query
-- [ ] Her seçenek: ürün görseli (32px avatar) + ürün adı + fiyat
-- [ ] Seçilince `/products/{id}` sayfasına git
-- [ ] Enter'da mevcut davranış korunur (keyword ile product list)
-- [ ] Görsel yoksa placeholder avatar (baş harf)
-- **M**
-
-### FB-7: Sipariş akışı frontend (Stage 10.6 ile aynı — oradan takip et)
+### Platform Genel Dokümantasyon
+- [ ] `ARCHITECTURE.md` güncel mi kontrol et — order-service akış diyagramı ekle
+- [ ] `README.md` yaz (proje henüz README'siz) — proje tanıtımı, kurulum, servis listesi
+- [ ] TÜBİTAK 2209-A başvurusu için teknik özet belgesi (ayrı bir `docs/` klasörüne)
 
 ---
 

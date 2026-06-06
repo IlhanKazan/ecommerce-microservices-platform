@@ -1,10 +1,9 @@
 package com.ecommerce.stockservice;
 
+import com.ecommerce.stockservice.base.AbstractBaseIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class StockServiceApplicationTests {
+class StockServiceApplicationTests extends AbstractBaseIntegrationTest {
 
     @Test
     void contextLoads() {

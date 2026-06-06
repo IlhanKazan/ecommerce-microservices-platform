@@ -24,5 +24,10 @@ public class ApiPaths {
         public static final String SUBMERCHANT = BASE_PATH_V1 + "/submerchant";
     }
 
+    @NoArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class Internal {
+        public static final String INTERNAL_PAYMENT = BASE_PATH_V1 + "/payments/internal";
+    }
+
 }
 
