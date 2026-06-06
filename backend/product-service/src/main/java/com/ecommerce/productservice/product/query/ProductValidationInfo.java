@@ -11,5 +11,6 @@ public record ProductValidationInfo(
         BigDecimal price,
         String currency,
         String status,
-        String salesStatus
+        String salesStatus,
+        String mainImageUrl
 ) implements Serializable {}
