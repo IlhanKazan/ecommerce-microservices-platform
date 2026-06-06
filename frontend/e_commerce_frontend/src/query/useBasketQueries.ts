@@ -2,8 +2,8 @@ import { useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { basketService } from '../features/catalog/api/productService';
 import { useAuth } from 'react-oidc-context';
-import { generateIdempotencyKey, IDEMPOTENCY_KEY_HEADER } from '../utils/idempotencyUtils';
-import type { AddItemRequest } from '../types';
+import { generateIdempotencyKey } from '../utils/idempotencyUtils';
+import type { AddItemRequest, BasketResponse, BasketItem } from '../types';
 
 export const BASKET_QUERY_KEY = ['basket'] as const;
 
@@ -47,11 +47,11 @@ export const useAddToBasket = () => {
             await queryClient.cancelQueries({ queryKey: BASKET_QUERY_KEY });
             const previousBasket = queryClient.getQueryData(BASKET_QUERY_KEY);
 
-            queryClient.setQueryData(BASKET_QUERY_KEY, (old: any) => {
+            queryClient.setQueryData(BASKET_QUERY_KEY, (old: BasketResponse | undefined) => {
                 if (!old) return old;
-                const existingItem = old.items.find((i: any) => i.productId === newItem.productId);
+                const existingItem = old.items.find((i: BasketItem) => i.productId === newItem.productId);
                 const updatedItems = existingItem
-                    ? old.items.map((i: any) =>
+                    ? old.items.map((i: BasketItem) =>
                         i.productId === newItem.productId
                             ? { ...i, quantity: i.quantity + newItem.quantity }
                             : i,
@@ -110,18 +110,18 @@ export const useUpdateBasketItem = () => {
         onMutate: async (payload) => {
             await queryClient.cancelQueries({ queryKey: BASKET_QUERY_KEY });
             const previousBasket = queryClient.getQueryData(BASKET_QUERY_KEY);
-            queryClient.setQueryData(BASKET_QUERY_KEY, (old: any) => {
+            queryClient.setQueryData(BASKET_QUERY_KEY, (old: BasketResponse | undefined) => {
                 if (!old) return old;
                 return {
                     ...old,
-                    items: old.items.map((i: any) =>
+                    items: old.items.map((i: BasketItem) =>
                         i.productId === payload.productId ? { ...i, quantity: payload.quantity } : i
                     ),
                 };
             });
             return { previousBasket };
         },
-        onError: (_err: unknown, _vars: unknown, context: any) => {
+        onError: (_err: unknown, _vars: unknown, context: { previousBasket: unknown } | undefined) => {
             if (context?.previousBasket) {
                 queryClient.setQueryData(BASKET_QUERY_KEY, context.previousBasket);
             }

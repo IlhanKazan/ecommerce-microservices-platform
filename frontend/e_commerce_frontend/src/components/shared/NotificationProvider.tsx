@@ -1,18 +1,13 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Snackbar, Alert } from '@mui/material';
 import type { AlertColor } from '@mui/material';
+import { NotificationContext } from './NotificationContext';
 
 interface NotificationState {
   open: boolean;
   message: string;
   severity: AlertColor;
 }
-
-interface NotificationContextValue {
-  notify: (message: string, severity?: AlertColor) => void;
-}
-
-const NotificationContext = createContext<NotificationContextValue | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notification, setNotification] = useState<NotificationState>({
@@ -46,12 +41,4 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       </Snackbar>
     </NotificationContext.Provider>
   );
-};
-
-export const useNotification = (): NotificationContextValue => {
-  const context = useContext(NotificationContext);
-  if (!context) {
-    throw new Error('useNotification must be used within a NotificationProvider');
-  }
-  return context;
 };

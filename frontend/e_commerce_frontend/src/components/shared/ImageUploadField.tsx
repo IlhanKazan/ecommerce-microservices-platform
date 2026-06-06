@@ -43,7 +43,7 @@ export function SingleImageUpload({ label, value, onChange, onError, tenantId }:
             onChange(null);
             onError('Görsel yüklenemedi. Tekrar deneyin.');
         }
-    }, [onChange, onError]);
+    }, [onChange, onError, tenantId]);
 
     return (
         <Box>
@@ -150,7 +150,7 @@ export function MultiImageUpload({ label, values, onChange, onError, max = 8, te
                 setItems((prev) => prev.filter((item) => item.id !== ph.id));
             }
         });
-    }, [items, max, onError]);
+    }, [items, max, onError, tenantId]);
 
     const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
 

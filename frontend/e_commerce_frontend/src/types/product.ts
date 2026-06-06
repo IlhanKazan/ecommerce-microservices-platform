@@ -204,9 +204,7 @@ export interface ProductCreateRequest {
     seoKeywords?: string;
 }
 
-export interface ProductUpdateRequest extends ProductCreateRequest {
-    // PUT body aynı alanları taşıyor
-}
+export type ProductUpdateRequest = ProductCreateRequest;
 
 // ─── Stock ────────────────────────────────────────────────────────────────────
 

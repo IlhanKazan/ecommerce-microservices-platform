@@ -4,7 +4,7 @@ import {
     Divider, CircularProgress, MenuItem, Stack,
     FormControlLabel, Radio, RadioGroup, Grid, IconButton
 } from '@mui/material';
-import { useNotification } from '../../../components/shared/NotificationProvider';
+import { useNotification } from '../../../components/shared/NotificationContext';
 import {
     Save as SaveIcon,
     Info as InfoIcon,
@@ -24,7 +24,7 @@ import AddressSelectionGrid from '../../../components/shared/address/AddressSele
 import AddressForm, { type AddressFormData } from '../../../components/shared/address/AddressForm';
 import TenantAddressCard from '../../../components/shared/address/TenantAddressCard';
 
-import type { UpdateTenantGeneralRequest, UpdateTenantCriticalRequest } from '../../../types/tenant';
+import type { TenantDetail, UpdateTenantGeneralRequest, UpdateTenantCriticalRequest } from '../../../types/tenant';
 import type { Address, CreateAddressRequest } from '../../../types/user';
 import { BusinessType, AddressType } from '../../../types/enums';
 import TeamManagementSection from "../components/TeamManagementSection.tsx";
@@ -113,7 +113,7 @@ const MerchantSettings: React.FC = () => {
                 iban: t.iban || ''
             });
 
-            const currentAddr = t.addresses?.[0] as any;
+            const currentAddr = t.addresses?.[0];
             if (currentAddr) {
                 setManualAddress({
                     title: currentAddr.title || '',
@@ -147,7 +147,7 @@ const MerchantSettings: React.FC = () => {
             return tenantService.uploadLogo(activeTenant.id, file);
         },
         onSuccess: (freshTenantData) => {
-            queryClient.setQueryData(['tenant', activeTenant?.id], (oldData: any) => {
+            queryClient.setQueryData<{ tenant: TenantDetail; userAddresses: Address[] }>(['tenant', activeTenant?.id], (oldData) => {
                 if (!oldData) return oldData;
                 return { ...oldData, tenant: freshTenantData };
             });
@@ -229,9 +229,10 @@ const MerchantSettings: React.FC = () => {
                 notify('Kritik bilgileriniz başarıyla güncellendi.', 'success');
             }
         },
-        onError: (error: any) => {
-            if (error.message !== "VALIDATION_ERROR") {
-                notify(error?.response?.data?.message || error.message || 'İşlem sırasında bir hata oluştu.', 'error');
+        onError: (error: unknown) => {
+            const e = error as { message?: string; response?: { data?: { message?: string } } };
+            if (e.message !== "VALIDATION_ERROR") {
+                notify(e?.response?.data?.message || e.message || 'İşlem sırasında bir hata oluştu.', 'error');
             }
         }
     });
@@ -246,7 +247,7 @@ const MerchantSettings: React.FC = () => {
         mutationFn: async () => {
             if (!activeTenant || !tenantData) return;
             const tId = activeTenant.id;
-            const original = tenantData.tenant as any;
+            const original = tenantData.tenant;
             const promises: Promise<void>[] = [];
 
             const isGeneralDirty = (
@@ -314,8 +315,9 @@ const MerchantSettings: React.FC = () => {
             setIsAddressDirty(false);
             notify('Mağaza bilgileri başarıyla güncellendi.', 'success');
         },
-        onError: (error: any) => {
-            notify(error?.response?.data?.message || error?.message || 'Mağaza bilgileri güncellenirken hata oluştu.', 'error');
+        onError: (error: unknown) => {
+            const e = error as { message?: string; response?: { data?: { message?: string } } };
+            notify(e?.response?.data?.message || e?.message || 'Mağaza bilgileri güncellenirken hata oluştu.', 'error');
         }
     });
 
@@ -394,7 +396,7 @@ const MerchantSettings: React.FC = () => {
                                         select fullWidth label="Şirket Tipi" disabled={isVerificationFieldsDisabled}
                                         value={criticalData.businessType}
                                         onChange={(e) => {
-                                            setCriticalData(p => ({...p, businessType: e.target.value as any}));
+                                            setCriticalData(p => ({...p, businessType: e.target.value as BusinessType}));
                                             setCriticalErrors(p => ({...p, taxId: ''}));
                                         }}
                                     >
@@ -463,7 +465,7 @@ const MerchantSettings: React.FC = () => {
                                                 onClick={() => {
                                                     setIsEditingVerification(false);
                                                     setCriticalErrors({});
-                                                    const t = tenantData.tenant as any;
+                                                    const t = tenantData.tenant;
                                                     setCriticalData({
                                                         businessType: t.businessType || BusinessType.CORPORATE,
                                                         taxId: t.taxId || '',
@@ -576,7 +578,7 @@ const MerchantSettings: React.FC = () => {
 
                         <Box sx={{ position: 'relative', display: 'inline-block', mb: 2 }}>
                             <Avatar
-                                src={(tenantData.tenant as any).logoUrl || undefined}
+                                src={tenantData.tenant.logoUrl || undefined}
                                 sx={{
                                     width: 120, height: 120, mx: 'auto', fontSize: '3rem',
                                     border: '4px solid white', boxShadow: 3

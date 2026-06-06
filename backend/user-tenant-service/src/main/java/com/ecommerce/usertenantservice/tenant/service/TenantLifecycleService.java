@@ -52,16 +52,12 @@ public class TenantLifecycleService {
             PaymentResult paymentResult = paymentServiceClientAdapter.processPayment(paymentRequest);
             log.info("PAYMENT SERVICE /process RESPONSE >> {}", paymentResult);
 
-            if (paymentResult.isSuccess()) {
-                log.info("Ödeme başarılı! Tenant ACTIVE statüsüne çekiliyor");
-                tenantStateService.activateTenant(tenant);
-                return true;
-            } else if (paymentResult.isInfrastructureError()) {
+            if (paymentResult.isInfrastructureError()) {
                 // Ödeme servisi erişilemez veya timeout — ödemenin gerçekleşip gerçekleşmediği bilinmiyor.
                 // Tenant PENDING_PAYMENT'ta kalır; kullanıcı retry-payment endpoint'i ile devam edebilir.
                 log.error("Ödeme servisine ulaşılamadı. Ödeme durumu belirsiz. TenantId: {}", tenant.getId());
                 throw new PaymentServiceUnreachableException(paymentResult.errorMessage());
-            } else {
+            } else if (!paymentResult.isSuccess()) {
                 log.warn("Ödeme başarısız (iş kuralı reddi)! Tenant FAILED statüsüne çekiliyor.");
                 tenantStateService.markTenantAsPaymentFailed(tenant);
                 throw new PaymentFailedException(paymentResult.errorMessage(), tenant.getId());
@@ -70,11 +66,16 @@ public class TenantLifecycleService {
         } catch (PaymentFailedException | PaymentServiceUnreachableException e) {
             throw e;
         } catch (Exception e) {
-            // activateTenant veya başka bir adım patladıysa — ödeme durumu bilinmiyor.
+            // Feign iletişimi veya response parse sırasında beklenmedik hata — ödeme durumu bilinmiyor.
             // Tenant PENDING_PAYMENT'ta kalır; ghost payment riskini önler.
-            log.error("Kritik hata: Tenant oluşturuldu ancak aktivasyon tamamlanamadı. TenantId: {}", tenant.getId(), e);
+            log.error("Kritik hata: Ödeme servisi iletişiminde beklenmedik hata. TenantId: {}", tenant.getId(), e);
             throw new TenantCreationException("İşlem sırasında beklenmedik bir hata oluştu. Lütfen ödeme durumunuzu kontrol edin.");
         }
+
+        // Try bloğundan exception fırlamadı — ödeme kesin başarılı. Aktivasyon başlıyor.
+        log.info("Ödeme başarılı! Tenant ACTIVE statüsüne çekiliyor");
+        tenantStateService.activateTenant(tenant);
+        return true;
     }
 
     @Transactional

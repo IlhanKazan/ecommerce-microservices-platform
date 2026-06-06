@@ -22,7 +22,7 @@ import {
     useGetTenantProducts,
     useGetTenantStocks,
 } from '../../../query/useProductQueries';
-import { useNotification } from '../../../components/shared/NotificationProvider';
+import { useNotification } from '../../../components/shared/NotificationContext';
 import type { StockSummaryItem } from '../../../types/product';
 
 // ─── Add Stock Dialog ─────────────────────────────────────────────────────────
@@ -155,7 +155,7 @@ const AddStockDialog: React.FC<AddStockDialogProps> = ({
                             label="Depo"
                             disabled
                             value={
-                                warehouses?.find((w: any) => w.id === preselectedWarehouseId)?.name ??
+                                warehouses?.find((w) => w.id === preselectedWarehouseId)?.name ??
                                 `#${preselectedWarehouseId}`
                             }
                             fullWidth
@@ -174,7 +174,7 @@ const AddStockDialog: React.FC<AddStockDialogProps> = ({
                             {!loadingWarehouses && (!warehouses || warehouses.length === 0) && (
                                 <MenuItem disabled>Önce bir depo oluşturmalısınız</MenuItem>
                             )}
-                            {warehouses?.map((w: any) => (
+                            {warehouses?.map((w) => (
                                 <MenuItem key={w.id} value={w.id}>
                                     {w.name}
                                     <Typography
@@ -482,7 +482,7 @@ const MerchantWarehousePage: React.FC = () => {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                warehouses.map((w: any) => {
+                                warehouses.map((w) => {
                                     const warehouseStocks = stockByWarehouse.get(w.id) ?? [];
                                     const isExpanded = expandedWarehouseId === w.id;
 

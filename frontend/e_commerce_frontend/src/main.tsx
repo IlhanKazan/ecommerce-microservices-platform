@@ -8,7 +8,6 @@ import customTheme from './utils/customTheme';
 import { GlobalStyles } from "@mui/material";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, type AuthProviderProps } from "react-oidc-context";
-import { User } from 'oidc-client-ts';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -40,7 +39,7 @@ const oidcConfig: AuthProviderProps = {
     loadUserInfo: true,
     accessTokenExpiringNotificationTimeInSeconds: 60,
 
-    onSigninCallback: (_user: User | void) => {
+    onSigninCallback: () => {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 };

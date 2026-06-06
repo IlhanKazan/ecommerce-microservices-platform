@@ -88,7 +88,7 @@ function App() {
             clearAuth();
             auth.removeUser().then(() => { window.location.href = '/'; });
         }
-    }, [auth.isAuthenticated, auth.user, auth.error, setAuth, clearAuth]);
+    }, [auth, localCartItems, clearCart, queryClient, setAuth, clearAuth]);
 
     const { data: categoryData } = useGetCategories();
     const setCategories = useCategoryStore((state) => state.setCategories);

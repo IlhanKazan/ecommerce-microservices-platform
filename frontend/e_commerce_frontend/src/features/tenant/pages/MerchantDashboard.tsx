@@ -16,7 +16,7 @@ import {
 import { useMerchantStore } from '../../../store/useMerchantStore';
 import { tenantService } from '../api/tenantService.ts';
 import type { TenantDetail } from '../../../types/tenant';
-import { AddressType, BusinessType } from '../../../types/enums';
+import { BusinessType } from '../../../types/enums';
 import TenantAddressCard from "../../../components/shared/address/TenantAddressCard.tsx";
 
 const MerchantDashboard: React.FC = () => {
@@ -41,7 +41,7 @@ const MerchantDashboard: React.FC = () => {
         };
 
         fetchDetail();
-    }, [activeTenant?.id]);
+    }, [activeTenant]);
 
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}><CircularProgress /></Box>;
     if (error) return <Alert severity="error">{error}</Alert>;
@@ -70,10 +70,6 @@ const MerchantDashboard: React.FC = () => {
     const getRoleLabel = (role: string) => {
         const map: Record<string, string> = { 'OWNER': 'Sahibi', 'ADMIN': 'Yönetici', 'STAFF': 'Personel', 'ACCOUNTANT': 'Muhasebe' };
         return map[role] || role;
-    };
-
-    const prettyAddressType = (type: string | undefined) => {
-        return type === AddressType.SHIPPING ? 'Teslimat/Depo' : 'Fatura';
     };
 
     return (
