@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import PageLayout from './components/shared/PageLayout';
 import LoadingSpinner from './components/shared/LoadingSpinner';
 import { NotificationProvider } from './components/shared/NotificationProvider';
@@ -15,6 +16,7 @@ import { basketService } from './features/catalog/api/productService';
 import { generateIdempotencyKey } from './utils/idempotencyUtils';
 import { useGetCategories } from './query/useProductQueries';
 import { useCategoryStore } from './store/useCategoryStore';
+import { BASKET_QUERY_KEY } from './query/useBasketQueries';
 
 const HomePage = lazy(() => import('./features/catalog/pages/HomePage.tsx'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
@@ -39,7 +41,7 @@ const MerchantSettings = lazy(() => import('./features/tenant/pages/MerchantSett
 const MerchantSubscription = lazy(() => import('./features/tenant/pages/MerchantSubscription'));
 
 const MerchantProducts = lazy(() => import('./features/tenant/pages/MerchantPlaceholderPages').then(module => ({ default: module.MerchantProducts })));
-const MerchantOrders = lazy(() => import('./features/tenant/pages/MerchantPlaceholderPages').then(module => ({ default: module.MerchantOrders })));
+const MerchantOrders = lazy(() => import('./features/tenant/pages/MerchantOrdersPage'));
 const MerchantReviews = lazy(() => import('./features/tenant/pages/MerchantPlaceholderPages').then(module => ({ default: module.MerchantReviews })));
 const MerchantWarehouse = lazy(() => import('./features/tenant/pages/MerchantWarehousePage'));
 const MerchantReviewsPage = lazy(() => import('./features/tenant/pages/MerchantReviewsPage'));
@@ -53,6 +55,7 @@ function App() {
     const setUser = useAuthStore((state) => state.setUser);
     const { data: userData } = useMe(isAuthenticated);
     const { items: localCartItems, clearCart } = useCartStore();
+    const queryClient = useQueryClient();
 
     useEffect(() => {
         if (userData) setUser(userData);
@@ -71,7 +74,10 @@ function App() {
                             generateIdempotencyKey()
                         )
                     )
-                ).finally(() => clearCart());
+                ).finally(() => {
+                    clearCart();
+                    queryClient.invalidateQueries({ queryKey: BASKET_QUERY_KEY });
+                });
             }
         } else if (!auth.isLoading && !auth.isAuthenticated) {
             clearAuth();

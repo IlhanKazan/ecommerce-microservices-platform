@@ -28,4 +28,14 @@ export const QueryKeys = {
     // Tenant stok özeti
     TENANT_STOCKS: (tenantId: number) =>
         ['tenant-stocks', tenantId] as const,
+
+    // Sipariş key'leri
+    MY_ORDERS: (page: number, size: number) =>
+        ['my-orders', page, size] as const,
+
+    ORDER_DETAIL: (orderId: number) =>
+        ['order-detail', orderId] as const,
+
+    TENANT_ORDERS: (tenantId: number, page: number, size: number) =>
+        ['tenant-orders', tenantId, page, size] as const,
 };
