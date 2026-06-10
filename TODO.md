@@ -47,33 +47,27 @@ SERVICE-WORK / TECHNICAL-DEBT  →  TODO.md "Aktif"  →  TODO.md "✅ Tamamlanm
 
 ## ⏭️ Aktif
 
-### Sprint 1: Borç temizleme
+### Sprint 1: Borç temizleme ✅ Tamamlandı
 
-#### S1-1: Bekleyen commit'ler
-- [x] Stage 9 + Stage 10 değişikliklerini `/commit-by-service` ile servis bazında commit et
+### Sprint 2: Platform mail sistemi tamamlama
 
-#### S1-2: Frontend lint fix (CI blocker)
-- [x] `no-explicit-any` → proper types (15+ satır, 14 dosya — detay: `TECHNICAL-DEBT.md`)
-- [x] `no-unused-vars` → kullanılmayan import'ları sil (7 satır)
-- [x] `NotificationProvider` — context export'u ayrı `NotificationContext.ts` dosyasına taşı
-- [x] `exhaustive-deps` uyarıları düzelt (5 satır)
-- [x] `npm run lint` → 0 error, 0 warning ✓
+#### S2-1: Platform mail sistemi — kod tarafı ✅ 2026-06-07
+- [x] ORDER_DELIVERED event + outbox publish (order-service) + mail handler + template
+- [x] SUBSCRIPTION_ACTIVATED event'i mail-service'te wire et (payload'a contactEmail eklendi)
+- [x] SUBSCRIPTION_RENEWAL_SUCCESS event + outbox publish (SubscriptionRenewalProcessor)
+- [x] SUBSCRIPTION_RENEWAL_FAILED event + outbox publish (suspended flag dahil)
+- [x] SubscriptionMailHandler yeni bean + 3 handler metodu
+- [x] mail-service PAYMENT topic @KafkaListener eklendi
+- [x] 4 yeni Thymeleaf template (order-delivered, subscription-activated, renewal-success, renewal-failed)
+- [x] TenantSubscription.contactEmail alanı + V7 migration
+- [x] PaymentContext/PaymentProcessRequest'e contactEmail eklendi
 
-#### S1-3: mail-service rebuild + verify
-- [ ] `docker compose up -d --build mail-service`
-- [ ] Sipariş ver → Mailhog UI'da (http://localhost:8025) ORDER_CONFIRMED maili gör
-- [ ] TENANT_ACTIVATED şablon içeriği kontrol — yanlışsa düzelt
-
-#### S1-4: activateTenant bug fix
-- [x] `TenantLifecycleService.createTenant` — `activateTenant` çağrısını try bloğu **dışına** taşı
-- [x] Try bloğu yalnızca `processPayment` Feign çağrısını sarsın
-- [ ] Test: createTenant → TENANT_ACTIVATED maili gelsin (PAYMENT_FAILED değil)
-- [x] Detay: `TECHNICAL-DEBT.md` "createTenant catch-all" maddesi
-
-#### S1-5: Outbox cleanup scheduler
-- [x] payment-service: `@Scheduled(cron = "0 0 3 * * *")` + `deleteByCreatedAtBefore` ekle
-- [x] basket-service: outbox tablosu var mı kontrol et — varsa aynı pattern (DB yok, skip)
-- [x] Pattern referans: `product-service/OutboxCleanupScheduler` veya `OutboxRepository.deleteByCreatedAtBefore`
+#### S2-2: Runtime verify (kullanıcı)
+- [ ] Build al: event-contracts → common-lib → payment-service, order-service, mail-service
+- [ ] `docker compose up -d --build payment-service order-service mail-service`
+- [ ] Merchant bir siparişi "Teslim Edildi" yap → Mailhog'da order-delivered maili
+- [ ] Yeni tenant oluştur → Mailhog'da hem tenant-activated hem subscription-activated (2 mail)
+- [ ] Renewal test: cron geçici `0/30 * * * * *` yap → Mailhog'da renewal maili
 
 ---
 
@@ -91,14 +85,108 @@ SERVICE-WORK / TECHNICAL-DEBT  →  TODO.md "Aktif"  →  TODO.md "✅ Tamamlanm
 
 ---
 
+## 🎨 Sprint 3: Frontend iyileştirme & Review sistemi
+
+### FB-8: Ürün sayfasında tenant kimliği ✅ 2026-06-07
+- [x] product-service: `UserTenantServiceClient` + adapter → `PublicProductInfo`'ya `tenantName`/`tenantLogoUrl` eklendi
+- [x] search-service: `UserTenantServiceClient` + adapter → `ProductDocument`'e `tenantName`/`tenantLogoUrl` eklendi; CREATED/UPDATED event'lerinde UTS çağrısı
+- [x] Frontend: `ProductSummary` ve `ProductDetail` tiplerine field'lar eklendi
+- [x] `ProductCard.tsx`: küçük Avatar + tenant adı (null-safe)
+- [x] `ProductDetailPage.tsx`: "Satıcı:" satırı — Avatar + isim kutusu
+
+### Veri tutarlılığı — ES inStock + sort ✅ 2026-06-07
+- [x] product-service: `POST /api/v1/public/admin/reindex` — tüm ACTIVE ürünler için PRODUCT_UPDATED event yayınlar (AdminProductController)
+- [x] stock-service: `POST /api/v1/public/admin/stocks/resync` — availableQuantity>0 olan stoklar için STOCK_STATUS_CHANGED(inStock=true) yayınlar (AdminStockController + resyncStockStatus())
+- [x] search-service: `ProductEventConsumer.handleProductCreated` → `createdAt: LocalDateTime.now()` set edildi
+- [x] search-service: `handleProductUpdated` → yeni document ise `createdAt` set edildi
+- [x] search-service: default sort değiştirildi — `inStock desc, createdAt desc nulls last` (stokta olanlar önce)
+- [x] `HomePage.tsx` + `ProductListPage.tsx`: `inStock: true` zorunlu filtresi kaldırıldı (tüm ürünler listelenir, kart "STOKTA YOK" rozetiyle ayırt eder)
+- **Build gerekiyor:** stock-service + search-service → `docker compose up -d --build stock-service search-service`
+
+### FB-9: Review sistemi (mock + entegrasyon)
+**Sorun:** Ürün sayfalarında review/yorum bölümü yok.
+- [ ] Backend: `review` entity + endpoint'leri (product-service'e ya da ayrı servis — karar verilecek)
+  - `POST /products/{id}/reviews` — yorum ekle (auth gerekli)
+  - `GET /products/{id}/reviews` — sayfalı liste (public)
+  - Rating ortalaması `ProductDetailInfo`'ya ekle
+- [ ] Backend: Geliştirme sırasında mock data üretici (seed script ya da endpoint)
+- [ ] Frontend: ürün detay sayfasına yıldız rating + yorum listesi + yorum formu
+- [ ] Frontend: Yorum gönderme mutation (React Query, idempotency key)
+
+### FB-10: Public tenant tanıtım sayfası
+**Sorun:** Tenant'ların müşteriye dönük public profil sayfası yok.
+- [ ] Backend: `GET /public/tenants/{tenantId}` — tenant adı, logo, açıklama, kategori
+- [ ] Backend: `GET /public/tenants/{tenantId}/products` — tenant'ın aktif ürünleri (sayfalı, filtreli)
+- [ ] Frontend: `/store/{tenantId}` route — banner, logo, ürün grid
+- [ ] Frontend: Ürün kartlarındaki tenant adı bu sayfaya link versin
+
+### FB-11: UI/UX genel iyileştirme ✅ 2026-06-10
+**Kapsam:** Tüm frontend — tema sistemi + müşteri ekranları + account + merchant. Trendyol/Hepsiburada ayarında.
+**Karar:** Turuncu e-ticaret paleti (`#F27A1A` + `#1A2238`), Inter font, fazlı (tema → müşteri → account+merchant).
+- [x] **Tema sistemi**: `utils/themeTokens.ts` (yeni — renk/gölge/radius/gradient token'ları), `customTheme.ts` yeniden yazıldı (turuncu palet, Inter tipografi hiyerarşisi, component override'ları, `lighter`/`darker` augmentation), `index.html` Inter font
+- [x] **Shared component**: `EmptyState.tsx`, `ProductCardSkeleton.tsx` (+ `ProductGridSkeleton`); 6 boş stub dosyası silindi
+- [x] Ana sayfa: yeni hero (gradyan), **gerçek kategorilere bağlı** kategori kartları, güven şeridi, skeleton, bozuk "mobil uygulama" metni → kampanya bandı
+- [x] Ürün listesi: tek dropdown → **sol filtre paneli** (kategori ağacı + fiyat aralığı + stok + sıralama), mobil filtre drawer, skeleton + EmptyState, URL `categoryId` desteği
+- [x] ProductCard: `React.memo`, yumuşak gölge + hover lift, fiyat hiyerarşisi (radius/orantı kullanıcı geri bildirimiyle düzeltildi)
+- [x] Ürün detay / sepet / mağaza: EmptyState, skeleton, tema renkleri; StorePage premium banner
+- [x] **Account avatar bug FIX**: `AccountLayout` `userProfile` → `user`+`oidcProfile`; isim/email doluyor, `profileImageUrl` ile gerçek avatar. Header "Hesabım" butonuna da avatar
+- [x] Merchant: `MerchantLayout` hardcoded renkler → tema token'ları (sidebar lacivert, vurgu turuncu)
+- **Runtime:** Kullanıcı build aldı, görsel onayladı ("muhteşem"). Kart radius/fiyat orantısı ikinci turda düzeltildi.
+
+### FB-12: Frontend performans iyileştirmesi — kod tarafı ✅ 2026-06-10
+**Sorun:** Arama sayfası açılışı ~4s, genel yavaşlık gözlemlendi.
+**Teşhis düzeltmesi:** Keşifte "obje query key → cache miss → 4s" denmişti; YANLIŞ — TanStack Query query key'leri structural hashler, cache hit olur. Gerçek darboğazlar: (1) filtre/sayfa değişiminde skeleton flicker, (2) App tüm-store aboneliği → tüm ağaç re-render, (3) icons tek mui-vendor chunk'ında.
+- [x] **keepPreviousData**: `useSearchProducts`'a `placeholderData: keepPreviousData`; ProductListPage'de skeleton sadece ilk açılışta, sonraki fetch'te grid korunur (hafif solar) — flicker bitti
+- [x] React Query `gcTime: 10dk` explicit (`main.tsx`)
+- [x] **Zustand selector temizliği**: `App.tsx` (kritik — route ağacının tepesi), `CartPage`, `HomePage`, `ProductListPage` → tüm-store destructure yerine alan bazlı selector (gereksiz re-render kalktı)
+- [x] **Referans stabilizasyonu**: ProductListPage `collectCategoryIds` + search payload `useMemo`; HomePage sabit payload modül seviyesine; StorePage payload `useMemo`
+- [x] **Bundle**: `vite.config.ts` `@mui/icons-material` ayrı `mui-icons-vendor` chunk'ına; `rollup-plugin-visualizer` eklendi (`dist/stats.html`)
+- [x] ProductCard `React.memo` (FB-11'de yapıldı)
+- [ ] **Runtime verify (kullanıcı):** `npm install` (yeni devDep) → `npm run build` → `dist/stats.html` chunk kıyas + flicker/re-render gözle doğrula
+- **Sonraki tur (kapsam dışı bırakıldı):** `OrderHistoryPage` mock + yapay 2sn delay temizliği, redundant `useGetCategories()`, Header `React.memo`. search-service ES sorgu süresi (`took`) ölçümü backend tarafı.
+- **Not:** 25 container aynı makinede — yavaşlığın bir kısmı ortamsal (cold ES sorgusu dahil).
+
+---
+
+## 🔧 Akış bütünlüğü / eksik temel işlevler (2026-06-10 servis taraması)
+
+Tüm controller endpoint'leri tarandı; CRUD asimetrileri ve eksik temel akışlar. **Not:** stok ekle/kaldır (`manual-add`/`manual-remove`), sepet, sipariş, adres, ürün CRUD **simetrik ve tam** — sorun yok.
+
+### FW-1: Depo (warehouse) güncelleme & silme yok 🟠
+- [ ] `WarehouseController` sadece `POST` (create) + `GET` (list). Depo açılıyor ama **düzenlenemiyor/silinemiyor**.
+- [ ] Eklenecek: `PUT /warehouses/{id}` (ad/lokasyon güncelle), `DELETE /warehouses/{id}` (içinde stok yoksa sil — stok varsa 409).
+- Dosya: `stock-service` `WarehouseController` + service/repo. Frontend: `MerchantWarehousePage`'e düzenle/sil aksiyonları.
+
+### FW-2: Mağaza askıya alma & kapatma akışı yok 🟠
+- [ ] `TenantStatus.SUSPENDED` / `CLOSED` enum'da var ama bu durumlara **geçiren hiçbir endpoint/iş akışı yok** (sadece repo query'de `status != 'CLOSED'` filtresi).
+- [ ] Eklenecek: mağaza sahibi için "mağazayı kapat" (`CLOSED`), admin için "askıya al" (`SUSPENDED`) endpoint'leri + ilgili event/mail + authz cache evict (bkz. TECHNICAL-DEBT "Authz cache evict eksik").
+- Dosya: `user-tenant-service` `TenantController` + `TenantStateService`.
+
+### FW-3: MinIO görsel orphan — silme entegrasyonu yok 🟡
+- [ ] Hiçbir serviste MinIO `removeObject` yok. Ürün/profil/tenant görseli **değiştirilince veya ürün silinince eski dosya MinIO'da kalıyor** (storage leak; zamanla şişer).
+- [ ] Eklenecek: `ImageService.deleteImage(url)`; ürün update'te listeden çıkan görselleri, ürün delete'te tüm görselleri, profil/logo değişiminde eskisini sil. (Tenant-bazlı izolasyon borcuyla birlikte ele alınabilir.)
+- Dosya: `ImageService` (product-service + user-tenant-service).
+
+### FW-4: Kategori yönetimi (admin CRUD) yok — incelenecek 🟢
+- [ ] `CategoryController` sadece public read (`GET` list + slug). Yeni kategori yalnızca Flyway seed ile ekleniyor; dinamik kategori/admin paneli için `POST/PUT/DELETE` gerekir. Admin paneli kapsama alınırsa iş, değilse kabul edilebilir.
+
+### FW-5: SubMerchant silme yok — değerlendirilecek 🟢
+- [ ] `SubMerchantController` create + update var, delete yok. iyzico alt üye işyeri kaldırma gerekli mi (mağaza kapatma akışıyla — FW-2 — bağlantılı) değerlendirilmeli.
+
+---
+
 ## 📚 Dokümantasyon & Portfolio
 
-### OpenAPI / Swagger UI
-- [ ] Her Spring Boot servisine `springdoc-openapi-starter-webmvc-ui` ekle (`pom.xml`)
-- [ ] Her servis `application-dev.yml`'e: `springdoc.api-docs.path=/v3/api-docs`, `springdoc.swagger-ui.path=/swagger-ui.html`
-- [ ] Controller'lara `@Tag`, `@Operation`, `@ApiResponse` annotation'ları ekle
-- [ ] Checkout + order endpoint'leri öncelikli (portfolio için en etkileyici)
-- [ ] Erişim: `http://localhost:808x/swagger-ui/index.html` servis bazında
+### OpenAPI / Swagger UI ✅ 2026-06-07 (runtime doğrulandı)
+- [x] Her Spring Boot servisine `springdoc-openapi-starter-webmvc-ui:2.8.13` eklendi (payment, product, search, basket, stock, order)
+- [x] Her servise `OpenApiConfig.java` — Bearer JWT security scheme, contact bilgileri
+- [x] UTS OpenApiConfig email güncellendi (`ilhan.kazan23@gmail.com`)
+- [x] Tüm controller'lara `@Tag`, `@Operation`, `@ApiResponse` eklendi (~18 controller)
+- [x] Internal/webhook endpoint'lere `@Hidden` (InternalPaymentController, InternalProductController, InternalStockController, InternalAuthzController, UserController sync metodları)
+- [x] Public endpoint'lere `security = {}` (search, public product, categories, storefront)
+- [x] Kritik DTO'lara `@Schema`: CheckoutRequest, PaymentRequest, ProductCreateRequest, ProductSearchRequest, CreateTenantRequest
+- [x] Tüm servisler runtime'da test edildi — Bearer scheme + gruplar + hidden endpoint'ler doğrulandı
+- Erişim: `http://localhost:808x/swagger-ui/index.html`
 
 ### Postman Collection (portfolio için kritik)
 - [ ] Tüm platform için tek Postman collection oluştur (`IlhanKazan_ECommerce.postman_collection.json`)
