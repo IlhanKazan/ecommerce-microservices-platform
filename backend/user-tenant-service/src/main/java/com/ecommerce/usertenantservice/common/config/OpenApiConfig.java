@@ -16,10 +16,10 @@ public class OpenApiConfig {
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("User Service API")
+                        .title("User & Tenant Service API")
                         .version("1.0")
-                        .description("E-Ticaret Platformu Kullanıcı ve Mağaza Yönetimi Servisi")
-                        .contact(new Contact().name("İlhan Kazan").email("email@test.com")))
+                        .description("Multi-tenant e-commerce platform — user profiles, merchant store lifecycle, subscription management")
+                        .contact(new Contact().name("İlhan Kazan").email("ilhan.kazan23@gmail.com")))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .components(new Components()
                         .addSecuritySchemes("bearerAuth",

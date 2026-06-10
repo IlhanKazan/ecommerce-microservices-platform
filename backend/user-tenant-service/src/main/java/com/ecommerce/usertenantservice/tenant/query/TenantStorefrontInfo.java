@@ -1,5 +1,7 @@
 package com.ecommerce.usertenantservice.tenant.query;
 
+import com.ecommerce.usertenantservice.tenant.constant.TenantStatus;
+
 import java.io.Serializable;
 
 public record TenantStorefrontInfo(
@@ -8,6 +10,8 @@ public record TenantStorefrontInfo(
         String businessName,
         String logoUrl,
         String description,
-        String websiteUrl
+        String websiteUrl,
+        TenantStatus status,
+        Boolean isVerified
 ) implements Serializable {
 }

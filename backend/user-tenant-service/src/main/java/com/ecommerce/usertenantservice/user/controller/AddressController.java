@@ -28,13 +28,14 @@ public class AddressController {
         this.addressMapper = addressMapper;
     }
 
-    @Operation(summary = "Get Addresses", description = "Mevcut kullanicin adreslerini getirir")
+    @Operation(summary = "List my addresses", description = "Returns all saved shipping/billing addresses for the authenticated user.")
     @GetMapping
     public ResponseEntity<List<AddressResponse>> getAddresses(@CurrentUser AuthUser user) {
         List<Address> currentAddresses = addressService.getUserAddresses(user.keycloakId());
         return ResponseEntity.ok(addressMapper.addressListToAddressResponseList(currentAddresses));
     }
 
+    @Operation(summary = "Create address")
     @PostMapping
     public ResponseEntity<AddressResponse> createUserAddress(@CurrentUser AuthUser user, @RequestBody UserAddressRequest addressRequest) {
         Address newAddress = addressMapper.addressRequestToAddress(addressRequest);
@@ -42,6 +43,7 @@ public class AddressController {
         return ResponseEntity.ok(addressMapper.addressToAddressResponse(savedAddress));
     }
 
+    @Operation(summary = "Update address")
     @PutMapping("/{id}")
     public ResponseEntity<AddressResponse> updateUserAddress(@CurrentUser AuthUser user, @PathVariable Long id, @RequestBody UserAddressRequest addressRequest) {
         Address oldAddress = addressService.getUserAddress(user.keycloakId(), id);
@@ -50,6 +52,7 @@ public class AddressController {
         return ResponseEntity.ok(addressMapper.addressToAddressResponse(savedAddress));
     }
 
+    @Operation(summary = "Set default address")
     @PutMapping("/{id}/default")
     public ResponseEntity<List<AddressResponse>> setAsDefaultAddress(@CurrentUser AuthUser user, @PathVariable Long id) {
         try{
@@ -61,6 +64,7 @@ public class AddressController {
         return ResponseEntity.ok(addressMapper.addressListToAddressResponseList(currentAddresses));
     }
 
+    @Operation(summary = "Delete address")
     @DeleteMapping("/{id}")
     public ResponseEntity<Boolean> deleteAddress(@CurrentUser AuthUser user, @PathVariable Long id){
         try{
