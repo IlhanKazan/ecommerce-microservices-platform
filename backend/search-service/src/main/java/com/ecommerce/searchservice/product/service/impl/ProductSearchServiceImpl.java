@@ -35,6 +35,18 @@ public class ProductSearchServiceImpl implements ProductSearchService {
 
         BoolQuery.Builder boolQueryBuilder = QueryBuilders.bool();
 
+        // Sadece aktif ve doğrulanmış mağazaların ürünleri görünsün
+        boolQueryBuilder.filter(
+                QueryBuilders.term(t -> t.field("tenantActive").value(true))
+        );
+
+        // Belirli bir mağaza sayfası için tenantId filtresi
+        if (request.tenantId() != null) {
+            boolQueryBuilder.filter(
+                    QueryBuilders.term(t -> t.field("tenantId").value(request.tenantId()))
+            );
+        }
+
         // inStock filtresi — null gelirse filtre uygulanmaz, true gelirse sadece stokta olanlar
         if (request.inStock() != null && request.inStock()) {
             boolQueryBuilder.filter(
@@ -126,23 +138,26 @@ public class ProductSearchServiceImpl implements ProductSearchService {
 
         // name: phrase_prefix (tam prefix) + fuzzy match (typo toleransı) ikisi birden
         // brand: keyword field → prefix query (phrase_prefix çalışmaz keyword alanda)
-        Query query = QueryBuilders.bool(b -> b
-                .should(QueryBuilders.matchPhrasePrefix(m -> m
-                        .field("name")
-                        .query(q)
-                        .maxExpansions(10)
+        Query query = QueryBuilders.bool(outerBool -> outerBool
+                .filter(QueryBuilders.term(t -> t.field("tenantActive").value(true)))
+                .must(QueryBuilders.bool(b -> b
+                        .should(QueryBuilders.matchPhrasePrefix(m -> m
+                                .field("name")
+                                .query(q)
+                                .maxExpansions(10)
+                        ))
+                        .should(QueryBuilders.match(m -> m
+                                .field("name")
+                                .query(q)
+                                .fuzziness("AUTO")
+                                .prefixLength(1)
+                        ))
+                        .should(QueryBuilders.prefix(p -> p
+                                .field("brand")
+                                .value(q.toLowerCase())
+                        ))
+                        .minimumShouldMatch("1")
                 ))
-                .should(QueryBuilders.match(m -> m
-                        .field("name")
-                        .query(q)
-                        .fuzziness("AUTO")
-                        .prefixLength(1)
-                ))
-                .should(QueryBuilders.prefix(p -> p
-                        .field("brand")
-                        .value(q.toLowerCase())
-                ))
-                .minimumShouldMatch("1")
         );
 
         NativeQuery nativeQuery = NativeQuery.builder()
@@ -177,8 +192,17 @@ public class ProductSearchServiceImpl implements ProductSearchService {
                     .field(f -> f.field("saleCount").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc))));
             case "rating" -> List.of(co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
                     .field(f -> f.field("ratingAverage").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc))));
-            default -> List.of(co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s  // newest
-                    .field(f -> f.field("createdAt").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc))));
+            default -> List.of(
+                    // inStock olanlar her zaman önce — stokta olmayan ürünler sona iner
+                    co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
+                            .field(f -> f.field("inStock")
+                                    .order(co.elastic.clients.elasticsearch._types.SortOrder.Desc)
+                                    .missing("_last"))),
+                    // ikincil kriter: en yeni ürün; null olanlar (eski seed data) en sona
+                    co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
+                            .field(f -> f.field("createdAt")
+                                    .order(co.elastic.clients.elasticsearch._types.SortOrder.Desc)
+                                    .missing("_last"))));
         };
     }
 

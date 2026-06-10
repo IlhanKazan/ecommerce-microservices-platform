@@ -42,3 +42,5 @@ application:
   clients:
     user-tenant:
       url: ${USER_TENANT_SERVICE_URL}
+    order-service:
+      url: ${ORDER_SERVICE_URL}

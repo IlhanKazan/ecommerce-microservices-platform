@@ -25,7 +25,10 @@ public interface ReviewRepository extends JpaRepository<ProductReview, Long> {
     Optional<ProductReview> findByIdAndUserId(Long id, UUID userId);
 
     // Rating güncellenince product tablosundaki aggregate'i güncelle
-    @Modifying
+    // clearAutomatically = true: bulk UPDATE sonrası 1. seviye cache'i temizle,
+    // aksi halde aynı transaction'da findById() eski (0/0) entity'yi döner
+    // ve PRODUCT_UPDATED event'ine stale değerler girer.
+    @Modifying(clearAutomatically = true)
     @Query("""
         UPDATE Product p SET
             p.ratingAverage = (

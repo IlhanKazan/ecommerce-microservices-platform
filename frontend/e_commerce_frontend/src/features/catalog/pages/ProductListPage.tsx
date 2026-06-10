@@ -1,70 +1,194 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-    Box, Typography, CircularProgress, Alert,
-    Pagination, Select, MenuItem, FormControl, InputLabel,
-    Container, Grid, Stack, type SelectChangeEvent
+    Box, Typography, Alert, Pagination, Select, MenuItem, FormControl,
+    Container, Stack, Paper, List, ListItemButton, ListItemText, Divider,
+    TextField, Button, Switch, FormControlLabel, IconButton, Drawer,
+    InputAdornment, type SelectChangeEvent,
 } from '@mui/material';
-import FilterListIcon from '@mui/icons-material/FilterList';
+import TuneIcon from '@mui/icons-material/Tune';
+import CloseIcon from '@mui/icons-material/Close';
+import SearchOffIcon from '@mui/icons-material/SearchOff';
 import { useSearchProducts, useGetCategories } from '../../../query/useProductQueries';
 import { useCategoryStore } from '../../../store/useCategoryStore';
 import { collectCategoryIds, flattenCategories } from '../../../utils/categoryUtils';
 import ProductCard from '../../../components/customer/ProductCard';
+import { ProductGridSkeleton } from '../../../components/shared/ProductCardSkeleton';
+import EmptyState from '../../../components/shared/EmptyState';
+import type { ProductSearchPayload } from '../../../types/product';
 
 const ITEMS_PER_PAGE = 12;
+
+type SortOption = NonNullable<ProductSearchPayload['sortBy']>;
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+    { value: 'newest', label: 'En Yeniler' },
+    { value: 'price_asc', label: 'Fiyat: Artan' },
+    { value: 'price_desc', label: 'Fiyat: Azalan' },
+    { value: 'rating', label: 'En Çok Beğenilen' },
+    { value: 'popular', label: 'Popüler' },
+];
 
 const ProductListPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const keywordFromUrl = searchParams.get('keyword') || '';
+    const categoryIdFromUrl = searchParams.get('categoryId');
 
     const [page, setPage] = useState(1);
-    const [selectedCategoryId, setSelectedCategoryId] = useState<number | ''>('');
+    const [selectedCategoryId, setSelectedCategoryId] = useState<number | ''>(
+        categoryIdFromUrl ? Number(categoryIdFromUrl) : '',
+    );
     const [keyword, setKeyword] = useState(keywordFromUrl);
+    const [sortBy, setSortBy] = useState<SortOption>('newest');
+    const [inStockOnly, setInStockOnly] = useState(false);
+    // Fiyat taslağı (apply'a basınca uygulanır → her tuşta refetch yok)
+    const [priceDraft, setPriceDraft] = useState<{ min: string; max: string }>({ min: '', max: '' });
+    const [appliedPrice, setAppliedPrice] = useState<{ min?: number; max?: number }>({});
+    const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
-    // ─── Kategoriler ──────────────────────────────────────────────────────────
-    // Store'dan kategori ağacını al; App.tsx zaten fetch etmiş olabilir
-    const { categories: storedCategories, isLoaded: categoriesLoaded } = useCategoryStore();
-
-    // Store boşsa (ilk yüklemede veya yenileme sonrası) tekrar fetch et
+    const storedCategories = useCategoryStore((s) => s.categories);
+    const categoriesLoaded = useCategoryStore((s) => s.isLoaded);
     const { data: fetchedCategories } = useGetCategories();
-    const categoryTree = categoriesLoaded ? storedCategories : (fetchedCategories ?? []);
+    const categoryTree = useMemo(
+        () => (categoriesLoaded ? storedCategories : (fetchedCategories ?? [])),
+        [categoriesLoaded, storedCategories, fetchedCategories],
+    );
+    const flatCategories = useMemo(() => flattenCategories(categoryTree), [categoryTree]);
 
-    // Dropdown için düzleştirilmiş liste
-    const flatCategories = flattenCategories(categoryTree);
-
-    // ─── Keyword URL sync ─────────────────────────────────────────────────────
+    // URL → state senkron
     useEffect(() => {
         setKeyword(keywordFromUrl);
         setPage(1);
     }, [keywordFromUrl]);
 
-    // ─── Search payload ───────────────────────────────────────────────────────
-    // Seçilen kategori + tüm torunlarının ID'lerini hesapla
-    const resolvedCategoryIds =
-        selectedCategoryId !== ''
-            ? collectCategoryIds(selectedCategoryId, categoryTree)
-            : undefined;
+    useEffect(() => {
+        setSelectedCategoryId(categoryIdFromUrl ? Number(categoryIdFromUrl) : '');
+        setPage(1);
+    }, [categoryIdFromUrl]);
 
-    const { data, isLoading, isError, isFetching } = useSearchProducts({
-        page: page > 0 ? page - 1 : 0,
-        size: ITEMS_PER_PAGE,
-        categoryIds: resolvedCategoryIds,
-        keyword: keyword === '' ? undefined : keyword,
-        inStock: true,
-    });
+    const resolvedCategoryIds = useMemo(
+        () => (selectedCategoryId !== '' ? collectCategoryIds(selectedCategoryId, categoryTree) : undefined),
+        [selectedCategoryId, categoryTree],
+    );
 
-    // ─── Handlers ────────────────────────────────────────────────────────────
-    const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
+    // Search payload'ı stabilize et — referans gereksiz değişmesin
+    const searchPayload = useMemo(
+        () => ({
+            page: page > 0 ? page - 1 : 0,
+            size: ITEMS_PER_PAGE,
+            categoryIds: resolvedCategoryIds,
+            keyword: keyword === '' ? undefined : keyword,
+            inStock: inStockOnly ? true : undefined,
+            minPrice: appliedPrice.min,
+            maxPrice: appliedPrice.max,
+            sortBy,
+        }),
+        [page, resolvedCategoryIds, keyword, inStockOnly, appliedPrice.min, appliedPrice.max, sortBy],
+    );
+
+    const { data, isLoading, isError, isFetching } = useSearchProducts(searchPayload);
+
+    const handlePageChange = (_e: React.ChangeEvent<unknown>, value: number) => {
         setPage(value);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleCategoryChange = (event: SelectChangeEvent<number | ''>) => {
-        setSelectedCategoryId(event.target.value as number | '');
+    const selectCategory = (id: number | '') => {
+        setSelectedCategoryId(id);
+        setPage(1);
+        setMobileFilterOpen(false);
+    };
+
+    const applyPrice = () => {
+        setAppliedPrice({
+            min: priceDraft.min ? Number(priceDraft.min) : undefined,
+            max: priceDraft.max ? Number(priceDraft.max) : undefined,
+        });
         setPage(1);
     };
 
-    const showLoading = isLoading || isFetching;
+    const hasActiveFilters =
+        selectedCategoryId !== '' || inStockOnly || appliedPrice.min != null || appliedPrice.max != null;
+
+    const clearFilters = () => {
+        setSelectedCategoryId('');
+        setInStockOnly(false);
+        setPriceDraft({ min: '', max: '' });
+        setAppliedPrice({});
+        setSortBy('newest');
+        setPage(1);
+    };
+
+    // Sadece ilk yüklemede (henüz veri yokken) skeleton; sonraki fetch'lerde keepPreviousData ile grid korunur
+    const showSkeleton = isLoading;
+
+    const FilterPanel = (
+        <Stack spacing={3}>
+            {/* Kategoriler */}
+            <Box>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Kategoriler</Typography>
+                <List dense disablePadding sx={{ maxHeight: 320, overflowY: 'auto' }}>
+                    <ListItemButton
+                        selected={selectedCategoryId === ''}
+                        onClick={() => selectCategory('')}
+                        sx={{ borderRadius: 1.5, '&.Mui-selected': { bgcolor: 'primary.lighter', color: 'primary.dark' } }}
+                    >
+                        <ListItemText primary="Tümü" primaryTypographyProps={{ fontWeight: selectedCategoryId === '' ? 700 : 500 }} />
+                    </ListItemButton>
+                    {flatCategories.map((cat) => (
+                        <ListItemButton
+                            key={cat.id}
+                            selected={selectedCategoryId === cat.id}
+                            onClick={() => selectCategory(cat.id)}
+                            sx={{
+                                borderRadius: 1.5, pl: 1 + cat.depth * 1.5,
+                                '&.Mui-selected': { bgcolor: 'primary.lighter', color: 'primary.dark' },
+                            }}
+                        >
+                            <ListItemText
+                                primary={cat.name}
+                                primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: selectedCategoryId === cat.id ? 700 : 500 }}
+                            />
+                        </ListItemButton>
+                    ))}
+                </List>
+            </Box>
+
+            <Divider />
+
+            {/* Fiyat aralığı */}
+            <Box>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>Fiyat Aralığı</Typography>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                    <TextField
+                        size="small" placeholder="Min" type="number" value={priceDraft.min}
+                        onChange={(e) => setPriceDraft((p) => ({ ...p, min: e.target.value }))}
+                        InputProps={{ endAdornment: <InputAdornment position="end">₺</InputAdornment> }}
+                    />
+                    <Typography color="text.disabled">–</Typography>
+                    <TextField
+                        size="small" placeholder="Max" type="number" value={priceDraft.max}
+                        onChange={(e) => setPriceDraft((p) => ({ ...p, max: e.target.value }))}
+                        InputProps={{ endAdornment: <InputAdornment position="end">₺</InputAdornment> }}
+                    />
+                </Stack>
+                <Button fullWidth size="small" variant="outlined" onClick={applyPrice}>Uygula</Button>
+            </Box>
+
+            <Divider />
+
+            {/* Stok */}
+            <FormControlLabel
+                control={<Switch checked={inStockOnly} onChange={(e) => { setInStockOnly(e.target.checked); setPage(1); }} color="primary" />}
+                label={<Typography variant="body2" fontWeight={600}>Sadece stoktakiler</Typography>}
+            />
+
+            {hasActiveFilters && (
+                <Button color="inherit" size="small" onClick={clearFilters} sx={{ color: 'text.secondary' }}>
+                    Filtreleri Temizle
+                </Button>
+            )}
+        </Stack>
+    );
 
     return (
         <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 4 }}>
@@ -74,94 +198,108 @@ const ProductListPage: React.FC = () => {
                     justifyContent="space-between"
                     alignItems={{ xs: 'flex-start', sm: 'center' }}
                     spacing={2}
-                    sx={{ mb: 4, pb: 2, borderBottom: '1px solid', borderColor: 'divider' }}
+                    sx={{ mb: 3 }}
                 >
                     <Box>
-                        <Typography variant="h4" component="h1" fontWeight="bold" color="text.primary">
+                        <Typography variant="h4" component="h1" fontWeight={800}>
                             {keyword ? `"${keyword}" için Sonuçlar` : 'Tüm Ürünler'}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                            {data?.totalElements || 0} ürün listeleniyor
+                            {data?.totalElements ?? 0} ürün listeleniyor
                         </Typography>
                     </Box>
 
-                    <FormControl sx={{ minWidth: 220 }} size="small" variant="outlined">
-                        <InputLabel id="category-select-label" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <FilterListIcon fontSize="small" /> Kategori Filtrele
-                        </InputLabel>
-                        <Select
-                            labelId="category-select-label"
-                            value={selectedCategoryId}
-                            label="Kategori Filtrele"
-                            onChange={handleCategoryChange}
-                            sx={{ borderRadius: 2 }}
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <Button
+                            variant="outlined" startIcon={<TuneIcon />}
+                            onClick={() => setMobileFilterOpen(true)}
+                            sx={{ display: { xs: 'flex', md: 'none' } }}
                         >
-                            <MenuItem value="">Tümü</MenuItem>
-
-                            {flatCategories.map((cat) => (
-                                <MenuItem
-                                    key={cat.id}
-                                    value={cat.id}
-                                    sx={{ pl: 2 + cat.depth * 1.5 }} // alt kategorileri indent et
-                                >
-                                    {cat.depth > 0 && (
-                                        <Typography
-                                            component="span"
-                                            sx={{ color: 'text.disabled', mr: 0.5, fontSize: '0.75rem' }}
-                                        >
-                                            {'└ '.repeat(cat.depth)}
-                                        </Typography>
-                                    )}
-                                    {cat.name}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
+                            Filtrele
+                        </Button>
+                        <FormControl size="small" sx={{ minWidth: 180 }}>
+                            <Select
+                                value={sortBy}
+                                onChange={(e: SelectChangeEvent) => { setSortBy(e.target.value as SortOption); setPage(1); }}
+                            >
+                                {SORT_OPTIONS.map((o) => (
+                                    <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Stack>
                 </Stack>
 
-                {isError && (
-                    <Alert severity="error" sx={{ mb: 4 }}>
-                        Ürünler listelenirken bir sorun oluştu. Servis şu an yanıt vermiyor olabilir.
-                    </Alert>
-                )}
+                <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
+                    {/* Sol filtre paneli — desktop */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            display: { xs: 'none', md: 'block' },
+                            width: 260, flexShrink: 0, p: 2.5, borderRadius: 3,
+                            boxShadow: (t) => t.shadows[0], border: '1px solid', borderColor: 'divider',
+                            position: 'sticky', top: 88,
+                        }}
+                    >
+                        {FilterPanel}
+                    </Paper>
 
-                {showLoading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-                        <CircularProgress />
-                    </Box>
-                ) : (
-                    <>
-                        {data?.content?.length === 0 ? (
-                            <Alert severity="info" sx={{ mt: 2 }}>
-                                Aradığınız kriterlere uygun ürün bulunamadı.
+                    {/* Sonuçlar */}
+                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                        {isError && (
+                            <Alert severity="error" sx={{ mb: 3 }}>
+                                Ürünler listelenirken bir sorun oluştu. Servis şu an yanıt vermiyor olabilir.
                             </Alert>
-                        ) : (
-                            <Grid container spacing={3}>
-                                {data?.content?.map((product) => (
-                                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={product.id}>
-                                        <ProductCard product={product} />
-                                    </Grid>
-                                ))}
-                            </Grid>
                         )}
 
-                        {data && data.totalPages > 1 && (
+                        {showSkeleton ? (
+                            <ProductGridSkeleton count={9} size={{ xs: 6, sm: 4, md: 4 }} />
+                        ) : data?.content?.length === 0 ? (
+                            <EmptyState
+                                icon={<SearchOffIcon />}
+                                title="Sonuç bulunamadı"
+                                description="Aradığınız kriterlere uygun ürün yok. Filtreleri değiştirmeyi deneyin."
+                                actionLabel={hasActiveFilters ? 'Filtreleri Temizle' : undefined}
+                                onAction={clearFilters}
+                            />
+                        ) : (
+                            <Box sx={{
+                                display: 'grid',
+                                gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
+                                gap: { xs: 1.5, sm: 2, md: 2.5 },
+                                // Yeni veri gelirken (filtre/sayfa değişimi) mevcut grid'i hafif soldur — flicker yok
+                                opacity: isFetching ? 0.55 : 1,
+                                transition: 'opacity 0.2s ease',
+                                pointerEvents: isFetching ? 'none' : 'auto',
+                            }}>
+                                {data?.content?.map((product) => (
+                                    <ProductCard key={product.id} product={product} />
+                                ))}
+                            </Box>
+                        )}
+
+                        {data && data.totalPages > 1 && !showSkeleton && (
                             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 6, mb: 2 }}>
                                 <Pagination
-                                    count={data.totalPages}
-                                    page={page}
-                                    onChange={handlePageChange}
-                                    color="primary"
-                                    size="large"
-                                    shape="rounded"
-                                    showFirstButton
-                                    showLastButton
+                                    count={data.totalPages} page={page} onChange={handlePageChange}
+                                    color="primary" size="large" shape="rounded" showFirstButton showLastButton
                                 />
                             </Box>
                         )}
-                    </>
-                )}
+                    </Box>
+                </Box>
             </Container>
+
+            {/* Mobil filtre drawer */}
+            <Drawer anchor="right" open={mobileFilterOpen} onClose={() => setMobileFilterOpen(false)}>
+                <Box sx={{ width: 300, p: 2.5 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                        <Typography variant="h6" fontWeight={800}>Filtrele</Typography>
+                        <IconButton onClick={() => setMobileFilterOpen(false)}><CloseIcon /></IconButton>
+                    </Stack>
+                    {FilterPanel}
+                </Box>
+            </Drawer>
         </Box>
     );
 };

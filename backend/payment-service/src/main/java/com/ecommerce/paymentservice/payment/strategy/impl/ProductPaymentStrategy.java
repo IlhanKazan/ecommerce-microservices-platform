@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.UUID;
 
@@ -70,15 +71,22 @@ public class ProductPaymentStrategy implements PaymentStrategy {
             request.setShippingAddress(buildAddress(context.getShippingAddress()));
         }
 
+        BigDecimal totalAmount = payment.getAmount();
+        BigDecimal commissionRate = context.getCommissionRate() != null
+                ? context.getCommissionRate() : BigDecimal.ZERO;
+        BigDecimal subMerchantAmount = totalAmount.subtract(
+                totalAmount.multiply(commissionRate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+        );
+
         BasketItem item = new BasketItem();
         item.setId(context.getReferenceId() != null ? context.getReferenceId().toString() : "ORDER");
         item.setName("Sipariş #" + context.getReferenceId());
         item.setCategory1("Ürün");
         item.setItemType(BasketItemType.PHYSICAL.name());
-        item.setPrice(payment.getAmount());
+        item.setPrice(totalAmount);
         if (context.getSubMerchantKey() != null) {
             item.setSubMerchantKey(context.getSubMerchantKey());
-            item.setSubMerchantPrice(payment.getAmount());
+            item.setSubMerchantPrice(subMerchantAmount);
         }
         request.setBasketItems(Collections.singletonList(item));
 

@@ -18,6 +18,9 @@ import com.ecommerce.productservice.product.query.ProductInfo;
 import com.ecommerce.productservice.product.command.ProductUpdateContext;
 import com.ecommerce.productservice.product.mapper.ProductMapper;
 import com.ecommerce.productservice.product.service.TenantProductService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -28,6 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
+@Tag(name = "Tenant Products", description = "Merchant product catalog — create, update, delete products and upload images")
 @RestController
 @RequestMapping(ApiPaths.TenantProduct.TENANT_PRODUCTS)
 @RequiredArgsConstructor
@@ -37,6 +41,10 @@ public class TenantProductController {
     private final ProductMapper productMapper;
     private final ImageService imageService;
 
+    @Operation(summary = "Create product", description = "Creates a new product in the tenant's catalog. Product is visible to customers once published. Triggers PRODUCT_CREATED event for search indexing.")
+    @ApiResponse(responseCode = "200", description = "Product created")
+    @ApiResponse(responseCode = "400", description = "Validation error — check SKU uniqueness, required fields")
+    @ApiResponse(responseCode = "403", description = "Not authorized for this tenant")
     @Idempotent(cachePrefix = "idempotency:product-create:", ttlSeconds = 300)
     @PostMapping
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
@@ -51,6 +59,8 @@ public class TenantProductController {
                 .body(productMapper.toResponse(saved));
     }
 
+    @Operation(summary = "List tenant products", description = "Paginated list of all products in this tenant's catalog, including draft and inactive products.")
+    @ApiResponse(responseCode = "200", description = "Paginated product list")
     // GET /api/v1/products/tenants/{tenantId}?page=0&size=20
     @GetMapping
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
@@ -76,6 +86,9 @@ public class TenantProductController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Get product", description = "Full product detail for the merchant view — includes all fields, stock status, SEO data.")
+    @ApiResponse(responseCode = "200", description = "Product detail")
+    @ApiResponse(responseCode = "404", description = "Product not found in this tenant")
     @GetMapping("/{productId}")
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
     public ResponseEntity<ProductResponse> getTenantProduct(
@@ -87,6 +100,8 @@ public class TenantProductController {
         return ResponseEntity.ok(productMapper.toResponseFromInfo(info));
     }
 
+    @Operation(summary = "Get product detail (edit view)", description = "Extended product detail for the edit form — includes all editable fields: SEO, tags, dimensions, variants.")
+    @ApiResponse(responseCode = "200", description = "Extended product detail")
     @GetMapping("/{productId}/detail")
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
     public ResponseEntity<ProductDetailResponse> getTenantProductDetail(
@@ -97,6 +112,9 @@ public class TenantProductController {
         return ResponseEntity.ok(productMapper.toDetailResponse(info));
     }
 
+    @Operation(summary = "Update product", description = "Updates all product fields. Triggers PRODUCT_UPDATED event for search re-indexing.")
+    @ApiResponse(responseCode = "200", description = "Product updated")
+    @ApiResponse(responseCode = "404", description = "Product not found")
     @Idempotent(cachePrefix = "idempotency:product-update:")
     @PutMapping("/{productId}")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
@@ -112,6 +130,8 @@ public class TenantProductController {
         return ResponseEntity.ok(productMapper.toResponse(updated));
     }
 
+    @Operation(summary = "Change sales status", description = "Toggles product between ON_SALE, PAUSED, OUT_OF_STOCK. Affects customer-facing visibility.")
+    @ApiResponse(responseCode = "200", description = "Status changed")
     // PATCH — sadece satış durumunu değiştir, tüm ürünü yollama
     @PatchMapping("/{productId}/sales-status")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
@@ -124,6 +144,8 @@ public class TenantProductController {
         return ResponseEntity.ok().build();
     }
 
+    @Operation(summary = "Delete product", description = "Soft-deletes the product (status → DELETED). Triggers PRODUCT_DELETED event to remove from search index.")
+    @ApiResponse(responseCode = "200", description = "Product deleted")
     @DeleteMapping("/{productId}")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<Void> deleteProduct(
@@ -134,6 +156,8 @@ public class TenantProductController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Upload product image", description = "Uploads an image to MinIO products/ bucket. Returns the public URL to use in product create/update requests. Max 5MB, JPEG/PNG/WebP.")
+    @ApiResponse(responseCode = "200", description = "Image uploaded — response contains {\"url\": \"http://...\"}")
     @PostMapping("/images/upload")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<Map<String, String>> uploadProductImage(

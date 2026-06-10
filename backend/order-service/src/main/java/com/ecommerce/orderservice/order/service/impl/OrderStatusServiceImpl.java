@@ -36,6 +36,8 @@ public class OrderStatusServiceImpl implements OrderStatusService {
             }
             case "DELIVERED" -> {
                 order.deliver();
+                outboxService.publishOrderDeliveredEvent(
+                        order.getId(), order.getTenantId(), order.getBuyerEmail(), java.time.LocalDateTime.now());
                 log.info("Sipariş teslim edildi. OrderID: {}", order.getId());
             }
             default -> throw new BusinessException(

@@ -1,13 +1,6 @@
 import React from 'react';
-import {
-    Typography, Card, CardContent, CardMedia, Box,
-    IconButton, Button, Stack, Rating,
-} from '@mui/material';
-import {
-    FavoriteBorder,
-    ShoppingCartOutlined,
-    Inventory2Outlined,
-} from '@mui/icons-material';
+import { Typography, Card, CardMedia, Box, IconButton, Button, Rating, Avatar } from '@mui/material';
+import { FavoriteBorder, ShoppingCartOutlined } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import type { ProductSummary } from '../../types';
 import { useToastStore } from '../../store/useToastStore';
@@ -20,32 +13,26 @@ interface ProductCardProps {
 }
 
 const formatPrice = (price: number): string =>
-    new Intl.NumberFormat('tr-TR', {
-        style: 'currency',
-        currency: 'TRY',
-        minimumFractionDigits: 2,
-    }).format(price);
+    new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2 }).format(price);
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     const toast = useToastStore();
-    const addItem = useCartStore((state) => state.addItem);
-    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const addItem = useCartStore((s) => s.addItem);
+    const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
     const { mutate: addApiItem, isPending } = useAddToBasket();
 
-    const imageUrl =
-        product.mainImageUrl ?? 'https://via.placeholder.com/300x300?text=Resim+Yok';
-
-    // discountedPrice varsa onu, yoksa normal fiyatı göster
+    const imageUrl = product.mainImageUrl ?? 'https://placehold.co/400x400/f5f5f5/bdbdbd?text=Resim+Yok';
     const displayPrice = product.discountedPrice ?? product.price;
     const hasDiscount =
-        product.discountedPrice !== null &&
-        product.discountedPrice !== undefined &&
-        product.discountedPrice < product.price;
+        product.discountedPrice != null && product.discountedPrice < product.price;
+    const discountPct = hasDiscount
+        ? Math.round((1 - product.discountedPrice! / product.price) * 100)
+        : 0;
+    const hasRating = (product.reviewCount ?? 0) > 0;
 
     const handleAddToCart = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-
         if (!product.inStock || isPending) return;
 
         if (isAuthenticated) {
@@ -53,7 +40,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                 { productId: Number(product.id), quantity: 1 },
                 {
                     onSuccess: () => toast.success(`"${product.name}" sepete eklendi!`),
-                    onError: () => toast.error('Ürün sepete eklenirken hata oluştu.'),
+                    onError: () => toast.error('Sepete eklenirken hata oluştu.'),
                 },
             );
         } else {
@@ -72,189 +59,221 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         <Card
             elevation={0}
             sx={{
-                bgcolor: 'white',
+                width: '100%',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                border: '1px solid #eee',
-                borderRadius: 3,
-                position: 'relative',
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
                 overflow: 'hidden',
-                transition: 'all 0.25s ease',
+                bgcolor: 'white',
+                transition: 'box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease',
                 '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    boxShadow: '0 10px 28px rgba(26,34,56,0.14)',
                     borderColor: 'transparent',
-                    '& .quick-add': { opacity: 1, transform: 'translateY(0)' },
+                    transform: 'translateY(-2px)',
+                    '& .card-add-btn': { opacity: 1, transform: 'translateY(0)' },
+                    '& .card-img': { transform: 'scale(1.05)' },
                 },
             }}
         >
-            {/* Favori */}
-            <IconButton
-                size="small"
-                sx={{
-                    position: 'absolute', top: 8, right: 8, zIndex: 2,
-                    bgcolor: 'rgba(255,255,255,0.9)',
-                    '&:hover': { bgcolor: 'white', color: 'error.main' },
-                }}
-            >
-                <FavoriteBorder fontSize="small" />
-            </IconButton>
-
-            {/* Stok rozeti */}
-            {!product.inStock && (
-                <Box sx={{
-                    position: 'absolute', top: 8, left: 8, zIndex: 2,
-                    bgcolor: 'grey.700', color: 'white',
-                    px: 1, py: 0.25, borderRadius: 1,
-                    fontSize: '0.7rem', fontWeight: 'bold',
-                }}>
-                    STOKTA YOK
-                </Box>
-            )}
-
-            {/* İndirim rozeti */}
-            {hasDiscount && (
-                <Box sx={{
-                    position: 'absolute', top: product.inStock ? 8 : 32, left: 8, zIndex: 2,
-                    bgcolor: 'error.main', color: 'white',
-                    px: 1, py: 0.25, borderRadius: 1,
-                    fontSize: '0.7rem', fontWeight: 'bold',
-                }}>
-                    {Math.round((1 - product.discountedPrice! / product.price) * 100)}% İNDİRİM
-                </Box>
-            )}
-
-            {/* Görsel */}
-            <Box sx={{ position: 'relative', paddingTop: '100%', overflow: 'hidden', bgcolor: '#f8f8f8' }}>
+            {/* ── Görsel alanı ── */}
+            <Box sx={{ position: 'relative', paddingTop: '100%', bgcolor: 'grey.50', overflow: 'hidden' }}>
+                {/* Tıklanabilir görsel */}
                 <Box
                     component={RouterLink}
                     to={`/product/${product.id}`}
-                    sx={{ position: 'absolute', inset: 0, display: 'block', zIndex: 1 }}
+                    sx={{ position: 'absolute', inset: 0, display: 'block' }}
                 >
                     <CardMedia
                         component="img"
+                        className="card-img"
                         image={imageUrl}
                         alt={product.name}
                         loading="lazy"
                         sx={{
-                            width: '100%', height: '100%',
-                            objectFit: 'contain', p: 2,
-                            opacity: product.inStock ? 1 : 0.5,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            p: 1.5,
+                            opacity: product.inStock ? 1 : 0.45,
+                            transition: 'transform 0.3s ease',
                         }}
                     />
                 </Box>
 
-                {/* Quick-add (hover) */}
+                {/* Rozetler — sol üst */}
+                <Box sx={{ position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 0.5, zIndex: 2 }}>
+                    {!product.inStock && (
+                        <Box sx={{
+                            px: 1, py: 0.25, borderRadius: 0.75,
+                            bgcolor: 'rgba(0,0,0,0.65)', color: 'white',
+                            fontSize: '0.65rem', fontWeight: 700, letterSpacing: 0.3,
+                        }}>
+                            TÜKENDI
+                        </Box>
+                    )}
+                    {hasDiscount && (
+                        <Box sx={{
+                            px: 1, py: 0.25, borderRadius: 0.75,
+                            bgcolor: 'error.main', color: 'white',
+                            fontSize: '0.65rem', fontWeight: 700,
+                        }}>
+                            %{discountPct} İNDİRİM
+                        </Box>
+                    )}
+                </Box>
+
+                {/* Favori — sağ üst */}
+                <IconButton
+                    size="small"
+                    sx={{
+                        position: 'absolute', top: 6, right: 6, zIndex: 2,
+                        bgcolor: 'rgba(255,255,255,0.85)',
+                        width: 28, height: 28,
+                        '&:hover': { bgcolor: 'white', color: 'error.main' },
+                    }}
+                >
+                    <FavoriteBorder sx={{ fontSize: 15 }} />
+                </IconButton>
+
+                {/* Hover sepet butonu */}
                 <Button
-                    className="quick-add"
+                    className="card-add-btn"
                     variant="contained"
                     size="small"
-                    startIcon={
-                        isPending
-                            ? undefined
-                            : product.inStock
-                                ? <ShoppingCartOutlined fontSize="small" />
-                                : <Inventory2Outlined fontSize="small" />
-                    }
+                    disableElevation
+                    startIcon={<ShoppingCartOutlined sx={{ fontSize: '0.9rem !important' }} />}
                     onClick={handleAddToCart}
                     disabled={!product.inStock || isPending}
                     sx={{
                         position: 'absolute', bottom: 8, left: 8, right: 8, zIndex: 3,
-                        opacity: 0, transform: 'translateY(8px)',
-                        transition: 'all 0.2s ease',
-                        borderRadius: 2, textTransform: 'none',
-                        fontWeight: 'bold', fontSize: '0.8rem',
+                        opacity: 0, transform: 'translateY(6px)',
+                        transition: 'opacity 0.2s ease, transform 0.2s ease',
+                        borderRadius: 1.5, textTransform: 'none',
+                        fontWeight: 600, fontSize: '0.78rem', py: 0.6,
                         display: { xs: 'none', sm: 'flex' },
                     }}
                 >
-                    {product.inStock ? 'Sepete Ekle' : 'Stokta Yok'}
+                    {product.inStock ? 'Sepete Ekle' : 'Tükendi'}
                 </Button>
             </Box>
 
-            {/* İçerik */}
-            <CardContent sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column' }}>
-                {product.brand && (
-                    <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}
-                    >
-                        {product.brand}
-                    </Typography>
-                )}
+            {/* ── İçerik alanı ── */}
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', px: 1.5, pt: 1.25, pb: 1.75 }}>
 
+                {/* Marka */}
+                <Box sx={{ minHeight: '1.3em', mb: 0.25 }}>
+                    {product.brand && (
+                        <Typography
+                            variant="caption"
+                            sx={{ color: 'text.disabled', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, fontSize: '0.65rem' }}
+                        >
+                            {product.brand}
+                        </Typography>
+                    )}
+                </Box>
+
+                {/* Ürün adı */}
                 <Typography
                     component={RouterLink}
                     to={`/product/${product.id}`}
-                    variant="body2"
                     sx={{
-                        fontWeight: 500, mt: 0.25,
-                        textDecoration: 'none', color: 'text.primary',
+                        fontWeight: 500, fontSize: '0.82rem', lineHeight: 1.35,
+                        color: 'text.primary', textDecoration: 'none',
                         display: '-webkit-box', overflow: 'hidden',
                         WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
-                        minHeight: '2.6em', lineHeight: 1.3,
+                        minHeight: '2.25em',
                         '&:hover': { color: 'primary.main' },
                     }}
                 >
                     {product.name}
                 </Typography>
 
-                {/* Puan & yorum sayısı — her ikisi de artık ProductSummary'de mevcut */}
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5, mb: 1, gap: 0.5 }}>
-                    <Rating
-                        value={product.ratingAverage ?? 0}
-                        precision={0.5}
-                        readOnly
-                        size="small"
-                        sx={{ fontSize: '1rem' }}
-                    />
-                    <Typography variant="caption" color="text.secondary">
-                        ({product.reviewCount ?? 0})
-                    </Typography>
+                {/* Yıldız — sadece review varsa göster */}
+                <Box sx={{ minHeight: '1.5em', mt: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    {hasRating && (
+                        <>
+                            <Rating
+                                value={product.ratingAverage ?? 0}
+                                precision={0.5}
+                                readOnly
+                                size="small"
+                                sx={{ fontSize: '0.85rem' }}
+                            />
+                            <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>
+                                ({product.reviewCount})
+                            </Typography>
+                        </>
+                    )}
                 </Box>
 
-                {/* Fiyat */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 'auto' }}>
+                {/* Satıcı */}
+                <Box sx={{ minHeight: '1.6em', mt: 0.5 }}>
+                    {product.tenantName && (
+                        <RouterLink
+                            to={`/store/${product.tenantId}`}
+                            style={{ textDecoration: 'none' }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, '&:hover': { opacity: 0.7 } }}>
+                                <Avatar
+                                    src={product.tenantLogoUrl ?? undefined}
+                                    alt={product.tenantName}
+                                    sx={{ width: 14, height: 14, fontSize: '0.5rem', bgcolor: 'primary.light' }}
+                                >
+                                    {product.tenantName.charAt(0).toUpperCase()}
+                                </Avatar>
+                                <Typography noWrap sx={{ color: 'text.secondary', fontSize: '0.68rem', maxWidth: 110 }}>
+                                    {product.tenantName}
+                                </Typography>
+                            </Box>
+                        </RouterLink>
+                    )}
+                </Box>
+
+                {/* Fiyat + mobil sepet */}
+                <Box sx={{ mt: 'auto', pt: 1.25, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
                     <Box>
                         {hasDiscount && (
-                            <Typography
-                                variant="caption"
-                                color="text.disabled"
-                                sx={{ textDecoration: 'line-through', display: 'block', lineHeight: 1 }}
-                            >
+                            <Typography sx={{ fontSize: '0.72rem', color: 'text.disabled', textDecoration: 'line-through', lineHeight: 1.2 }}>
                                 {formatPrice(product.price)}
                             </Typography>
                         )}
                         <Typography
-                            variant="subtitle1"
-                            color={product.inStock ? (hasDiscount ? 'error.main' : 'primary.main') : 'text.disabled'}
-                            fontWeight="bold"
-                            sx={{ fontSize: '1rem' }}
+                            sx={{
+                                fontWeight: 800,
+                                fontSize: '1.1rem',
+                                lineHeight: 1.2,
+                                fontVariantNumeric: 'tabular-nums',
+                                color: !product.inStock ? 'text.disabled' : hasDiscount ? 'error.main' : 'text.primary',
+                            }}
                         >
                             {formatPrice(displayPrice)}
                         </Typography>
                     </Box>
 
-                    {/* Mobil sepet butonu */}
+                    {/* Mobil sepet */}
                     <IconButton
-                        color="primary"
                         size="small"
                         onClick={handleAddToCart}
                         disabled={!product.inStock || isPending}
                         sx={{
                             display: { xs: 'flex', sm: 'none' },
+                            width: 32, height: 32,
                             border: '1px solid', borderColor: 'divider',
-                            borderRadius: 1.5,
-                            '&:hover': { bgcolor: 'primary.main', color: 'white' },
+                            borderRadius: 1,
+                            color: 'primary.main',
+                            '&:hover': { bgcolor: 'primary.main', color: 'white', borderColor: 'primary.main' },
                         }}
                     >
-                        <ShoppingCartOutlined fontSize="small" />
+                        <ShoppingCartOutlined sx={{ fontSize: 16 }} />
                     </IconButton>
-                </Stack>
-            </CardContent>
+                </Box>
+            </Box>
         </Card>
     );
 };
 
-export default ProductCard;
+export default React.memo(ProductCard);

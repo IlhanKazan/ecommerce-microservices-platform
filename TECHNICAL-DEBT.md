@@ -30,17 +30,18 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 - [ ] Mantıksal "internal" path'i ama network seviyesinde herhangi bir korumayla ayrılmamış. Servis hesabı role check veya k8s'te NetworkPolicy/mTLS gerekli (prod için).
 - **Geçici çözüm (dev):** Internal endpoint'lere `hasRole('SERVICE')` ekle veya özel header kontrolü. Prod'da mTLS/NetworkPolicy.
 
-### Concurrent sipariş — race condition
-- [ ] **Aynı anda iki kullanıcı son birimi satın alırsa:** Stock entity'de `@Version` (optimistic lock) var — ikincisi `OptimisticLockException` alır. Bu exception order-service'te yakalanıp `STOCK_RESERVATION_FAILED` olarak işlenmeli; stack trace değil, kullanıcıya "stok tükendi" dönmeli.
-- Şu an `@Version` var ama exception handling planlanmamış.
+### Concurrent sipariş — race condition ✅ 2026-06-07 düzeltildi
+- [x] `StockExceptionHandler` eklendi (stock-service): `OptimisticLockingFailureException` → 409, `PessimisticLockingFailureException` → 409
+- [x] order-service `reserveStockOrThrow()` mesajı güncellendi — her iki 409 kaynağını da doğru karşılıyor
+- 500 stack trace yok, kullanıcıya anlamlı hata mesajı gidiyor
 
 ---
 
 ## Order Service — Bilinen Teknik Borç (Stage 10 sonrası)
 
-### 🟡 Checkout idempotency gap
-- [ ] `saveOrderWithItems` DB yazımı başarısız olursa (`reserve ✅ → pay ✅ → DB ❌`): `IdempotencyAspect` exception'da Redis key siliyor → retry double-charge eder.
-- Çözüm: payment-service'te orderId bazlı idempotency VEYA aspect'te exception tipine göre key silme kararı.
+### 🟡 Checkout idempotency gap ✅ 2026-06-07 düzeltildi
+- [x] `IdempotencyAspect` catch bloğu güncellendi: `DataAccessException` / `TransactionException` durumunda Redis key silinmiyor (TTL: 5 dk). Diğer exception'larda (BusinessException, ExternalServiceException, FeignException) key silinir → retry allowed.
+- Etki: `reserve ✅ → pay ✅ → DB ❌` → retry → `DUPLICATE_REQUEST` → double charge yok.
 
 ### 🟡 Payment refund stub — gerçek iyzico çağrısı yok
 - [ ] `POST /api/v1/payments/internal/refund` şimdilik sadece `PaymentStatus.REFUNDED` set ediyor.
@@ -66,6 +67,35 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 ---
 
 ## 🟠 Production blocker
+
+### iyzico SubMerchant komisyon mekanizması ✅ 2026-06-07 düzeltildi
+
+**Yapılanlar:**
+- `subscription_plans` tablosuna `commission_rate` eklendi (V5 migration)
+- 4 mock plan seed edildi: Başlangıç %8 / Büyüme %5 / İşletme %3 / Kurumsal %1
+- `TenantSubscription`'a `commission_rate` snapshot alanı eklendi
+- `PaymentServiceImpl.resolveCommissionRate()` → aktif subscription'dan oran okunuyor, yoksa %8 fallback
+- `ProductPaymentStrategy`: `subMerchantPrice = amount × (1 - rate/100)` — artık doğru hesaplıyor
+- `Payment.commissionRate` ve `Payment.commissionAmount` artık kayıt altına alınıyor
+
+**Kalan küçük borç:**
+- [x] `fetchSubMerchantKeyOrThrow` (OrderSagaServiceImpl) — null/blank dönünce `SUBMERCHANT_NOT_READY` 400 fırlatılıyor, sessizce platforma düşmüyor. 2026-06-07
+- [ ] Abonelik yükseltme/düşürme akışında commission_rate güncellenmeli (şimdi sadece ilk subscription'da set ediliyor)
+
+### ORDER_DELIVERED event ve maili eksik ✅ 2026-06-07 düzeltildi
+- [x] `EVENT_ORDER_DELIVERED` EventConstants'a eklendi, `OrderDeliveredEventPayload` event-contracts'a eklendi
+- [x] `OrderStatusServiceImpl` DELIVERED case'inde outbox'a yazıyor
+- [x] `MailEventConsumer` ORDER consumer'da handler'a yönlendiriyor, `order-delivered.html` şablonu eklendi
+
+### Mail genişletme backlog (🟢 nice-to-have)
+- [ ] **Şifre sıfırlama maili** — Keycloak kendi gönderiyor ama özel şablon yok (Keycloak SMTP'si Mailhog'a bağlı)
+- [ ] **Hoş geldiniz maili** — yeni kullanıcı kaydında; Keycloak bu görevi üstleniyor, platform'dan ikinci mail atmak yerine Keycloak şablonu özelleştirilebilir
+- [x] **Abonelik yenileme başarısız** ✅ 2026-06-07 — `SubscriptionRenewalProcessor.handlePaymentFailure` outbox yazıyor, mail-service PAYMENT topic'ten dinliyor
+- [x] **Abonelik yenileme başarılı** ✅ 2026-06-07 — aynı
+- [x] **Abonelik aktivasyon maili** ✅ 2026-06-07 — SUBSCRIPTION_ACTIVATED event'i mail-service'te wire edildi, `subscription-activated.html` eklendi
+- [ ] **Merchant yeni sipariş bildirimi** — alıcıya değil, mağazaya bildirim (farklı mail adresi gerekli)
+
+
 
 ### Outbox cleanup scheduler eksik
 - [ ] `payment-service` ve `basket-service` outbox cleanup scheduler **YOK**. Outbox tabloları sonsuz şişer.
@@ -102,8 +132,9 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 - Çözüm: Tenant-bazlı object key prefix (`tenants/<tenantId>/products/...`) veya tenant başına bucket.
 - Notion'da iki yerde geçiyor: "DevOps" ve "user-tenant-service"
 
-### Frontend lint — CI blocker (42 error, 5 warning)
-- [ ] `npm run lint` (`--max-warnings 0`) CI'da fail ediyor. PR `devops/stage9-containerization` merge edilemez.
+### Frontend lint — CI blocker (42 error, 5 warning) ✅ 2026-06-10
+- [x] **Çözüldü.** Asıl 42 error daha önce (Sprint 1 lint temizliğinde) giderilmiş; 2026-06-10'da kalan 3 warning de düzeltildi (`ProductListPage` categoryTree useMemo, `CartPage` useMemo deps). `npm run lint` → **0 error, 0 warning**. CI yeşil.
+- _(Aşağıdaki eski hata envanteri tarihçe — üzerine dönme.)_
 - **Dosyalar ve kategoriler:**
   - `@typescript-eslint/no-explicit-any` (30+ instance): `Header.tsx:50`, `HomePage.tsx:127`, `ProductDetailPage.tsx:124,441`, `CartPage.tsx:177`, `AddStockModal.tsx:54`, `TeamManagementSection.tsx:58`, `WarehouseManagement.tsx:56`, `CreateStorePage.tsx:192`, `MerchantSettings.tsx` (8 satır), `MerchantSubscription.tsx:136`, `MerchantWarehousePage.tsx:156,333`, `userService.ts` (5 satır), `AccountAddresses.tsx:89,109`, `useBasketQueries.ts:50,52,54`, `useProductQueries.ts:116,131`, `types/common.ts:7`
   - `@typescript-eslint/no-unused-vars` (5 instance): `KcPageLayout.tsx:2` (`Paper`), `Login.tsx:4` (`RouterLink`), `productService.ts:227` (`_payload`), `CreateStorePage.tsx:60` (`setActiveTenant`), `MerchantDashboard.tsx:75` (`prettyAddressType`), `main.tsx:43` (`_user`), `useBasketQueries.ts:5` (`IDEMPOTENCY_KEY_HEADER`)
@@ -129,20 +160,18 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
   - (a) search-service'e minimal Postgres DB sadece inbox için
   - (b) Elasticsearch'te `processed_messages` index'i
 
-### Outbox `@Transactional` self-invocation bug
-- [ ] `SubscriptionRenewalServiceImpl.processDailyRenewals` aynı sınıfın `processSingleRenewal`'ını çağırıyor. Proxy atlandığı için iç metot'un `@Transactional`'ı çalışmıyor.
-- Dosya: TODO [08.02.2026 22:30]
-- Çözüm: `processSingleRenewal`'ı ayrı `@Service` bean'e al veya `AopContext.currentProxy()`.
+### Outbox `@Transactional` self-invocation bug ✅ 2026-06-07 düzeltildi
+- [x] `SubscriptionRenewalProcessor` yeni `@Service` bean'e taşındı. `processDailyRenewals` artık `renewalProcessor.processSingleRenewal(sub)` çağırıyor — Spring proxy devreye giriyor, `@Transactional` çalışıyor.
 
 ### Idempotency UTS createTenant'ta yok
 - [ ] `TenantLifecycleService.createTenant` aynı kart ile iki kez POST = iki tenant. `@Idempotent` AOP eklenmeli.
 - TODO [10.02.2026 11:21]
 
-### createTenant catch-all yanlış event tetikliyor — ödeme başarılı ama başarısız maili gidiyor
-- [ ] `TenantLifecycleService.createTenant`'ta `tenantStateService.activateTenant(tenant)` çağrısı, ödeme try-catch bloğunun **içinde**. Ödeme başarılı olup `activateTenant` herhangi bir sebepten patlarsa generic `catch(Exception e)` devreye giriyor ve `markTenantAsPaymentFailed` çağrılıyor → `TenantPaymentFailedEvent` yayınlanıyor → mail servis ödeme başarısız maili gönderiyor. Gerçek para çekildi ama tenant PAYMENT_FAILED statüsüne düşüyor.
-- İkinci senaryo: payment-service `handleIyzicoResponse` içinde iyzico success döndükten sonra (para çekildi) `createActiveSubscription` veya outbox yazımı patlarsa `@Transactional` rollback yapıyor, UTS FeignException → yine `markTenantAsPaymentFailed`.
-- Çözüm: `activateTenant` çağrısını try bloğunun **dışına** taşı; try bloğu yalnızca `processPayment` Feign çağrısını sarsın. Test yazılırken `TenantLifecycleService.createTenant` full-flow testinde yakalanmalı.
-- Dosya: `TenantLifecycleService:47-71`, `PaymentServiceImpl.handleIyzicoResponse:118-146`
+### createTenant catch-all yanlış event tetikliyor — ödeme başarılı ama başarısız maili gidiyor ✅ 2026-06-10
+- [x] **UTS tarafı çözülmüş:** `TenantLifecycleService.createTenant` refactor edilmiş — `activateTenant` artık try bloğunun **dışında** (proc. sonrası), generic `catch(Exception e)` `markTenantAsPaymentFailed` ÇAĞIRMIYOR, sadece `TenantCreationException` fırlatıp tenant'ı PENDING'de bırakıyor. `PaymentResult.isInfrastructureError()/isSuccess()` ayrımıyla belirsiz durumda da PENDING. → Yanlış "ödeme başarısız" maili artık gitmez.
+- [x] **İkinci senaryo (payment-service ghost-payment) çözüldü 2026-06-10:** iyzico success sonrası `createActiveSubscription`/outbox patlarsa para sessizce kaybolmasın diye `PaymentServiceImpl.handleIyzicoResponse` SUBSCRIPTION branch'i try-catch'e alındı. Patlayınca yeni `PaymentProvisioningFailureRecorder` (`@Transactional(REQUIRES_NEW)`, ayrı bean) `PROVISION_FAILED` statüsünde kalıcı bir "para izi" `Payment` kaydı yazar (iyzicoTransactionId dolu), sonra ana tx rollback'e izin verilir → çift provision olmaz, UTS tenant PENDING'de kalır. `PaymentStatus.PROVISION_FAILED` enum eklendi (string sütun, migration yok).
+- **Kalan telafi borcu:** `PROVISION_FAILED` kayıtları için otomatik refund/retry scheduler yok — operatör manuel görmeli. Otomatik refund iyzico `Cancel` entegrasyonuna bağlı (bkz. "Payment refund stub").
+- Dosya: `TenantLifecycleService.java`, `PaymentServiceImpl.handleIyzicoResponse`, `PaymentProvisioningFailureRecorder.java`
 
 ### Authz cache evict eksik durumlar
 - [ ] Şu durumlar evict yapmıyor, kullanıcı eski rolüyle 2 saat takılı kalıyor:

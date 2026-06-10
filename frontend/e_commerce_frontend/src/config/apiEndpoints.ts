@@ -31,6 +31,7 @@ export const API_ENDPOINTS = {
         PAYMENT_HISTORY: (tenantId: number) => `/tenants/${tenantId}/payment-details`,
         RETRY_PAYMENT: (tenantId: number) => `/tenants/${tenantId}/retry-payment`,
         VERIFY_TENANT: (tenantId: number) => `/tenants/${tenantId}/verification`,
+        STOREFRONT: (id: number) => `/public/tenants/${id}/storefront`,
     },
     SUBSCRIPTION: {
         PLANS: '/subscriptions/plans',
@@ -48,6 +49,8 @@ export const API_ENDPOINTS = {
             `/public/products/${productId}/reviews/${reviewId}/helpful`,
         REVIEW_DELETE: (productId: number, reviewId: number) =>
             `/public/products/${productId}/reviews/${reviewId}`,
+        REVIEW_IMAGE_UPLOAD: (productId: number) =>
+            `/public/products/${productId}/reviews/images/upload`,
 
         // Tenant endpoints
         TENANT_LIST: (tenantId: number) => `/products/tenants/${tenantId}`,

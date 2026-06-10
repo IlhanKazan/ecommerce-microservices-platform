@@ -13,6 +13,9 @@ import com.ecommerce.usertenantservice.user.entity.User;
 import com.ecommerce.usertenantservice.user.mapper.UserMapper;
 import com.ecommerce.usertenantservice.user.service.ImageService;
 import com.ecommerce.usertenantservice.user.service.UserService;
+import io.swagger.v3.oas.annotations.Hidden;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -28,7 +31,7 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping(ApiPaths.User.USER)
-@Tag(name = "User Controller", description = "Kullanıcı ekleme, silme ve listeleme işlemleri")
+@Tag(name = "Users", description = "User profile and account management")
 public class UserController {
     private final UserService userService;
     private final UserMapper userMapper;
@@ -42,6 +45,7 @@ public class UserController {
         this.userTenantService = userTenantService;
     }
 
+    @Hidden
     @PreAuthorize("hasRole('sync_user')")
     @PostMapping("/")
     public ResponseEntity<UserResponse> syncUserRegistration(@RequestBody KeycloakSyncRequest  keycloakSyncRequest) {
@@ -51,6 +55,7 @@ public class UserController {
         return ResponseEntity.ok(userMapper.toResponse(savedUser));
     }
 
+    @Hidden
     @PreAuthorize("hasRole('sync_user')")
     @PutMapping("/{keycloakId}")
     public ResponseEntity<UserResponse> syncUserUpdate(@PathVariable UUID keycloakId, @RequestBody KeycloakSyncRequest keycloakSyncRequest) {
@@ -60,6 +65,7 @@ public class UserController {
         return ResponseEntity.ok(userMapper.toResponse(updatedUser));
     }
 
+    @Hidden
     @PreAuthorize("hasRole('sync_user')")
     @DeleteMapping("/{keycloakId}")
     public ResponseEntity<UserResponse> syncUserDelete(@PathVariable UUID keycloakId) {
@@ -67,6 +73,8 @@ public class UserController {
         return ResponseEntity.ok(userMapper.toResponse(deletedUser));
     }
 
+    @Operation(summary = "Update user profile", description = "Updates the authenticated user's own profile fields: name, phone, identity number.")
+    @ApiResponse(responseCode = "200", description = "Profile updated")
     @PutMapping("/update")
     public ResponseEntity<UserResponse> updateUser(
             @RequestBody UserRequest userRequest,
@@ -80,6 +88,8 @@ public class UserController {
     }
 
     // TODO [29.12.2025 06:48]: Bazi yerlerde optional var ama bazi yerlerde yok, duzeltilebilir...
+    @Operation(summary = "Get current user", description = "Returns the authenticated user's full profile.")
+    @ApiResponse(responseCode = "200", description = "User profile")
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(@CurrentUser AuthUser user) {
         User me =  userService.getExistingUser(user.keycloakId());
@@ -94,6 +104,8 @@ public class UserController {
         }
     }
 
+    @Operation(summary = "Upload profile photo", description = "Uploads a profile photo to MinIO. Returns updated user with new photo URL. Max 5MB, JPEG/PNG/WebP.")
+    @ApiResponse(responseCode = "200", description = "Photo uploaded")
     @PostMapping(value = "/upload-profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UserResponse> uploadProfileImage(
             @CurrentUser AuthUser user,
@@ -109,6 +121,8 @@ public class UserController {
         return ResponseEntity.ok(userMapper.toResponse(updatedUser));
     }
 
+    @Operation(summary = "Get my payment history", description = "Paginated list of all payment transactions made by the authenticated user.")
+    @ApiResponse(responseCode = "200", description = "Payment history page")
     @GetMapping("/payment-history")
     public ResponseEntity<Page<PaymentHistoryResponse>> getUserPaymentHistory(@CurrentUser AuthUser user, Pageable pageable){
         return ResponseEntity.ok(userService.getUserPaymentHistory(user.keycloakId(), pageable));

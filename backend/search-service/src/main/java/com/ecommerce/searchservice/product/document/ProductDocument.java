@@ -70,9 +70,21 @@ public class ProductDocument {
     @Field(type = FieldType.Double)
     private Double ratingAverage;
 
+    @Field(type = FieldType.Integer)
+    private Integer reviewCount;
+
     @Field(type = FieldType.Date, format = DateFormat.date_hour_minute_second)
     private LocalDateTime createdAt;
 
     @Field(type = FieldType.Integer)
     private Integer saleCount;
+
+    @Field(type = FieldType.Keyword)
+    private String tenantName;
+
+    @Field(type = FieldType.Keyword)
+    private String tenantLogoUrl;
+
+    @Field(type = FieldType.Boolean)
+    private Boolean tenantActive;
 }

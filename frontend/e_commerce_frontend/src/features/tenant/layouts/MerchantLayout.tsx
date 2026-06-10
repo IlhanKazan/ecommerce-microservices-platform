@@ -60,17 +60,17 @@ const MerchantLayout: React.FC = () => {
 
     // ─── Drawer içeriği ───────────────────────────────────────────────────────
     const drawerContent = (
-        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#1e293b', color: '#fff' }}>
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'secondary.main', color: '#fff' }}>
             <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Avatar
                     variant="rounded"
                     src={activeTenant?.logoUrl ?? undefined}
-                    sx={{ bgcolor: '#38bdf8', width: 40, height: 40 }}
+                    sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}
                 >
                     <StoreIcon />
                 </Avatar>
                 <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography variant="subtitle2" color="#94a3b8" fontSize="0.75rem">
+                    <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.6)' }} fontSize="0.75rem">
                         Aktif Mağaza
                     </Typography>
                     <Typography variant="body1" fontWeight="bold" noWrap title={activeTenant?.name}>
@@ -81,7 +81,7 @@ const MerchantLayout: React.FC = () => {
                     <IconButton
                         onClick={handleSwitchStore}
                         size="small"
-                        sx={{ color: '#94a3b8', '&:hover': { color: '#fff' } }}
+                        sx={{ color: 'rgba(255,255,255,0.6)', '&:hover': { color: '#fff' } }}
                     >
                         <SwitchStoreIcon fontSize="small" />
                     </IconButton>
@@ -105,16 +105,16 @@ const MerchantLayout: React.FC = () => {
                                 sx={{
                                     borderRadius: 2,
                                     '&.Mui-selected': {
-                                        bgcolor: '#38bdf8',
+                                        bgcolor: 'primary.main',
                                         color: '#fff',
-                                        '&:hover': { bgcolor: '#0ea5e9' },
+                                        '&:hover': { bgcolor: 'primary.dark' },
                                     },
-                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
+                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.06)' },
                                 }}
                             >
                                 <ListItemIcon
                                     sx={{
-                                        color: location.pathname === item.path ? '#fff' : '#94a3b8',
+                                        color: location.pathname === item.path ? '#fff' : 'rgba(255,255,255,0.6)',
                                         minWidth: 40,
                                     }}
                                 >
@@ -138,7 +138,7 @@ const MerchantLayout: React.FC = () => {
 
     // ─── Render ───────────────────────────────────────────────────────────────
     return (
-        <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f8fafc' }}>
+        <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
             <CssBaseline />
 
             {/* ── AppBar ────────────────────────────────────────────────── */}
@@ -149,9 +149,10 @@ const MerchantLayout: React.FC = () => {
                     // Desktop: drawer genişliği kadar daralt ve sağa kaydır
                     width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
                     ml:    { md: `${DRAWER_WIDTH}px` },
-                    bgcolor: '#fff',
-                    color: '#334155',
-                    borderBottom: '1px solid #e2e8f0',
+                    bgcolor: 'background.paper',
+                    color: 'text.primary',
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
                     // AppBar'ı drawer'ın ÜSTünde TUT — her iki modda da
                     zIndex: (theme) => theme.zIndex.drawer + 1,
                 }}
@@ -169,7 +170,7 @@ const MerchantLayout: React.FC = () => {
                     <Typography
                         variant="h6"
                         fontWeight="bold"
-                        sx={{ flexGrow: 1, color: '#1e293b' }}
+                        sx={{ flexGrow: 1, color: 'text.primary' }}
                     >
                         Satıcı Paneli
                     </Typography>
@@ -177,6 +178,7 @@ const MerchantLayout: React.FC = () => {
                     <Tooltip title={user?.firstName ?? 'Hesap'}>
                         <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small">
                             <Avatar
+                                src={user?.profileImageUrl ?? undefined}
                                 sx={{
                                     width: 36,
                                     height: 36,

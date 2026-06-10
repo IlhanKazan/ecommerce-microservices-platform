@@ -66,4 +66,7 @@ public class ProductReview extends BaseEntity {
 
     private LocalDateTime sellerResponseAt;
 
+    @Column(length = 100)
+    private String reviewerName;
+
 }

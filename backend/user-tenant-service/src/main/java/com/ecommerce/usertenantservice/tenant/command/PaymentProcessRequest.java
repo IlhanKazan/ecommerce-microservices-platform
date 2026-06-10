@@ -10,5 +10,6 @@ public record PaymentProcessRequest(
         PaymentCardInfo cardInfo,
         BuyerInfo buyer,
         AddressInfo billingAddress,
-        AddressInfo shippingAddress
+        AddressInfo shippingAddress,
+        String contactEmail
 ) {}

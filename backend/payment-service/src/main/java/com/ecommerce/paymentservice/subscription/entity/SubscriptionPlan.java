@@ -42,4 +42,7 @@ public class SubscriptionPlan extends BaseEntity {
     @Column(name = "is_active")
     private boolean isActive;
 
+    @Column(name = "commission_rate", nullable = false)
+    private BigDecimal commissionRate;
+
 }

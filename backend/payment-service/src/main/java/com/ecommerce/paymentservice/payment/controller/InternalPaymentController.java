@@ -11,6 +11,7 @@ import com.ecommerce.paymentservice.payment.controller.dto.response.InternalPaym
 import com.ecommerce.paymentservice.payment.domain.PaymentContext;
 import com.ecommerce.paymentservice.payment.entity.Payment;
 import com.ecommerce.paymentservice.payment.service.PaymentService;
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Hidden
 @Slf4j
 @RestController
 @RequestMapping(ApiPaths.Internal.INTERNAL_PAYMENT)

@@ -136,7 +136,8 @@ public class TenantLifecycleService {
                 cardInfo,
                 buyerInfo,
                 addressInfo,
-                addressInfo
+                addressInfo,
+                tenant.getContactEmail() != null ? tenant.getContactEmail() : user.getEmail()
         );
     }
 

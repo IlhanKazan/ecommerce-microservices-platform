@@ -17,6 +17,8 @@ export interface ProductSummary {
     reviewCount: number;
     salesStatus: string;
     inStock: boolean;
+    tenantName?: string | null;
+    tenantLogoUrl?: string | null;
 }
 
 // ─── Product Service ─────────────────────────────────────────────────────────
@@ -44,6 +46,8 @@ export interface ProductDetail {
     maxOrderQty: number | null;
     status: string;
     salesStatus: string;
+    tenantName?: string | null;
+    tenantLogoUrl?: string | null;
 }
 
 // ─── Review ──────────────────────────────────────────────────────────────────
@@ -51,8 +55,8 @@ export interface ProductDetail {
 /** GET /api/v1/public/products/{id}/reviews */
 export interface ProductReviewDTO {
     id: number;
-    /** UUID — backend maskeli göstermiyor, avatarda baş harf kullan */
     userId: string;
+    reviewerName: string | null;
     title: string;
     reviewText: string;
     rating: number;
@@ -110,8 +114,22 @@ export interface ProductSearchPayload {
     maxPrice?: number;
     inStock?: boolean;
     sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'popular' | 'rating';
+    tenantId?: number;
     page: number;
     size: number;
+}
+
+// ─── Tenant Storefront ────────────────────────────────────────────────────────
+
+export interface TenantStorefront {
+    id: number;
+    name: string;
+    businessName?: string;
+    logoUrl?: string;
+    description?: string;
+    websiteUrl?: string;
+    status: string;
+    isVerified: boolean;
 }
 
 // ─── Pagination ───────────────────────────────────────────────────────────────

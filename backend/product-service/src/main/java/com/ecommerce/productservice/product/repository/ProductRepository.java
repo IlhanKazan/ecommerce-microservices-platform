@@ -26,5 +26,6 @@ public interface ProductRepository extends JpaRepository<Product, Long>{
     List<Product> findAllByTenantId(Long tenantId);
     List<Product> findByCategoryIdAndStatus(Long categoryId, String status);
     List<Product> findByParentProductIdAndStatus(Long parentProductId, String status);
+    List<Product> findAllByStatus(ProductStatus status);
 
 }

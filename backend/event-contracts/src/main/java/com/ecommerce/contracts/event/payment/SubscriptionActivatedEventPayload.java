@@ -6,6 +6,7 @@ public record SubscriptionActivatedEventPayload(
         Long subscriptionId,
         Long tenantId,
         String planName,
-        LocalDate nextBillingDate
+        LocalDate nextBillingDate,
+        String contactEmail
 ) {
 }

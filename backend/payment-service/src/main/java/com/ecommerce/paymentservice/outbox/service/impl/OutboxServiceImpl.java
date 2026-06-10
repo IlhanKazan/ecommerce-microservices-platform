@@ -5,6 +5,8 @@ import com.ecommerce.common.exception.SystemException;
 import com.ecommerce.contracts.event.payment.PaymentFailedEventPayload;
 import com.ecommerce.contracts.event.payment.PaymentSuccessEventPayload;
 import com.ecommerce.contracts.event.payment.SubscriptionActivatedEventPayload;
+import com.ecommerce.contracts.event.payment.SubscriptionRenewalFailedEventPayload;
+import com.ecommerce.contracts.event.payment.SubscriptionRenewalSuccessEventPayload;
 import com.ecommerce.paymentservice.outbox.entity.Outbox;
 import com.ecommerce.paymentservice.outbox.repository.OutboxRepository;
 import com.ecommerce.paymentservice.outbox.service.OutboxService;
@@ -97,7 +99,8 @@ public class OutboxServiceImpl implements OutboxService {
                     subscription.getId(),
                     subscription.getTenantId(),
                     subscription.getPlanName(),
-                    subscription.getNextBillingDate()
+                    subscription.getNextBillingDate(),
+                    subscription.getContactEmail()
             );
 
             Outbox outboxEvent = Outbox.builder()
@@ -110,6 +113,57 @@ public class OutboxServiceImpl implements OutboxService {
             outboxRepository.save(outboxEvent);
             log.info("Outbox kaydı oluşturuldu: SUBSCRIPTION_ACTIVATED_EVENT - Subscription ID: {}", subscription.getId());
 
+        } catch (JsonProcessingException e) {
+            log.error("Outbox payload JSON çevrim hatası: {}", e.getMessage());
+            throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void publishSubscriptionRenewalSuccessEvent(TenantSubscription subscription) {
+        try {
+            SubscriptionRenewalSuccessEventPayload payload = new SubscriptionRenewalSuccessEventPayload(
+                    subscription.getTenantId(),
+                    subscription.getContactEmail(),
+                    subscription.getPlanName(),
+                    subscription.getNextBillingDate()
+            );
+            Outbox outboxEvent = Outbox.builder()
+                    .aggregateType(EventConstants.AGGREGATE_PAYMENT)
+                    .aggregateId(subscription.getId().toString())
+                    .messageType(EventConstants.EVENT_SUBSCRIPTION_RENEWAL_SUCCESS)
+                    .messagePayload(objectMapper.writeValueAsString(payload))
+                    .build();
+            outboxRepository.save(outboxEvent);
+            log.info("Outbox kaydı oluşturuldu: SUBSCRIPTION_RENEWAL_SUCCESS_EVENT - Subscription ID: {}", subscription.getId());
+        } catch (JsonProcessingException e) {
+            log.error("Outbox payload JSON çevrim hatası: {}", e.getMessage());
+            throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void publishSubscriptionRenewalFailedEvent(TenantSubscription subscription, String failureReason, boolean suspended) {
+        try {
+            SubscriptionRenewalFailedEventPayload payload = new SubscriptionRenewalFailedEventPayload(
+                    subscription.getTenantId(),
+                    subscription.getContactEmail(),
+                    subscription.getPlanName(),
+                    failureReason,
+                    subscription.getFailedPaymentCount(),
+                    suspended
+            );
+            Outbox outboxEvent = Outbox.builder()
+                    .aggregateType(EventConstants.AGGREGATE_PAYMENT)
+                    .aggregateId(subscription.getId().toString())
+                    .messageType(EventConstants.EVENT_SUBSCRIPTION_RENEWAL_FAILED)
+                    .messagePayload(objectMapper.writeValueAsString(payload))
+                    .build();
+            outboxRepository.save(outboxEvent);
+            log.info("Outbox kaydı oluşturuldu: SUBSCRIPTION_RENEWAL_FAILED_EVENT - Subscription ID: {}, askıya alındı: {}",
+                    subscription.getId(), suspended);
         } catch (JsonProcessingException e) {
             log.error("Outbox payload JSON çevrim hatası: {}", e.getMessage());
             throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");

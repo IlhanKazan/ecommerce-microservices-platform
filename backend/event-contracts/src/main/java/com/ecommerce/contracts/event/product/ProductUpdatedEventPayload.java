@@ -18,5 +18,7 @@ public record ProductUpdatedEventPayload(
         Map<String, String> attributes,
         List<String> tags,
         String status,
-        String salesStatus
+        String salesStatus,
+        BigDecimal ratingAverage,   // nullable — only set on rating recalculate
+        Integer reviewCount         // nullable — only set on rating recalculate
 ) {}

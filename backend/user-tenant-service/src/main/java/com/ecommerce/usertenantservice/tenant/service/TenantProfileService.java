@@ -61,7 +61,9 @@ public class TenantProfileService {
                 tenant.getBusinessName(),
                 tenant.getLogoUrl(),
                 tenant.getDescription(),
-                tenant.getWebsiteUrl()
+                tenant.getWebsiteUrl(),
+                tenant.getStatus(),
+                tenant.getIsVerified()
         );
     }
 

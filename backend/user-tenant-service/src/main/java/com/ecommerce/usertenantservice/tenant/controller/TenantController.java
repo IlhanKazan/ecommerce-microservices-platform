@@ -19,6 +19,9 @@ import com.ecommerce.usertenantservice.user.controller.dto.request.UserAddressRe
 import com.ecommerce.usertenantservice.user.entity.Address;
 import com.ecommerce.usertenantservice.user.mapper.AddressMapper;
 import com.ecommerce.usertenantservice.user.service.ImageService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +40,7 @@ import java.util.List;
 @RequestMapping(ApiPaths.Tenant.TENANT)
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Tenants", description = "Merchant store lifecycle — creation, payment, verification, member management, subscription")
 public class TenantController {
 
     // TODO [10.02.2026 11:33]: CQRS araştırılacak, diğer mikroservisler için işe yarayabilir
@@ -50,6 +54,10 @@ public class TenantController {
     private final TenantMemberService tenantMemberService;
     private final TenantLifecycleService tenantLifecycleService;
 
+    @Operation(summary = "Create tenant store", description = "Creates a new merchant store and immediately processes the subscription payment via iyzico. On success, tenant status becomes ACTIVE. Idempotent — use X-Idempotency-Key header.")
+    @ApiResponse(responseCode = "200", description = "Tenant created and payment successful")
+    @ApiResponse(responseCode = "402", description = "Payment rejected by iyzico")
+    @ApiResponse(responseCode = "503", description = "Payment service unreachable — retry safe, tenant stays PENDING_PAYMENT")
     @PostMapping
     public ResponseEntity<Void> createTenant(
             @RequestBody @Valid CreateTenantRequest request,
@@ -65,6 +73,9 @@ public class TenantController {
         }
     }
 
+    @Operation(summary = "Retry subscription payment", description = "Re-attempts payment for a tenant stuck in PAYMENT_FAILED or PENDING_PAYMENT status.")
+    @ApiResponse(responseCode = "200", description = "Payment successful, tenant activated")
+    @ApiResponse(responseCode = "402", description = "Payment rejected again")
     @PostMapping("/{tenantId}/retry-payment")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<Void> retryPayment(
@@ -75,6 +86,8 @@ public class TenantController {
         return ResponseEntity.ok().build();
     }
 
+    @Operation(summary = "Submit business verification documents", description = "Uploads tax ID, trade registry and other verification data. Required before iyzico sub-merchant approval.")
+    @ApiResponse(responseCode = "200", description = "Verification data saved")
     @PutMapping("/{tenantId}/verification")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<Void> verifyTenant(
@@ -86,6 +99,8 @@ public class TenantController {
     }
 
 
+    @Operation(summary = "List my stores", description = "Returns all tenant stores owned by or membership of the authenticated user.")
+    @ApiResponse(responseCode = "200", description = "List of tenant summaries")
     @GetMapping("/me")
     public ResponseEntity<List<TenantSummaryResponse>> getMyTenants(@CurrentUser AuthUser user) {
 
@@ -95,6 +110,10 @@ public class TenantController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Get tenant detail", description = "Full tenant profile including status, address, members and subscription info.")
+    @ApiResponse(responseCode = "200", description = "Tenant detail")
+    @ApiResponse(responseCode = "403", description = "Not a member of this tenant")
+    @ApiResponse(responseCode = "404", description = "Tenant not found")
     @GetMapping("/{tenantId}")
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
     public ResponseEntity<TenantResponse> getTenantDetail(@PathVariable Long tenantId) {
@@ -105,6 +124,8 @@ public class TenantController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Update general store info", description = "Updates non-critical fields: display name, description, website URL.")
+    @ApiResponse(responseCode = "200", description = "Tenant updated")
     @PutMapping("/general/{tenantId}")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<TenantResponse> updateTenantGeneral(
@@ -120,6 +141,8 @@ public class TenantController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Update critical business info", description = "Updates legally significant fields: business name, tax ID, business type. May trigger re-verification.")
+    @ApiResponse(responseCode = "200", description = "Tenant updated")
     @PutMapping("/critical/{tenantId}")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<TenantResponse> updateTenantCritical(
@@ -139,6 +162,8 @@ public class TenantController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Add tenant address")
+    @ApiResponse(responseCode = "200", description = "Address added")
     @PostMapping("/{tenantId}/addresses")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<Void> addAddress(
@@ -151,6 +176,8 @@ public class TenantController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
+    @Operation(summary = "Update tenant address")
+    @ApiResponse(responseCode = "200", description = "Address updated")
     @PutMapping("/{tenantId}/addresses/{addressId}")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<Void> updateAddress(
@@ -166,6 +193,8 @@ public class TenantController {
         return ResponseEntity.ok().build();
     }
 
+    @Operation(summary = "Delete tenant address")
+    @ApiResponse(responseCode = "200", description = "Address deleted")
     @DeleteMapping("/{tenantId}/addresses/{addressId}")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<Void> deleteAddress(
@@ -176,6 +205,8 @@ public class TenantController {
         return ResponseEntity.ok().build();
     }
 
+    @Operation(summary = "Upload tenant logo", description = "Uploads a logo image to MinIO. Returns updated tenant with new logo URL. Max 5MB, JPEG/PNG/WebP.")
+    @ApiResponse(responseCode = "200", description = "Logo uploaded, tenant updated")
     @PostMapping(value = "/{tenantId}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<TenantResponse> uploadLogo(
@@ -187,6 +218,9 @@ public class TenantController {
     }
 
     // TODO [6.02.2026 14:50]: Uye ekleme islemi icin yeni bir davet tablosu olusturulacak ama v2 icin dusunulecek.
+    @Operation(summary = "Add team member", description = "Adds an existing platform user to this tenant with a specified role.")
+    @ApiResponse(responseCode = "200", description = "Member added")
+    @ApiResponse(responseCode = "404", description = "User not found")
     @PostMapping("/{tenantId}/members")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<Void> addMember(@PathVariable Long tenantId, @RequestBody AddMemberRequest request) {
@@ -194,6 +228,8 @@ public class TenantController {
         return ResponseEntity.ok().build();
     }
 
+    @Operation(summary = "Update member role")
+    @ApiResponse(responseCode = "200", description = "Role updated")
     @PutMapping("/{tenantId}/members/{memberId}")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<Void> updateMemberRole(
@@ -204,6 +240,8 @@ public class TenantController {
         return ResponseEntity.ok().build();
     }
 
+    @Operation(summary = "Remove team member")
+    @ApiResponse(responseCode = "200", description = "Member removed")
     @DeleteMapping("/{tenantId}/members/{memberId}")
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
     public ResponseEntity<Void> removeMember(
@@ -213,6 +251,8 @@ public class TenantController {
         return ResponseEntity.ok().build();
     }
 
+    @Operation(summary = "Get active subscription", description = "Returns current subscription plan, billing cycle, next billing date and commission rate.")
+    @ApiResponse(responseCode = "200", description = "Subscription detail")
     @GetMapping("/{tenantId}/subscription")
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
     public ResponseEntity<TenantSubscriptionResponse> getSubscriptionDetail(@PathVariable Long tenantId){
@@ -221,6 +261,8 @@ public class TenantController {
                 .orElseThrow(() -> new ResourceNotFoundException("Bu mağazaya ait abonelik bilgisi bulunamadı", "404"));
     }
 
+    @Operation(summary = "Get tenant payment history", description = "Paginated list of all payment transactions for this tenant.")
+    @ApiResponse(responseCode = "200", description = "Payment history page")
     @GetMapping("/{tenantId}/payment-details")
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
     public ResponseEntity<Page<PaymentHistoryResponse>> getTenantPaymentHistory(@PathVariable Long tenantId, Pageable pageable){

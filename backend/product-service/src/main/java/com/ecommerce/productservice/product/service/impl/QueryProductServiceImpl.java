@@ -2,8 +2,9 @@ package com.ecommerce.productservice.product.service.impl;
 
 import com.ecommerce.common.exception.BusinessException;
 import com.ecommerce.common.exception.ResourceNotFoundException;
+import com.ecommerce.productservice.client.adapter.UserTenantClientAdapter;
+import com.ecommerce.productservice.client.dto.TenantStorefrontResponse;
 import com.ecommerce.productservice.product.constant.ProductStatus;
-import com.ecommerce.productservice.product.constant.SalesStatus;
 import com.ecommerce.productservice.product.entity.Product;
 import com.ecommerce.productservice.product.query.PublicProductInfo;
 import com.ecommerce.productservice.product.repository.ProductRepository;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class QueryProductServiceImpl implements QueryProductService {
 
     private final ProductRepository productRepository;
+    private final UserTenantClientAdapter userTenantClientAdapter;
 
     @Override
     @Cacheable(cacheNames = "public-product", key = "#id")
@@ -33,6 +35,8 @@ public class QueryProductServiceImpl implements QueryProductService {
         if (product.getStatus() != ProductStatus.ACTIVE) {
             throw new BusinessException("Bu ürün şu an satışta değil.", "PRODUCT_NOT_AVAILABLE");
         }
+
+        TenantStorefrontResponse storefront = userTenantClientAdapter.getStorefront(product.getTenantId());
 
         return new PublicProductInfo(
                 product.getId(),
@@ -56,8 +60,10 @@ public class QueryProductServiceImpl implements QueryProductService {
                 product.getMinOrderQty(),
                 product.getMaxOrderQty(),
                 product.getStatus().toString(),
-                product.getSalesStatus().toString()
+                product.getSalesStatus().toString(),
+                storefront != null ? storefront.name() : null,
+                storefront != null ? storefront.logoUrl() : null,
+                product.getAiReviewReport()
         );
     }
-
 }

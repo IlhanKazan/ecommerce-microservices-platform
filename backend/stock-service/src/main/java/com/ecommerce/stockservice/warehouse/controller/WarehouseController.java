@@ -7,6 +7,9 @@ import com.ecommerce.stockservice.warehouse.controller.dto.response.WarehouseRes
 import com.ecommerce.stockservice.warehouse.entity.Warehouse;
 import com.ecommerce.stockservice.warehouse.mapper.WarehouseMapper;
 import com.ecommerce.stockservice.warehouse.service.WarehouseService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,11 +22,14 @@ import java.util.List;
 @RestController
 @RequestMapping(ApiPaths.Warehouses.WAREHOUSES_PATH)
 @RequiredArgsConstructor
+@Tag(name = "Warehouses", description = "Warehouse management per tenant — create and list warehouses")
 public class WarehouseController {
 
     private final WarehouseService warehouseService;
     private final WarehouseMapper warehouseMapper;
 
+    @Operation(summary = "Create warehouse", description = "Creates a new warehouse location for the tenant. Warehouses are used to track inventory by physical location.")
+    @ApiResponse(responseCode = "201", description = "Warehouse created")
     @Idempotent(cachePrefix = "idempotency:warehouse-create:", ttlSeconds = 300)
     @PostMapping
     @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
@@ -39,6 +45,8 @@ public class WarehouseController {
                 .body(warehouseMapper.toResponse(warehouse));
     }
 
+    @Operation(summary = "List warehouses", description = "Returns all warehouses for this tenant.")
+    @ApiResponse(responseCode = "200", description = "Warehouse list")
     @GetMapping
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
     public ResponseEntity<List<WarehouseResponse>> getWarehouses(@PathVariable Long tenantId) {

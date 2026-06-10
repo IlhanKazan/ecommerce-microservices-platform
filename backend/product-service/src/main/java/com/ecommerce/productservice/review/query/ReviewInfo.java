@@ -11,10 +11,12 @@ public record ReviewInfo(
         Long id,
         Long productId,
         UUID userId,
+        String reviewerName,
         String title,
         String reviewText,
         Integer rating,
         String sentimentLabel,
+        Float sentimentScore,
         Boolean isVerifiedPurchase,
         Integer helpfulCount,
         Integer notHelpfulCount,
@@ -22,5 +24,6 @@ public record ReviewInfo(
         List<String> imageUrls,
         String sellerResponse,
         LocalDateTime sellerResponseAt,
-        LocalDateTime reviewedAt
+        LocalDateTime reviewedAt,
+        List<String> keywords
 ) implements Serializable {}

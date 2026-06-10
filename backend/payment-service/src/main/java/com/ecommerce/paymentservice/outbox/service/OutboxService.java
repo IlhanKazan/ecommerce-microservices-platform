@@ -7,4 +7,6 @@ public interface OutboxService {
     void publishPaymentSuccessEvent(Payment payment);
     void publishPaymentFailedEvent(Payment payment);
     void publishSubscriptionActivatedEvent(TenantSubscription subscription);
+    void publishSubscriptionRenewalSuccessEvent(TenantSubscription subscription);
+    void publishSubscriptionRenewalFailedEvent(TenantSubscription subscription, String failureReason, boolean suspended);
 }

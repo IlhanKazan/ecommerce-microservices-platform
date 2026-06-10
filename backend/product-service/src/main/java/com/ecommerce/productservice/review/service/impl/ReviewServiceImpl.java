@@ -3,13 +3,18 @@ package com.ecommerce.productservice.review.service.impl;
 import com.ecommerce.common.dto.PageResponse;
 import com.ecommerce.common.exception.BusinessException;
 import com.ecommerce.common.exception.ResourceNotFoundException;
+import java.util.List;
+import com.ecommerce.productservice.client.adapter.OrderClientAdapter;
+import com.ecommerce.productservice.outbox.service.OutboxService;
 import com.ecommerce.productservice.product.entity.Product;
 import com.ecommerce.productservice.product.repository.ProductRepository;
 import com.ecommerce.productservice.review.command.ReviewCreateCommand;
 import com.ecommerce.productservice.review.constant.ReviewStatus;
 import com.ecommerce.productservice.review.entity.ProductReview;
+import com.ecommerce.productservice.review.entity.ReviewVote;
 import com.ecommerce.productservice.review.query.ReviewInfo;
 import com.ecommerce.productservice.review.repository.ReviewRepository;
+import com.ecommerce.productservice.review.repository.ReviewVoteRepository;
 import com.ecommerce.productservice.review.service.ReviewService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +23,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.CacheManager;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -27,11 +34,21 @@ import java.util.UUID;
 public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
+    private final ReviewVoteRepository reviewVoteRepository;
     private final ProductRepository productRepository;
+    private final OutboxService outboxService;
+    private final OrderClientAdapter orderClientAdapter;
+    private final CacheManager cacheManager;
 
     @Override
     @Transactional
     public ReviewInfo createReview(ReviewCreateCommand command) {
+        if (!orderClientAdapter.hasPurchased(command.userId(), command.productId())) {
+            throw new BusinessException(
+                    "Yorum yazabilmek için ürünü satın almış olmanız gerekiyor.",
+                    "REVIEW_NOT_PURCHASED");
+        }
+
         Product product = productRepository.findById(command.productId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Ürün bulunamadı.", "PRODUCT_NOT_FOUND"));
@@ -45,18 +62,28 @@ public class ReviewServiceImpl implements ReviewService {
         ProductReview review = ProductReview.builder()
                 .product(product)
                 .userId(command.userId())
+                .reviewerName(command.reviewerName())
                 .title(command.title())
                 .reviewText(command.reviewText())
                 .rating(command.rating())
                 .imageUrls(command.imageUrls())
-                .isVerifiedPurchase(false)
-                .status(ReviewStatus.PENDING)
+                .isVerifiedPurchase(true)
+                .status(ReviewStatus.APPROVED)
                 .reviewedAt(LocalDateTime.now())
                 .build();
 
         ProductReview saved = reviewRepository.save(review);
-        log.info("Yorum oluşturuldu. Product: {}, User: {}, Status: PENDING",
+        log.info("Yorum oluşturuldu. Product: {}, User: {}, Status: APPROVED",
                 command.productId(), command.userId());
+
+        outboxService.publishReviewCreatedEvent(saved);
+
+        reviewRepository.recalculateProductRating(command.productId());
+        Objects.requireNonNull(cacheManager.getCache("public-product")).evict(command.productId());
+        Product updatedProduct = productRepository.findById(command.productId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Ürün bulunamadı.", "PRODUCT_NOT_FOUND"));
+        outboxService.publishProductUpdatedEvent(updatedProduct);
 
         return toInfo(saved);
     }
@@ -76,7 +103,12 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional
-    public void markHelpful(Long reviewId, boolean helpful) {
+    public void markHelpful(Long reviewId, boolean helpful, UUID userId) {
+        if (reviewVoteRepository.existsByReviewIdAndUserId(reviewId, userId)) {
+            throw new BusinessException(
+                    "Bu yorum için zaten oy kullandınız.", "REVIEW_ALREADY_VOTED");
+        }
+
         ProductReview review = findReviewById(reviewId);
 
         if (helpful) {
@@ -86,6 +118,13 @@ public class ReviewServiceImpl implements ReviewService {
         }
 
         reviewRepository.save(review);
+        reviewVoteRepository.save(ReviewVote.builder()
+                .reviewId(reviewId)
+                .userId(userId)
+                .isHelpful(helpful)
+                .build());
+
+        log.info("Review oyu kaydedildi. ReviewId: {}, User: {}, helpful: {}", reviewId, userId, helpful);
     }
 
     @Override
@@ -123,7 +162,24 @@ public class ReviewServiceImpl implements ReviewService {
 
         // Rating aggregate'ini güncelle
         reviewRepository.recalculateProductRating(review.getProduct().getId());
+        Objects.requireNonNull(cacheManager.getCache("public-product")).evict(review.getProduct().getId());
+        Product deletedReviewProduct = productRepository.findById(review.getProduct().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Ürün bulunamadı.", "PRODUCT_NOT_FOUND"));
+        outboxService.publishProductUpdatedEvent(deletedReviewProduct);
+
         log.info("Yorum silindi ve rating güncellendi. ReviewId: {}", reviewId);
+    }
+
+    @Override
+    @Transactional
+    public void updateSentiment(Long reviewId, String sentimentLabel,
+                                Float sentimentScore, List<String> keywords) {
+        ProductReview review = findReviewById(reviewId);
+        review.setSentimentLabel(sentimentLabel);
+        review.setSentimentScore(sentimentScore);
+        review.setKeywords(keywords);
+        reviewRepository.save(review);
+        log.info("Sentiment güncellendi. ReviewId: {}, label: {}", reviewId, sentimentLabel);
     }
 
     private ProductReview findReviewById(Long reviewId) {
@@ -137,10 +193,12 @@ public class ReviewServiceImpl implements ReviewService {
                 r.getId(),
                 r.getProduct().getId(),
                 r.getUserId(),
+                r.getReviewerName(),
                 r.getTitle(),
                 r.getReviewText(),
                 r.getRating(),
                 r.getSentimentLabel(),
+                r.getSentimentScore(),
                 r.getIsVerifiedPurchase(),
                 r.getHelpfulCount(),
                 r.getNotHelpfulCount(),
@@ -148,7 +206,8 @@ public class ReviewServiceImpl implements ReviewService {
                 r.getImageUrls(),
                 r.getSellerResponse(),
                 r.getSellerResponseAt(),
-                r.getReviewedAt()
+                r.getReviewedAt(),
+                r.getKeywords()
         );
     }
 }

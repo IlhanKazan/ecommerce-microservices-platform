@@ -67,6 +67,7 @@ export interface SubscriptionPlan {
     price: number;
     currency: string;
     billingCycle: BillingCycle;
+    commissionRate: number;
     features: string;
 }
 
@@ -75,6 +76,7 @@ export type SubscriptionStatus = 'ACTIVE' | 'PAYMENT_FAILED' | 'CANCELED' | 'TRI
 export interface SubscriptionDetail {
     planName: string;
     feeAmount: number;
+    commissionRate: number;
     cycleUnit: 'MONTHLY' | 'YEARLY';
     nextBillingDate: string;
     status: SubscriptionStatus;

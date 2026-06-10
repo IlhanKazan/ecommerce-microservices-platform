@@ -6,6 +6,7 @@ import java.util.UUID;
 public record ReviewCreateCommand(
         Long productId,
         UUID userId,
+        String reviewerName,
         String title,
         String reviewText,
         Integer rating,

@@ -3,12 +3,17 @@ package com.ecommerce.mailservice.consumer;
 import com.ecommerce.common.event.constants.EventConstants;
 import com.ecommerce.contracts.event.order.OrderCancelledEventPayload;
 import com.ecommerce.contracts.event.order.OrderConfirmedEventPayload;
+import com.ecommerce.contracts.event.order.OrderDeliveredEventPayload;
 import com.ecommerce.contracts.event.order.OrderRefundedEventPayload;
 import com.ecommerce.contracts.event.order.OrderShippedEventPayload;
+import com.ecommerce.contracts.event.payment.SubscriptionActivatedEventPayload;
+import com.ecommerce.contracts.event.payment.SubscriptionRenewalFailedEventPayload;
+import com.ecommerce.contracts.event.payment.SubscriptionRenewalSuccessEventPayload;
 import com.ecommerce.contracts.event.tenant.TenantActivatedEventPayload;
 import com.ecommerce.contracts.event.tenant.TenantPaymentFailedEventPayload;
 import com.ecommerce.mailservice.inbox.service.InboxService;
 import com.ecommerce.mailservice.mail.handler.OrderMailHandler;
+import com.ecommerce.mailservice.mail.handler.SubscriptionMailHandler;
 import com.ecommerce.mailservice.mail.handler.TenantMailHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +33,7 @@ public class MailEventConsumer {
     private final InboxService inboxService;
     private final TenantMailHandler tenantMailHandler;
     private final OrderMailHandler orderMailHandler;
+    private final SubscriptionMailHandler subscriptionMailHandler;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = EventConstants.AGGREGATE_TENANT, groupId = "mail-service-group")
@@ -113,6 +119,13 @@ public class MailEventConsumer {
                         orderMailHandler.handleOrderRefunded(payload, messageId);
                     }
                 }
+                case EventConstants.EVENT_ORDER_DELIVERED -> {
+                    OrderDeliveredEventPayload payload =
+                            objectMapper.readValue(json, OrderDeliveredEventPayload.class);
+                    if (payload.recipientEmail() != null) {
+                        orderMailHandler.handleOrderDelivered(payload, messageId);
+                    }
+                }
                 case null, default ->
                         log.debug("Mail-service için ORDER event ilgisiz: {}", eventType);
             }
@@ -123,14 +136,49 @@ public class MailEventConsumer {
         }
     }
 
+    @KafkaListener(topics = EventConstants.AGGREGATE_PAYMENT, groupId = "mail-service-group")
+    public void consumePaymentEvents(ConsumerRecord<String, String> record) {
+        String eventType = extractHeader(record, "message_type");
+        String messageId = record.topic() + ":" + record.partition() + ":" + record.offset();
+
+        log.info("PAYMENT event alındı — eventType: {}, messageId: {}", eventType, messageId);
+
+        try {
+            String json = objectMapper.readValue(record.value(), String.class);
+
+            if (inboxService.isAlreadyProcessed(messageId, eventType, json)) {
+                return;
+            }
+
+            switch (eventType) {
+                case EventConstants.EVENT_SUBSCRIPTION_ACTIVATED -> {
+                    SubscriptionActivatedEventPayload payload =
+                            objectMapper.readValue(json, SubscriptionActivatedEventPayload.class);
+                    subscriptionMailHandler.handleSubscriptionActivated(payload, messageId);
+                }
+                case EventConstants.EVENT_SUBSCRIPTION_RENEWAL_SUCCESS -> {
+                    SubscriptionRenewalSuccessEventPayload payload =
+                            objectMapper.readValue(json, SubscriptionRenewalSuccessEventPayload.class);
+                    subscriptionMailHandler.handleRenewalSuccess(payload, messageId);
+                }
+                case EventConstants.EVENT_SUBSCRIPTION_RENEWAL_FAILED -> {
+                    SubscriptionRenewalFailedEventPayload payload =
+                            objectMapper.readValue(json, SubscriptionRenewalFailedEventPayload.class);
+                    subscriptionMailHandler.handleRenewalFailed(payload, messageId);
+                }
+                case null, default ->
+                        log.debug("Mail-service için PAYMENT event ilgisiz: {}", eventType);
+            }
+
+        } catch (Exception e) {
+            log.error("PAYMENT event işlenirken hata — eventType: {}, messageId: {}, hata: {}",
+                    eventType, messageId, e.getMessage(), e);
+        }
+    }
+
     private String extractHeader(ConsumerRecord<?, ?> record, String headerName) {
         Header header = record.headers().lastHeader(headerName);
         if (header == null) return null;
         return new String(header.value(), StandardCharsets.UTF_8);
     }
-
-    // TODO: PAYMENT topic consumer — PaymentSuccessEventPayload'da alıcı email yok.
-    // Çözüm: (A) PaymentSuccessEventPayload'a recipientEmail ekle (additive)
-    //         (B) UTS Feign ile tenantId → contactEmail resolve et.
-    // MVP scope'u dışında, sonraki iterasyonda eklenecek.
 }

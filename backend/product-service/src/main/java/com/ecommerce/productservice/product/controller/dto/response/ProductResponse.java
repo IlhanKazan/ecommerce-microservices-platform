@@ -23,5 +23,7 @@ public record ProductResponse(
         BigDecimal ratingAverage,
         Integer reviewCount,
         String status,
-        String salesStatus
+        String salesStatus,
+        String tenantName,
+        String tenantLogoUrl
 ) {}

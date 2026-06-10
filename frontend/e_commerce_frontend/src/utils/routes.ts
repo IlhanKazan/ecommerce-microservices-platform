@@ -16,4 +16,6 @@ export const AppRoutes = {
     MERCHANT: '/merchant',
     MERCHANT_DASHBOARD: '/merchant/dashboard',
     MERCHANT_SELECT: '/merchant/select',
+
+    STORE: '/store/:tenantId',
 };

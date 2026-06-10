@@ -11,7 +11,6 @@ import {
     AddBusiness as AddBusinessIcon,
     ShoppingCartOutlined as CartIcon,
     Search as SearchIcon,
-    PersonOutline as PersonIcon,
 } from '@mui/icons-material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { AppRoutes } from '../../utils/routes';
@@ -280,7 +279,7 @@ const Header: React.FC = () => {
                                     transition: 'border-color 0.2s, box-shadow 0.2s',
                                     '&:focus-within': {
                                         borderColor: 'primary.main',
-                                        boxShadow: '0 0 0 3px rgba(125,85,37,0.08)',
+                                        boxShadow: '0 0 0 3px rgba(242,122,26,0.15)',
                                     },
                                 }}
                             >
@@ -351,7 +350,14 @@ const Header: React.FC = () => {
                             {auth.isAuthenticated ? (
                                 <Button
                                     color="inherit"
-                                    startIcon={<PersonIcon />}
+                                    startIcon={
+                                        <Avatar
+                                            src={user?.profileImageUrl ?? undefined}
+                                            sx={{ width: 26, height: 26, bgcolor: 'primary.main', fontSize: '0.8rem', fontWeight: 700 }}
+                                        >
+                                            {(user?.firstName ?? 'H').charAt(0).toUpperCase()}
+                                        </Avatar>
+                                    }
                                     component={RouterLink}
                                     to={AppRoutes.ACCOUNT}
                                     size="small"

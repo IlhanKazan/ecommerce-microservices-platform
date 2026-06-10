@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="tr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Abonelik Yenileme Başarısız</title>
+    <style>
+        body { margin: 0; padding: 0; background-color: #f5f5f5; font-family: Arial, sans-serif; }
+        .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; }
+        .header-warning { background-color: #e65100; padding: 32px; text-align: center; }
+        .header-suspended { background-color: #b71c1c; padding: 32px; text-align: center; }
+        .header-warning h1, .header-suspended h1 { color: #ffffff; margin: 0; font-size: 24px; }
+        .body { padding: 32px; color: #333333; }
+        .body h2 { font-size: 20px; margin-top: 0; }
+        .body p { line-height: 1.6; }
+        .badge-warning { display: inline-block; background: #fff3e0; color: #e65100; border-radius: 4px; padding: 6px 14px; font-weight: bold; font-size: 15px; margin: 16px 0; }
+        .badge-suspended { display: inline-block; background: #ffebee; color: #b71c1c; border-radius: 4px; padding: 6px 14px; font-weight: bold; font-size: 15px; margin: 16px 0; }
+        .info-box { background: #fff8e1; border-left: 4px solid #e65100; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+        .info-box-danger { background: #ffebee; border-left: 4px solid #b71c1c; padding: 12px 16px; margin: 16px 0; border-radius: 4px; }
+        .footer { background: #f5f5f5; padding: 20px 32px; text-align: center; color: #888888; font-size: 12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Askıya alındı durumu -->
+    <div th:if="${suspended}" class="header-suspended">
+        <h1>E-Commerce Platform</h1>
+    </div>
+    <!-- Sadece başarısız (henüz askıya alınmadı) durumu -->
+    <div th:unless="${suspended}" class="header-warning">
+        <h1>E-Commerce Platform</h1>
+    </div>
+
+    <div class="body">
+        <!-- Askıya alındı durumu -->
+        <div th:if="${suspended}">
+            <h2>Aboneliğiniz Askıya Alındı</h2>
+            <p>Merhaba,</p>
+            <p><strong th:text="${planName}">—</strong> planınız için otomatik ödeme <strong th:text="${failedAttempts}">—</strong> kez başarısız oldu.</p>
+            <div class="badge-suspended">Mağaza Askıya Alındı</div>
+            <div class="info-box-danger">
+                <p style="margin: 0;"><strong>Plan:</strong> <span th:text="${planName}">—</span></p>
+                <p style="margin: 8px 0 0;"><strong>Başarısız deneme:</strong> <span th:text="${failedAttempts}">—</span></p>
+                <p style="margin: 8px 0 0;"><strong>Hata:</strong> <span th:text="${failureReason}">—</span></p>
+            </div>
+            <p>Mağazanız geçici olarak askıya alındı. Ödeme bilgilerinizi güncelleyip yeniden aktivasyon yapabilirsiniz.</p>
+        </div>
+
+        <!-- Sadece başarısız (henüz askıya alınmadı) durumu -->
+        <div th:unless="${suspended}">
+            <h2>Abonelik Yenileme Başarısız</h2>
+            <p>Merhaba,</p>
+            <p><strong th:text="${planName}">—</strong> planınız için otomatik ödeme alınamadı.</p>
+            <div class="badge-warning">Ödeme Başarısız</div>
+            <div class="info-box">
+                <p style="margin: 0;"><strong>Plan:</strong> <span th:text="${planName}">—</span></p>
+                <p style="margin: 8px 0 0;"><strong>Başarısız deneme:</strong> <span th:text="${failedAttempts}">—</span></p>
+                <p style="margin: 8px 0 0;"><strong>Hata:</strong> <span th:text="${failureReason}">—</span></p>
+            </div>
+            <p>Ödeme bilgilerinizi kontrol edin. 3 başarısız denemeden sonra mağazanız askıya alınacaktır.</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayınız.</p>
+    </div>
+</div>
+</body>
+</html>

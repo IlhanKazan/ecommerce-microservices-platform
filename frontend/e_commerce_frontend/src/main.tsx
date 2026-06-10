@@ -13,6 +13,7 @@ const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
             staleTime: 60_000,
+            gcTime: 1000 * 60 * 10, // 10 dk — cache'de kalma süresi (navigation'da yeniden fetch'i azaltır)
             retry: 1,
             refetchOnWindowFocus: false,
         },

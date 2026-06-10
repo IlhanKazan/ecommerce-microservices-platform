@@ -26,6 +26,9 @@ public record PublicProductInfo(
         Integer minOrderQty,
         Integer maxOrderQty,
         String status,
-        String salesStatus
+        String salesStatus,
+        String tenantName,
+        String tenantLogoUrl,
+        String aiReviewReport
 ) implements Serializable {
 }

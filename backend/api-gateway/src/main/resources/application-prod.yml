@@ -31,7 +31,7 @@ spring:
         - id: user-tenant-service
           uri: http://user-tenant-service:8081
           predicates:
-            - Path=/api/v1/users/**, /api/v1/tenants/**, /api/v1/addresses/**
+            - Path=/api/v1/users/**, /api/v1/tenants/**, /api/v1/public/tenants/**, /api/v1/addresses/**
 
         - id: payment-service
           uri: http://payment-service:8082

@@ -8,6 +8,7 @@ import com.ecommerce.paymentservice.payment.constant.PaymentType;
 import com.ecommerce.paymentservice.payment.entity.Payment;
 import com.ecommerce.paymentservice.payment.domain.PaymentContext;
 import com.ecommerce.paymentservice.payment.repository.PaymentRepository;
+import com.ecommerce.paymentservice.payment.service.PaymentProvisioningFailureRecorder;
 import com.ecommerce.paymentservice.payment.service.PaymentService;
 import com.ecommerce.paymentservice.payment.strategy.PaymentStrategy;
 import com.ecommerce.paymentservice.subscription.constant.TenantSubscriptionStatus;
@@ -22,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +40,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final IyzicoTransactionService iyzicoTransactionService;
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
+    private final PaymentProvisioningFailureRecorder provisioningFailureRecorder;
 
     @Override
     @Transactional
@@ -67,11 +70,26 @@ public class PaymentServiceImpl implements PaymentService {
             amount = strategy.calculatePrice(context.getReferenceId());
         }
 
+        BigDecimal commissionRate = BigDecimal.ZERO;
+        BigDecimal commissionAmount = BigDecimal.ZERO;
+        BigDecimal netAmount = amount;
+
+        if (context.getType() == PaymentType.PRODUCT_ORDER) {
+            commissionRate = resolveCommissionRate(context.getTenantId(), context.getCommissionRate());
+            commissionAmount = amount.multiply(commissionRate)
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            netAmount = amount.subtract(commissionAmount);
+            log.info("Komisyon hesaplandı — tenantId: {}, tutar: {}, oran: {}%, komisyon: {}, net: {}",
+                    context.getTenantId(), amount, commissionRate, commissionAmount, netAmount);
+        }
+
         Payment payment = Payment.builder()
                 .tenantId(context.getTenantId())
                 .customerId(context.getCustomerId())
                 .amount(amount)
-                .netAmount(amount)
+                .commissionRate(commissionRate)
+                .commissionAmount(commissionAmount)
+                .netAmount(netAmount)
                 .currency("TRY")
                 .paymentType(context.getType())
                 .paymentStatus(PaymentStatus.PENDING)
@@ -85,11 +103,27 @@ public class PaymentServiceImpl implements PaymentService {
 
         paymentRepository.save(payment);
 
-        CreatePaymentRequest iyzicoRequest = strategy.prepareIyzicoRequest(payment, context);
+        PaymentContext enrichedContext = PaymentContext.builder()
+                .type(context.getType())
+                .referenceId(context.getReferenceId())
+                .customerId(context.getCustomerId())
+                .tenantId(context.getTenantId())
+                .cardInfo(context.getCardInfo())
+                .buyer(context.getBuyer())
+                .billingAddress(context.getBillingAddress())
+                .shippingAddress(context.getShippingAddress())
+                .amount(context.getAmount())
+                .currency(context.getCurrency())
+                .subMerchantKey(context.getSubMerchantKey())
+                .commissionRate(commissionRate)
+                .contactEmail(context.getContactEmail())
+                .build();
+
+        CreatePaymentRequest iyzicoRequest = strategy.prepareIyzicoRequest(payment, enrichedContext);
 
         com.iyzipay.model.Payment iyzicoResponse = callIyzico(payment, iyzicoRequest);
 
-        return handleIyzicoResponse(payment, iyzicoResponse, context);
+        return handleIyzicoResponse(payment, iyzicoResponse, enrichedContext);
     }
 
     @Override
@@ -128,6 +162,21 @@ public class PaymentServiceImpl implements PaymentService {
         }, () -> log.warn("[REFUND] OrderID: {} için ödeme kaydı bulunamadı — iade atlandı.", orderId));
     }
 
+    private BigDecimal resolveCommissionRate(Long tenantId, BigDecimal contextRate) {
+        if (contextRate != null && contextRate.compareTo(BigDecimal.ZERO) > 0) {
+            return contextRate;
+        }
+        try {
+            Optional<TenantSubscription> sub = tenantSubscriptionService.findLatestSubscription(tenantId);
+            if (sub.isPresent() && sub.get().getCommissionRate() != null) {
+                return sub.get().getCommissionRate();
+            }
+        } catch (Exception e) {
+            log.warn("Komisyon oranı alınamadı (tenantId={}), varsayılan %8 kullanılıyor: {}", tenantId, e.getMessage());
+        }
+        return new BigDecimal("8.00");
+    }
+
     private PaymentStrategy findStrategy(PaymentType type) {
         return strategies.stream()
                 .filter(s -> s.supports(type))
@@ -142,13 +191,31 @@ public class PaymentServiceImpl implements PaymentService {
             payment.setIyzicoTransactionId(iyzicoResponse.getPaymentId());
 
             if (context != null && context.getType() == PaymentType.SUBSCRIPTION) {
-                TenantSubscription sub = tenantSubscriptionService.createActiveSubscription(
-                        context.getTenantId(),
-                        context.getReferenceId(),
-                        iyzicoResponse.getCardToken(),
-                        payment.getAmount()
-                );
-                outboxService.publishSubscriptionActivatedEvent(sub);
+                try {
+                    TenantSubscription sub = tenantSubscriptionService.createActiveSubscription(
+                            context.getTenantId(),
+                            context.getReferenceId(),
+                            iyzicoResponse.getCardToken(),
+                            payment.getAmount(),
+                            context.getContactEmail()
+                    );
+                    outboxService.publishSubscriptionActivatedEvent(sub);
+                } catch (Exception e) {
+                    // iyzico parayı çekti ama abonelik provisioning'i patladı.
+                    // Para izini AYRI tx'te (REQUIRES_NEW) kalıcı yaz, sonra ana tx'in rollback olmasına izin ver.
+                    // Böylece çift provision olmaz, UTS tenant'ı PENDING'de tutar, para sessizce kaybolmaz.
+                    log.error("KRİTİK: iyzico ödeme başarılı ama abonelik provisioning patladı. tenantId={}, iyzicoTxnId={}",
+                            context.getTenantId(), iyzicoResponse.getPaymentId(), e);
+                    provisioningFailureRecorder.recordProvisionFailure(
+                            context.getTenantId(),
+                            context.getCustomerId(),
+                            context.getReferenceId(),
+                            payment.getAmount(),
+                            iyzicoResponse.getPaymentId(),
+                            e.getMessage()
+                    );
+                    throw e;
+                }
             }
 
             Payment saved = paymentRepository.save(payment);

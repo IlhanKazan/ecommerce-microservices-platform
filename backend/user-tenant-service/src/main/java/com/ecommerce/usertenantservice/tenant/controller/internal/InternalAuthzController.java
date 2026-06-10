@@ -2,12 +2,14 @@ package com.ecommerce.usertenantservice.tenant.controller.internal;
 
 import com.ecommerce.usertenantservice.tenant.repository.TenantRepository;
 import com.ecommerce.usertenantservice.tenant.service.AuthzCacheService;
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+@Hidden
 @RestController
 @RequestMapping("/api/v1/internal/authz")
 @RequiredArgsConstructor
