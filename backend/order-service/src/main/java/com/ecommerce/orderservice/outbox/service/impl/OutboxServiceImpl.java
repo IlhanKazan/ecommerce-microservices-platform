@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -69,6 +70,17 @@ public class OutboxServiceImpl implements OutboxService {
                 new OrderRefundedEventPayload(orderId, userId, tenantId, reason, recipientEmail)
         );
         log.info("ORDER_REFUNDED_EVENT outbox'a yazıldı. OrderID: {}", orderId);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void publishOrderDeliveredEvent(Long orderId, Long tenantId, String recipientEmail, LocalDateTime deliveredAt) {
+        publish(
+                orderId.toString(),
+                EventConstants.EVENT_ORDER_DELIVERED,
+                new OrderDeliveredEventPayload(orderId, tenantId, recipientEmail, deliveredAt)
+        );
+        log.info("ORDER_DELIVERED_EVENT outbox'a yazıldı. OrderID: {}", orderId);
     }
 
     private void publish(String aggregateId, String messageType, Object payload) {

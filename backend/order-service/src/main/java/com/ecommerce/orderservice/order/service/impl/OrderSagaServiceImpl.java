@@ -79,6 +79,13 @@ public class OrderSagaServiceImpl implements OrderSagaService {
         BigDecimal totalAmount = calculateTotal(basket.items(), snapshots);
         String currency = snapshots.get(0).currency();
 
+        // iyzico per-transaction limiti — merchant sözleşmesiyle artırılabilir
+        if (totalAmount.compareTo(new BigDecimal("99999.99")) > 0) {
+            throw new BusinessException(
+                    "Sipariş tutarı tek seferde işlenebilecek maksimum tutarı (99.999,99 ₺) aşıyor. Lütfen siparişinizi bölerek verin.",
+                    "ORDER_AMOUNT_LIMIT_EXCEEDED");
+        }
+
         // ─── 3. Stok rezervasyonu ────────────────────────────────────────
         String tempOrderId = "CHECKOUT-" + UUID.randomUUID();
         StockReserveRequest stockReq = new StockReserveRequest(
@@ -91,7 +98,7 @@ public class OrderSagaServiceImpl implements OrderSagaService {
         reserveStockOrThrow(stockReq);
 
         // ─── 4. Ödeme ────────────────────────────────────────────────────
-        String subMerchantKey = fetchSubMerchantKeyQuietly(command.tenantId());
+        String subMerchantKey = fetchSubMerchantKeyOrThrow(command.tenantId());
 
         OrderPaymentRequest paymentReq = new OrderPaymentRequest(
                 null,
@@ -120,7 +127,7 @@ public class OrderSagaServiceImpl implements OrderSagaService {
         try {
             stockClient.reserveStock(req);
         } catch (FeignException.Conflict e) {
-            throw new BusinessException("Yetersiz stok. Lütfen miktarı azaltın.", "INSUFFICIENT_STOCK");
+            throw new BusinessException("Stok rezervasyonu başarısız oldu. Lütfen tekrar deneyin.", "INSUFFICIENT_STOCK");
         } catch (FeignException.BadRequest e) {
             throw new BusinessException("Stok rezervasyonu başarısız.", "STOCK_RESERVE_FAILED");
         } catch (FeignException e) {
@@ -174,12 +181,18 @@ public class OrderSagaServiceImpl implements OrderSagaService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private String fetchSubMerchantKeyQuietly(Long tenantId) {
+    private String fetchSubMerchantKeyOrThrow(Long tenantId) {
         try {
-            return userTenantClient.getSubMerchantKey(tenantId);
+            String key = userTenantClient.getSubMerchantKey(tenantId);
+            if (key == null || key.isBlank()) {
+                throw new BusinessException("Mağaza ödeme altyapısı henüz hazır değil.", "SUBMERCHANT_NOT_READY");
+            }
+            return key;
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("SubMerchantKey alınamadı (tenantId={}): {}", tenantId, e.getMessage());
-            return null;
+            log.error("SubMerchantKey alınamadı (tenantId={}): {}", tenantId, e.getMessage());
+            throw new ExternalServiceException("Mağaza bilgileri alınamadı.", "USER_TENANT_SERVICE_UNAVAILABLE");
         }
     }
 
