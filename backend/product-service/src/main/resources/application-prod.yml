@@ -52,6 +52,8 @@ application:
   clients:
     user-tenant:
       url: http://user-tenant-service:8081
+    order-service:
+      url: http://order-service:8088
 
 management:
   endpoints:

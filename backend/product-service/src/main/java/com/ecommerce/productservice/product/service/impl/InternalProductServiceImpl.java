@@ -2,6 +2,7 @@ package com.ecommerce.productservice.product.service.impl;
 
 import com.ecommerce.common.exception.BusinessException;
 import com.ecommerce.common.exception.ResourceNotFoundException;
+import com.ecommerce.productservice.outbox.service.OutboxService;
 import com.ecommerce.productservice.product.constant.ProductStatus;
 import com.ecommerce.productservice.product.constant.SalesStatus;
 import com.ecommerce.productservice.product.entity.Product;
@@ -13,12 +14,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class InternalProductServiceImpl implements InternalProductService {
 
     private final ProductRepository productRepository;
+    private final OutboxService outboxService;
 
     @Override
     @Transactional(readOnly = true)
@@ -52,5 +56,32 @@ public class InternalProductServiceImpl implements InternalProductService {
                 product.getSalesStatus().name(),
                 product.getMainImageUrl()
         );
+    }
+
+    @Override
+    @Transactional
+    public int reindexAllProducts() {
+        List<Product> products = productRepository.findAllByStatus(ProductStatus.ACTIVE);
+        log.info("[REINDEX] {} adet aktif ürün için PRODUCT_UPDATED event yayınlanıyor...", products.size());
+        for (Product product : products) {
+            try {
+                outboxService.publishProductUpdatedEvent(product);
+            } catch (Exception e) {
+                log.error("[REINDEX] Ürün ID {} için event yayınlanamadı: {}", product.getId(), e.getMessage());
+            }
+        }
+        log.info("[REINDEX] Tamamlandı. {} ürün için event yazıldı.", products.size());
+        return products.size();
+    }
+
+    @Override
+    @Transactional
+    public void updateAiReport(Long productId, String aiReviewReport) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Ürün bulunamadı.", "PRODUCT_NOT_FOUND"));
+        product.setAiReviewReport(aiReviewReport);
+        productRepository.save(product);
+        log.info("[AI-REPORT] AI raporu güncellendi. ProductId: {}", productId);
     }
 }

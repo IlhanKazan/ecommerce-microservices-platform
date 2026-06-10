@@ -5,10 +5,12 @@ import com.ecommerce.common.exception.SystemException;
 import com.ecommerce.contracts.event.product.ProductCreatedEventPayload;
 import com.ecommerce.contracts.event.product.ProductDeletedEventPayload;
 import com.ecommerce.contracts.event.product.ProductUpdatedEventPayload;
+import com.ecommerce.contracts.event.review.ReviewCreatedEventPayload;
 import com.ecommerce.productservice.outbox.entity.Outbox;
 import com.ecommerce.productservice.outbox.repository.OutboxRepository;
 import com.ecommerce.productservice.outbox.service.OutboxService;
 import com.ecommerce.productservice.product.entity.Product;
+import com.ecommerce.productservice.review.entity.ProductReview;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -78,7 +80,9 @@ public class OutboxServiceImpl implements OutboxService {
                     product.getAttributes(),
                     product.getTags(),
                     product.getStatus().name(),
-                    product.getSalesStatus().name()
+                    product.getSalesStatus().name(),
+                    product.getRatingAverage(),
+                    product.getReviewCount()
             );
 
             Outbox outbox = Outbox.builder()
@@ -118,6 +122,37 @@ public class OutboxServiceImpl implements OutboxService {
 
         } catch (JsonProcessingException e) {
             log.error("Outbox payload JSON çevrim hatası: {}", e.getMessage());
+            throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void publishReviewCreatedEvent(ProductReview review) {
+        try {
+            var payload = new ReviewCreatedEventPayload(
+                    review.getId(),
+                    review.getProduct().getId(),
+                    review.getProduct().getTenantId(),
+                    review.getUserId(),
+                    review.getTitle(),
+                    review.getReviewText(),
+                    review.getRating(),
+                    review.getReviewedAt()
+            );
+
+            Outbox outbox = Outbox.builder()
+                    .aggregateType(EventConstants.AGGREGATE_REVIEW)
+                    .aggregateId(review.getId().toString())
+                    .messageType(EventConstants.EVENT_REVIEW_CREATED)
+                    .messagePayload(objectMapper.writeValueAsString(payload))
+                    .build();
+
+            outboxRepository.save(outbox);
+            log.info("Review outbox kaydı oluşturuldu: Review ID {}", review.getId());
+
+        } catch (JsonProcessingException e) {
+            log.error("Review outbox JSON çevrim hatası: {}", e.getMessage());
             throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");
         }
     }

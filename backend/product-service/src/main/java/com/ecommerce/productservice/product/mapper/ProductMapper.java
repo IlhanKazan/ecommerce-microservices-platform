@@ -32,8 +32,12 @@ public interface ProductMapper {
 
     @Mapping(source = "category.id", target = "categoryId")
     @Mapping(source = "parentProduct.id", target = "parentProductId")
+    @Mapping(target = "tenantName", ignore = true)
+    @Mapping(target = "tenantLogoUrl", ignore = true)
     ProductResponse toResponse(Product product);
 
+    @Mapping(target = "tenantName", ignore = true)
+    @Mapping(target = "tenantLogoUrl", ignore = true)
     ProductResponse toResponseFromInfo(ProductInfo info);
 
     ProductDetailResponse toDetailResponse(ProductDetailInfo info);

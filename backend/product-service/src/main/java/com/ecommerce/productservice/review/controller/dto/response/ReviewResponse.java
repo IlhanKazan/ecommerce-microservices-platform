@@ -9,10 +9,12 @@ import java.util.UUID;
 public record ReviewResponse(
         Long id,
         UUID userId,
+        String reviewerName,
         String title,
         String reviewText,
         Integer rating,
         String sentimentLabel,
+        Float sentimentScore,
         Boolean isVerifiedPurchase,
         Integer helpfulCount,
         Integer notHelpfulCount,
@@ -20,5 +22,6 @@ public record ReviewResponse(
         String sellerResponse,
         LocalDateTime sellerResponseAt,
         LocalDateTime reviewedAt,
-        ReviewStatus status
+        ReviewStatus status,
+        List<String> keywords
 ) {}
