@@ -5,6 +5,8 @@ import com.ecommerce.contracts.event.product.ProductCreatedEventPayload;
 import com.ecommerce.contracts.event.product.ProductDeletedEventPayload;
 import com.ecommerce.contracts.event.product.ProductUpdatedEventPayload;
 import com.ecommerce.contracts.event.stock.StockStatusChangedEventPayload;
+import com.ecommerce.searchservice.client.adapter.UserTenantClientAdapter;
+import com.ecommerce.searchservice.client.dto.TenantStorefrontResponse;
 import com.ecommerce.searchservice.product.document.ProductDocument;
 import com.ecommerce.searchservice.product.mapper.ProductSearchMapper;
 import com.ecommerce.searchservice.product.repository.ProductSearchRepository;
@@ -12,6 +14,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import java.time.LocalDateTime;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.document.Document;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
@@ -29,6 +32,7 @@ public class ProductEventConsumer {
     private final ObjectMapper objectMapper;
     private final ProductSearchMapper productSearchMapper;
     private final ElasticsearchOperations elasticsearchOperations;
+    private final UserTenantClientAdapter userTenantClientAdapter;
 
     @KafkaListener(topics = EventConstants.AGGREGATE_PRODUCT, groupId = "search-service-group")
     public void consumeProductEvents(
@@ -56,6 +60,8 @@ public class ProductEventConsumer {
         ProductCreatedEventPayload payload = objectMapper.readValue(json, ProductCreatedEventPayload.class);
         ProductDocument document = productSearchMapper.toDocument(payload);
         document.setInStock(false);
+        document.setCreatedAt(LocalDateTime.now());
+        enrichWithTenantInfo(document, payload.tenantId());
         searchRepository.save(document);
         log.info("ES Yeni Ürün İndekslendi: {}", document.getId());
     }
@@ -63,9 +69,13 @@ public class ProductEventConsumer {
     private void handleProductUpdated(String json) throws JsonProcessingException {
         ProductUpdatedEventPayload payload = objectMapper.readValue(json, ProductUpdatedEventPayload.class);
 
+        boolean isNew = !searchRepository.existsById(payload.productId().toString());
         ProductDocument document = searchRepository.findById(payload.productId().toString())
                 .orElse(new ProductDocument());
 
+        if (isNew) {
+            document.setCreatedAt(LocalDateTime.now());
+        }
         document.setId(payload.productId().toString());
         document.setTenantId(payload.tenantId());
         document.setCategoryId(payload.categoryId());
@@ -83,8 +93,29 @@ public class ProductEventConsumer {
         // salesStatus'ü ayrı tut; search query her iki alanı birlikte filtreler.
         document.setSalesStatus(payload.salesStatus());
 
+        if (payload.ratingAverage() != null) {
+            document.setRatingAverage(payload.ratingAverage().doubleValue());
+        }
+        if (payload.reviewCount() != null) {
+            document.setReviewCount(payload.reviewCount());
+        }
+
+        enrichWithTenantInfo(document, payload.tenantId());
         searchRepository.save(document);
         log.info("ES Ürün Güncellendi. ID: {}, salesStatus: {}", payload.productId(), payload.salesStatus());
+    }
+
+    private void enrichWithTenantInfo(ProductDocument document, Long tenantId) {
+        TenantStorefrontResponse storefront = userTenantClientAdapter.getStorefront(tenantId);
+        if (storefront != null) {
+            document.setTenantName(storefront.name());
+            document.setTenantLogoUrl(storefront.logoUrl());
+            document.setTenantActive(
+                "ACTIVE".equals(storefront.status()) && Boolean.TRUE.equals(storefront.isVerified())
+            );
+        } else {
+            document.setTenantActive(false);
+        }
     }
 
     private void handleProductDeleted(String json) throws JsonProcessingException {
