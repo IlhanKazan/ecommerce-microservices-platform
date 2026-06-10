@@ -3,6 +3,7 @@ package com.ecommerce.stockservice.stock.controller;
 import com.ecommerce.stockservice.common.constants.ApiPaths;
 import com.ecommerce.stockservice.stock.controller.dto.request.InternalStockReserveRequest;
 import com.ecommerce.stockservice.stock.service.InternalStockService;
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Hidden
 @RestController
 @RequestMapping(ApiPaths.Internal.INTERNAL_STOCKS)
 @RequiredArgsConstructor

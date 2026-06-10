@@ -14,4 +14,6 @@ public interface StockService {
     Stock getStock(Long tenantId, Long warehouseId, Long productId);
     StockInfo getStockInfo(Long tenantId, Long warehouseId, Long productId);
     List<StockSummaryInfo> getTenantStockSummary(Long tenantId);
+
+    int resyncStockStatus();
 }

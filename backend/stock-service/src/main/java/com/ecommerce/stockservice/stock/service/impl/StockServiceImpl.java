@@ -163,6 +163,22 @@ public class StockServiceImpl implements StockService {
     }
 
     @Override
+    @Transactional
+    public int resyncStockStatus() {
+        List<Stock> positiveStocks = stockRepository.findAllWithPositiveQuantity();
+        for (Stock stock : positiveStocks) {
+            outboxService.publishStockStatusChangedEvent(
+                    stock.getId().toString(),
+                    stock.getProductId(),
+                    true,
+                    "IN_STOCK"
+            );
+        }
+        log.info("Stok resync tamamlandı. {} ürün için STOCK_STATUS_CHANGED event yazıldı.", positiveStocks.size());
+        return positiveStocks.size();
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<StockSummaryInfo> getTenantStockSummary(Long tenantId) {
         return stockRepository.findAllByTenantIdWithWarehouse(tenantId).stream()

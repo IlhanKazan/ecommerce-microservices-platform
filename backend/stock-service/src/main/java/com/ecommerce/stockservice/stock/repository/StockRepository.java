@@ -44,4 +44,8 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     // INTERNAL: Rollback için — ürünün tüm stok kayıtlarını döndürür
     List<Stock> findAllByTenantIdAndProductId(Long tenantId, Long productId);
 
+    // RESYNC: availableQuantity > 0 olan tüm stok kayıtları — ES senkronizasyonu için
+    @Query("SELECT s FROM Stock s WHERE s.availableQuantity > 0")
+    List<Stock> findAllWithPositiveQuantity();
+
 }
