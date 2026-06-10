@@ -1,6 +1,7 @@
 package com.ecommerce.mailservice.mail.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public interface MailService {
     void sendTenantActivated(String toEmail, String tenantName, String inboxMessageId);
@@ -11,4 +12,9 @@ public interface MailService {
     void sendOrderCancelled(String toEmail, Long orderId, String reason, String messageId);
     void sendOrderShipped(String toEmail, Long orderId, String trackingNumber, String messageId);
     void sendOrderRefunded(String toEmail, Long orderId, String reason, String messageId);
+    void sendOrderDelivered(String toEmail, Long orderId, String messageId);
+
+    void sendSubscriptionActivated(String toEmail, String planName, LocalDate nextBillingDate, String messageId);
+    void sendSubscriptionRenewalSuccess(String toEmail, String planName, LocalDate nextBillingDate, String messageId);
+    void sendSubscriptionRenewalFailed(String toEmail, String planName, String failureReason, int failedAttempts, boolean suspended, String messageId);
 }

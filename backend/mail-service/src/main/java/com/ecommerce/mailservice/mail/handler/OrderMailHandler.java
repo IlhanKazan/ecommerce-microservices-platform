@@ -2,6 +2,7 @@ package com.ecommerce.mailservice.mail.handler;
 
 import com.ecommerce.contracts.event.order.OrderCancelledEventPayload;
 import com.ecommerce.contracts.event.order.OrderConfirmedEventPayload;
+import com.ecommerce.contracts.event.order.OrderDeliveredEventPayload;
 import com.ecommerce.contracts.event.order.OrderRefundedEventPayload;
 import com.ecommerce.contracts.event.order.OrderShippedEventPayload;
 import com.ecommerce.mailservice.mail.service.MailService;
@@ -40,5 +41,10 @@ public class OrderMailHandler {
     public void handleOrderRefunded(OrderRefundedEventPayload payload, String messageId) {
         log.info("Sipariş iade maili — orderId: {}", payload.orderId());
         mailService.sendOrderRefunded(payload.recipientEmail(), payload.orderId(), payload.reason(), messageId);
+    }
+
+    public void handleOrderDelivered(OrderDeliveredEventPayload payload, String messageId) {
+        log.info("Sipariş teslim maili — orderId: {}, email: {}", payload.orderId(), payload.recipientEmail());
+        mailService.sendOrderDelivered(payload.recipientEmail(), payload.orderId(), messageId);
     }
 }

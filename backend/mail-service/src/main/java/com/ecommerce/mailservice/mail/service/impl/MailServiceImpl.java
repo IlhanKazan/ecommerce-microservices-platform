@@ -16,6 +16,7 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Service
@@ -86,6 +87,40 @@ public class MailServiceImpl implements MailService {
         ctx.setVariable("orderId", orderId);
         ctx.setVariable("reason", reason != null ? reason : "Belirtilmedi");
         send(toEmail, "İadeniz İşleme Alındı — #" + orderId, "mail/order-refunded", ctx, messageId, "ORDER_REFUNDED_EVENT");
+    }
+
+    @Override
+    public void sendOrderDelivered(String toEmail, Long orderId, String messageId) {
+        Context ctx = new Context();
+        ctx.setVariable("orderId", orderId);
+        send(toEmail, "Siparişiniz Teslim Edildi — #" + orderId, "mail/order-delivered", ctx, messageId, "ORDER_DELIVERED_EVENT");
+    }
+
+    @Override
+    public void sendSubscriptionActivated(String toEmail, String planName, LocalDate nextBillingDate, String messageId) {
+        Context ctx = new Context();
+        ctx.setVariable("planName", planName);
+        ctx.setVariable("nextBillingDate", nextBillingDate);
+        send(toEmail, "Aboneliğiniz Başlatıldı", "mail/subscription-activated", ctx, messageId, "SUBSCRIPTION_ACTIVATED_EVENT");
+    }
+
+    @Override
+    public void sendSubscriptionRenewalSuccess(String toEmail, String planName, LocalDate nextBillingDate, String messageId) {
+        Context ctx = new Context();
+        ctx.setVariable("planName", planName);
+        ctx.setVariable("nextBillingDate", nextBillingDate);
+        send(toEmail, "Aboneliğiniz Yenilendi", "mail/subscription-renewal-success", ctx, messageId, "SUBSCRIPTION_RENEWAL_SUCCESS_EVENT");
+    }
+
+    @Override
+    public void sendSubscriptionRenewalFailed(String toEmail, String planName, String failureReason, int failedAttempts, boolean suspended, String messageId) {
+        Context ctx = new Context();
+        ctx.setVariable("planName", planName);
+        ctx.setVariable("failureReason", failureReason);
+        ctx.setVariable("failedAttempts", failedAttempts);
+        ctx.setVariable("suspended", suspended);
+        String subject = suspended ? "Aboneliğiniz Askıya Alındı" : "Abonelik Yenileme Başarısız";
+        send(toEmail, subject, "mail/subscription-renewal-failed", ctx, messageId, "SUBSCRIPTION_RENEWAL_FAILED_EVENT");
     }
 
     private void send(String toEmail, String subject, String templateName, Context ctx,
