@@ -12,6 +12,9 @@ import com.ecommerce.basketservice.service.BasketService;
 import com.ecommerce.common.annotation.CurrentUser;
 import com.ecommerce.common.annotation.Idempotent;
 import com.ecommerce.common.security.dto.AuthUser;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,11 +25,16 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/baskets")
 @RequiredArgsConstructor
+@Tag(name = "Basket", description = "Shopping cart — add items, update quantities, clear cart. All operations require authentication.")
 public class BasketController {
 
     private final BasketService basketService;
     private final ProductClientAdapter productClientAdapter;
 
+    @Operation(summary = "Add item to basket", description = "Adds a product to the authenticated user's cart. If the product already exists in the cart, quantity is incremented. Validates product availability and stock via product-service.")
+    @ApiResponse(responseCode = "200", description = "Item added — returns success message")
+    @ApiResponse(responseCode = "404", description = "Product not found or not available for sale")
+    @ApiResponse(responseCode = "409", description = "Requested quantity exceeds available stock")
     @Idempotent(cachePrefix = "idempotency:basket-add:", ttlSeconds = 300)
     @PostMapping("/me/items")
     public ResponseEntity<String> addItemToBasket(
@@ -48,6 +56,8 @@ public class BasketController {
         return ResponseEntity.ok("Ürün sepete başarıyla eklendi.");
     }
 
+    @Operation(summary = "Get my basket", description = "Returns the full basket for the authenticated user including all items, quantities and current prices from product-service.")
+    @ApiResponse(responseCode = "200", description = "Basket with items")
     @GetMapping("/me")
     public ResponseEntity<BasketResponse> getMyBasket(@CurrentUser AuthUser user) {
         Basket basket = basketService.getBasket(user.keycloakId());
@@ -70,6 +80,9 @@ public class BasketController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Remove item from basket", description = "Removes a specific product from the cart entirely regardless of quantity.")
+    @ApiResponse(responseCode = "204", description = "Item removed")
+    @ApiResponse(responseCode = "404", description = "Product not in basket")
     @DeleteMapping("/me/items/{productId}")
     public ResponseEntity<Void> removeItemFromBasket(
             @CurrentUser AuthUser user,
@@ -78,6 +91,8 @@ public class BasketController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Update item quantity", description = "Sets the quantity for a cart item. Use quantity=0 to remove the item, or DELETE endpoint instead.")
+    @ApiResponse(responseCode = "204", description = "Quantity updated")
     @PatchMapping("/me/items/{productId}")
     public ResponseEntity<Void> updateItemQuantity(
             @CurrentUser AuthUser user,
@@ -87,6 +102,8 @@ public class BasketController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Clear basket", description = "Removes all items from the authenticated user's cart.")
+    @ApiResponse(responseCode = "204", description = "Basket cleared")
     @DeleteMapping("/me")
     public ResponseEntity<Void> clearMyBasket(@CurrentUser AuthUser user) {
         basketService.deleteBasket(user.keycloakId());
