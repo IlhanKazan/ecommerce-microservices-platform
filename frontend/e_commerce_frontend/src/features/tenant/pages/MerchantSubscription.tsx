@@ -20,6 +20,7 @@ import { useMerchantStore } from '../../../store/useMerchantStore';
 import { useNotification } from '../../../components/shared/NotificationContext';
 import { tenantService } from '../api/tenantService.ts';
 import type { SubscriptionPlan, PaymentCardInfo, PaymentStatus, PaymentType } from '../../../types/tenant';
+import { PlanFeatureList } from '../../../components/shared/PlanFeatureList';
 
 /**
  * SECURITY: Sensitive card data is captured via refs at submit time,
@@ -335,37 +336,67 @@ const MerchantSubscription: React.FC = () => {
                 {plans.map((plan) => {
                     const isCurrent = subDetail ? (plan.name === subDetail.planName) : false;
                     const isChangingThis = changePlanMutation.variables === plan.id && changePlanMutation.isPending;
+                    const highlight = plan.name === 'Büyüme';
 
                     return (
-                        <Grid size={{ xs: 12, md: 4 }} key={plan.id}>
+                        <Grid size={{ xs: 12, sm: 6, md: 3 }} key={plan.id}>
                             <Paper
                                 sx={{
                                     p: 3, height: '100%', display: 'flex', flexDirection: 'column',
                                     borderRadius: 4,
-                                    border: isCurrent ? '2px solid #38bdf8' : '1px solid #e2e8f0',
-                                    boxShadow: isCurrent ? '0 0 20px rgba(56, 189, 248, 0.2)' : 'none',
+                                    border: isCurrent ? '2px solid #38bdf8' : highlight ? '2px solid #818cf8' : '1px solid #e2e8f0',
+                                    boxShadow: isCurrent ? '0 0 20px rgba(56, 189, 248, 0.2)' : highlight ? '0 0 16px rgba(129,140,248,0.15)' : 'none',
                                     transition: 'transform 0.2s',
+                                    position: 'relative',
+                                    overflow: 'hidden',
                                     '&:hover': { transform: 'translateY(-5px)' }
                                 }}
                             >
-                                <Typography variant="h5" fontWeight="bold">{plan.name}</Typography>
-                                <Typography variant="h4" fontWeight="800" color="primary.main" sx={{ mt: 1 }}>
-                                    {plan.price} {plan.currency}
-                                    <Typography component="span" variant="body2" color="text.secondary">/{plan.billingCycle === 'MONTHLY' ? 'ay' : 'yıl'}</Typography>
+                                {highlight && !isCurrent && (
+                                    <Chip
+                                        label="En Popüler"
+                                        size="small"
+                                        sx={{
+                                            position: 'absolute', top: 12, right: 12,
+                                            bgcolor: '#818cf8', color: '#fff', fontWeight: 'bold', fontSize: 11
+                                        }}
+                                    />
+                                )}
+                                {isCurrent && (
+                                    <Chip
+                                        icon={<CheckIcon sx={{ fontSize: 14 }} />}
+                                        label="Mevcut Paket"
+                                        size="small"
+                                        color="info"
+                                        sx={{ position: 'absolute', top: 12, right: 12, fontWeight: 'bold', fontSize: 11 }}
+                                    />
+                                )}
+
+                                <Typography variant="h6" fontWeight="bold" sx={{ pr: isCurrent || highlight ? 10 : 0 }}>
+                                    {plan.name}
+                                </Typography>
+                                <Typography variant="h4" fontWeight="800" color="primary.main" sx={{ mt: 0.5 }}>
+                                    {plan.price === 0 ? 'Ücretsiz' : `${plan.price} ₺`}
+                                    {plan.price > 0 && (
+                                        <Typography component="span" variant="body2" color="text.secondary">
+                                            /{plan.billingCycle === 'MONTHLY' ? 'ay' : 'yıl'}
+                                        </Typography>
+                                    )}
                                 </Typography>
 
                                 <Divider sx={{ my: 2 }} />
 
-                                <Stack spacing={1} sx={{ mt: 2, mb: 3, flexGrow: 1 }}>
-                                    <Stack direction="row" alignItems="center" gap={1}>
-                                        <CheckIcon color="success" fontSize="small" />
-                                        <Typography variant="body2">Standart Özellikler</Typography>
-                                    </Stack>
-                                </Stack>
+                                <Box sx={{ flexGrow: 1, mb: 3 }}>
+                                    <PlanFeatureList
+                                        featuresJson={plan.features}
+                                        commissionRate={plan.commissionRate}
+                                        compact
+                                    />
+                                </Box>
 
                                 <Button
                                     variant={isCurrent ? "outlined" : "contained"}
-                                    color={isCurrent ? "success" : "primary"}
+                                    color={isCurrent ? "success" : highlight ? "secondary" : "primary"}
                                     disabled={isCurrent || changePlanMutation.isPending}
                                     onClick={() => handleChangePlan(plan)}
                                     fullWidth

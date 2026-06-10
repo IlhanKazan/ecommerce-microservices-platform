@@ -105,10 +105,11 @@ interface MultiImageUploadProps {
     onChange: (imgs: ImagePreview[]) => void;
     onError: (msg: string) => void;
     max?: number;
-    tenantId: number;
+    tenantId?: number;
+    uploadFn?: (file: File) => Promise<string>;
 }
 
-export function MultiImageUpload({ label, values, onChange, onError, max = 8, tenantId }: MultiImageUploadProps) {
+export function MultiImageUpload({ label, values, onChange, onError, max = 8, tenantId, uploadFn }: MultiImageUploadProps) {
     // Internal state — upload süresince parent closure stale kalmaması için
     const [items, setItems] = useState<ImagePreview[]>(values);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -136,10 +137,12 @@ export function MultiImageUpload({ label, values, onChange, onError, max = 8, te
         const placeholders = toProcess.map(createImagePreviewPlaceholder);
         setItems((prev) => [...prev, ...placeholders]);
 
+        const doUpload = uploadFn ?? ((f: File) => productService.uploadProductImage(tenantId!, f));
+
         toProcess.forEach(async (file, i) => {
             const ph = placeholders[i];
             try {
-                const url = await productService.uploadProductImage(tenantId, file);
+                const url = await doUpload(file);
                 URL.revokeObjectURL(ph.previewUrl);
                 setItems((prev) => prev.map((item) =>
                     item.id === ph.id ? createImagePreviewFromUrl(url) : item,
@@ -150,7 +153,7 @@ export function MultiImageUpload({ label, values, onChange, onError, max = 8, te
                 setItems((prev) => prev.filter((item) => item.id !== ph.id));
             }
         });
-    }, [items, max, onError, tenantId]);
+    }, [items, max, onError, tenantId, uploadFn]);
 
     const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
 

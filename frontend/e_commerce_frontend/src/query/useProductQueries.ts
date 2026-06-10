@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
     productService,
     basketService,
@@ -27,6 +27,8 @@ export const useSearchProducts = (body: SearchPayload) => {
         queryKey: QueryKeys.SEARCH_PRODUCTS(body),
         queryFn: () => productService.searchProducts(body),
         staleTime: 1000 * 60 * 2,
+        // Sayfa/filtre/sıralama değişiminde eski sonuçları ekranda tut → skeleton flicker yok
+        placeholderData: keepPreviousData,
     });
 };
 
@@ -95,6 +97,17 @@ export const useDeleteReview = (productId: number) => {
             queryClient.invalidateQueries({ queryKey: ['product-reviews', productId] });
             queryClient.invalidateQueries({ queryKey: QueryKeys.PRODUCT_DETAIL(productId) });
         },
+    });
+};
+
+// ─── Tenant Storefront ────────────────────────────────────────────────────────
+
+export const useGetTenantStorefront = (tenantId: number) => {
+    return useQuery({
+        queryKey: ['tenant-storefront', tenantId],
+        queryFn: () => productService.getTenantStorefront(tenantId),
+        enabled: !!tenantId,
+        staleTime: 1000 * 60 * 5,
     });
 };
 

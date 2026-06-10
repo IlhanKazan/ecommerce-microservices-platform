@@ -32,6 +32,7 @@ const CartPage = lazy(() => import('./features/checkout/pages/CartPage'));
 const CheckoutPage = lazy(() => import('./features/checkout/pages/CheckoutPage'));
 const ProductDetailPage = lazy(() => import('./features/catalog/pages/ProductDetailPage.tsx'));
 const ProductListPage = lazy(() => import('./features/catalog/pages/ProductListPage.tsx'));
+const StorePage = lazy(() => import('./features/catalog/pages/StorePage.tsx'));
 
 const CreateStorePage = lazy(() => import('./features/tenant/pages/CreateStorePage'));
 const SelectStorePage = lazy(() => import('./features/tenant/pages/SelectStorePage'));
@@ -54,7 +55,10 @@ function App() {
 
     const setUser = useAuthStore((state) => state.setUser);
     const { data: userData } = useMe(isAuthenticated);
-    const { items: localCartItems, clearCart } = useCartStore();
+    // Selector'lar — App route ağacının tepesi; tüm-store aboneliği her sepet değişiminde
+    // tüm ağacı re-render ederdi. Alan bazlı abonelikle gereksiz render önlenir.
+    const localCartItems = useCartStore((s) => s.items);
+    const clearCart = useCartStore((s) => s.clearCart);
     const queryClient = useQueryClient();
 
     useEffect(() => {
@@ -130,6 +134,7 @@ function App() {
                     />
                     <Route path={AppRoutes.PRODUCT_DETAIL.slice(1)} element={<ProductDetailPage />} />
                     <Route path={AppRoutes.PRODUCT_LIST.slice(1)} element={<ProductListPage />} />
+                    <Route path={AppRoutes.STORE.slice(1)} element={<StorePage />} />
                 </Route>
 
                 <Route element={<MerchantProtectedRoute />}>

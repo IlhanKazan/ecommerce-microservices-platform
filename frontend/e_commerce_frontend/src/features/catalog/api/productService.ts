@@ -14,6 +14,7 @@ import type {
     ProductCreateRequest,
     ProductUpdateRequest,
     AutocompleteSuggestion,
+    TenantStorefront,
 } from '../../../types/product';
 import type { BasketResponse, AddItemRequest } from '../../../types';
 
@@ -92,6 +93,13 @@ export const productService = {
 
     deleteReview: async (productId: number, reviewId: number): Promise<void> => {
         await api.delete(API_ENDPOINTS.PRODUCT.REVIEW_DELETE(productId, reviewId));
+    },
+
+    // ─── Public Tenant Storefront ─────────────────────────────────────────────
+
+    getTenantStorefront: async (tenantId: number): Promise<TenantStorefront> => {
+        const response = await api.get<TenantStorefront>(API_ENDPOINTS.TENANT.STOREFRONT(tenantId));
+        return response.data;
     },
 
     // ─── Categories ───────────────────────────────────────────────────────────
@@ -173,6 +181,17 @@ export const productService = {
             API_ENDPOINTS.PRODUCT.SELLER_RESPONSE(tenantId, productId, reviewId),
             { response },
         );
+    },
+
+    uploadReviewImage: async (productId: number, file: File): Promise<string> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await api.post<{ url: string }>(
+            API_ENDPOINTS.PRODUCT.REVIEW_IMAGE_UPLOAD(productId),
+            formData,
+            { headers: { 'Content-Type': undefined } },
+        );
+        return response.data.url;
     },
 
     uploadProductImage: async (tenantId: number, file: File): Promise<string> => {

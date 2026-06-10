@@ -6,7 +6,7 @@ import {
     Paper, IconButton, Breadcrumbs, Link, Tabs, Tab,
     Snackbar, Table, TableBody, TableCell, TableContainer, TableRow,
     Avatar, Chip, TextField, Dialog, DialogTitle, DialogContent,
-    DialogActions
+    DialogActions, Tooltip
 } from '@mui/material';
 import {
     ShoppingCart as ShoppingCartIcon,
@@ -35,6 +35,9 @@ import {
     useDeleteReview,
 } from '../../../query/useProductQueries';
 import type { ReviewCreateRequest } from '../../../types/product';
+import { MultiImageUpload } from '../../../components/shared/ImageUploadField';
+import type { ImagePreview } from '../../../utils/imageUploadUtils';
+import { productService } from '../api/productService';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -56,9 +59,10 @@ interface ReviewFormState {
     rating: number;
     title: string;
     reviewText: string;
+    imageUrls: ImagePreview[];
 }
 
-const EMPTY_FORM: ReviewFormState = { rating: 5, title: '', reviewText: '' };
+const EMPTY_FORM: ReviewFormState = { rating: 5, title: '', reviewText: '', imageUrls: [] };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -93,6 +97,7 @@ const ProductDetailPage: React.FC = () => {
     const { mutate: createReview, isPending: isSubmittingReview } = useCreateReview(id);
     const { mutate: markHelpful } = useMarkReviewHelpful(id);
     const { mutate: deleteReview } = useDeleteReview(id);
+    const [votedReviews, setVotedReviews] = useState<Set<number>>(new Set());
 
     const [snackbar, setSnackbar] = useState<{
         open: boolean;
@@ -149,6 +154,7 @@ const ProductDetailPage: React.FC = () => {
             title: reviewForm.title,
             reviewText: reviewForm.reviewText,
             rating: reviewForm.rating,
+            imageUrls: reviewForm.imageUrls.map((img) => img.url),
         };
 
         createReview(body, {
@@ -157,8 +163,13 @@ const ProductDetailPage: React.FC = () => {
                 setReviewForm(EMPTY_FORM);
                 setSnackbar({ open: true, message: 'Yorumunuz başarıyla eklendi.', severity: 'success' });
             },
-            onError: () =>
-                setSnackbar({ open: true, message: 'Yorum eklenirken hata oluştu.', severity: 'error' }),
+            onError: (error: unknown) => {
+                const msg =
+                    (error as { response?: { data?: { message?: string } } })
+                        ?.response?.data?.message
+                    ?? 'Yorum eklenirken hata oluştu.';
+                setSnackbar({ open: true, message: msg, severity: 'error' });
+            },
         });
     };
 
@@ -293,7 +304,38 @@ const ProductDetailPage: React.FC = () => {
                                 <Typography variant="caption" color="text.secondary">SKU: {product.sku}</Typography>
                             </Stack>
 
-                            <Box sx={{ my: 3, p: 2, bgcolor: 'rgba(125, 85, 37, 0.05)', borderRadius: 2, border: '1px dashed', borderColor: 'primary.light' }}>
+                            {/* Satıcı */}
+                            {product.tenantName && (
+                                <RouterLink
+                                    to={`/store/${product.tenantId}`}
+                                    style={{ textDecoration: 'none', color: 'inherit' }}
+                                >
+                                    <Box
+                                        sx={{
+                                            display: 'inline-flex', alignItems: 'center', gap: 1,
+                                            px: 1.5, py: 0.75, mb: 2,
+                                            border: '1px solid', borderColor: 'divider',
+                                            borderRadius: 2, bgcolor: 'grey.50',
+                                            cursor: 'pointer',
+                                            '&:hover': { bgcolor: 'grey.100', borderColor: 'primary.light' },
+                                        }}
+                                    >
+                                        <Typography variant="caption" color="text.secondary">Satıcı:</Typography>
+                                        <Avatar
+                                            src={product.tenantLogoUrl ?? undefined}
+                                            alt={product.tenantName}
+                                            sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: 'primary.light' }}
+                                        >
+                                            {product.tenantName.charAt(0).toUpperCase()}
+                                        </Avatar>
+                                        <Typography variant="body2" fontWeight={500}>
+                                            {product.tenantName}
+                                        </Typography>
+                                    </Box>
+                                </RouterLink>
+                            )}
+
+                            <Box sx={{ my: 3, p: 2, bgcolor: 'primary.lighter', borderRadius: 2, border: '1px dashed', borderColor: 'primary.light' }}>
                                 {product.discountedPrice ? (
                                     <Stack spacing={0.5}>
                                         <Typography variant="h6" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
@@ -433,18 +475,19 @@ const ProductDetailPage: React.FC = () => {
                             ) : (
                                 <Stack spacing={4}>
                                     {reviews.map((review) => {
-                                        // review.userId UUID; avatarda ilk karakteri göster
-                                        const avatarLetter = review.userId?.charAt(0).toUpperCase() ?? 'A';
-                                        // Kendi yorumunu silebilmek için sub claim karşılaştırması
+                                        const initials = review.reviewerName
+                                            ? review.reviewerName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+                                            : '?';
                                         const isOwn =
                                             isAuthenticated &&
                                             currentUser?.sub === review.userId;
+                                        const hasVoted = votedReviews.has(review.id);
 
                                         return (
                                             <Box key={review.id} sx={{ pb: 3, borderBottom: '1px solid #eee' }}>
                                                 <Stack direction="row" spacing={2} alignItems="flex-start">
                                                     <Avatar sx={{ bgcolor: 'primary.light', color: 'white', width: 45, height: 45 }}>
-                                                        {avatarLetter}
+                                                        {initials}
                                                     </Avatar>
 
                                                     <Box sx={{ flexGrow: 1 }}>
@@ -454,9 +497,8 @@ const ProductDetailPage: React.FC = () => {
                                                             spacing={1}
                                                             mb={0.5}
                                                         >
-                                                            {/* userName yok — anonim gösterim */}
                                                             <Typography variant="subtitle2" fontWeight="bold">
-                                                                Alıcı
+                                                                {review.reviewerName ?? 'Anonim Kullanıcı'}
                                                             </Typography>
                                                             {review.isVerifiedPurchase && (
                                                                 <Chip
@@ -504,26 +546,38 @@ const ProductDetailPage: React.FC = () => {
 
                                                         {/* Helpful / Sil */}
                                                         <Stack direction="row" alignItems="center" spacing={1} mt={2}>
-                                                            <Button
-                                                                size="small"
-                                                                startIcon={<ThumbUpOutlined />}
-                                                                sx={{ color: 'text.secondary', textTransform: 'none' }}
-                                                                onClick={() =>
-                                                                    markHelpful({ reviewId: review.id, helpful: true })
-                                                                }
-                                                            >
-                                                                Faydalı ({review.helpfulCount})
-                                                            </Button>
-                                                            <Button
-                                                                size="small"
-                                                                startIcon={<ThumbDownOutlined />}
-                                                                sx={{ color: 'text.secondary', textTransform: 'none' }}
-                                                                onClick={() =>
-                                                                    markHelpful({ reviewId: review.id, helpful: false })
-                                                                }
-                                                            >
-                                                                Faydasız ({review.notHelpfulCount})
-                                                            </Button>
+                                                            <Tooltip title={!isAuthenticated ? 'Oy vermek için giriş yapın' : hasVoted ? 'Zaten oy kullandınız' : ''}>
+                                                                <span>
+                                                                    <Button
+                                                                        size="small"
+                                                                        startIcon={<ThumbUpOutlined />}
+                                                                        disabled={!isAuthenticated || hasVoted}
+                                                                        sx={{ color: 'text.secondary', textTransform: 'none' }}
+                                                                        onClick={() => {
+                                                                            markHelpful({ reviewId: review.id, helpful: true });
+                                                                            setVotedReviews(prev => new Set(prev).add(review.id));
+                                                                        }}
+                                                                    >
+                                                                        Faydalı ({review.helpfulCount})
+                                                                    </Button>
+                                                                </span>
+                                                            </Tooltip>
+                                                            <Tooltip title={!isAuthenticated ? 'Oy vermek için giriş yapın' : hasVoted ? 'Zaten oy kullandınız' : ''}>
+                                                                <span>
+                                                                    <Button
+                                                                        size="small"
+                                                                        startIcon={<ThumbDownOutlined />}
+                                                                        disabled={!isAuthenticated || hasVoted}
+                                                                        sx={{ color: 'text.secondary', textTransform: 'none' }}
+                                                                        onClick={() => {
+                                                                            markHelpful({ reviewId: review.id, helpful: false });
+                                                                            setVotedReviews(prev => new Set(prev).add(review.id));
+                                                                        }}
+                                                                    >
+                                                                        Faydasız ({review.notHelpfulCount})
+                                                                    </Button>
+                                                                </span>
+                                                            </Tooltip>
                                                             {isOwn && (
                                                                 <Button
                                                                     size="small"
@@ -578,6 +632,14 @@ const ProductDetailPage: React.FC = () => {
                             value={reviewForm.reviewText}
                             onChange={(e) => setReviewForm((f) => ({ ...f, reviewText: e.target.value }))}
                             inputProps={{ maxLength: 1000 }}
+                        />
+                        <MultiImageUpload
+                            label="Fotoğraf Ekle (isteğe bağlı, maks. 3)"
+                            values={reviewForm.imageUrls}
+                            onChange={(imgs) => setReviewForm((f) => ({ ...f, imageUrls: imgs }))}
+                            onError={(msg) => setSnackbar({ open: true, message: msg, severity: 'error' })}
+                            max={3}
+                            uploadFn={(file) => productService.uploadReviewImage(id, file)}
                         />
                     </Stack>
                 </DialogContent>

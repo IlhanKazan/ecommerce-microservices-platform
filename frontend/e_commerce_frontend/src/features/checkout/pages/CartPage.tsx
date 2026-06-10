@@ -6,11 +6,12 @@ import {
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCartOutlined';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { Link as RouterLink } from 'react-router-dom';
 import { AppRoutes } from '../../../utils/routes';
+import EmptyState from '../../../components/shared/EmptyState';
 import { useBasket, useRemoveFromBasket, useUpdateBasketItem } from '../../../query/useBasketQueries';
 import { useToastStore } from '../../../store/useToastStore';
 import { useCartStore } from '../../../store/useCartStore';
@@ -31,12 +32,14 @@ const CartPage: React.FC = () => {
     const { mutate: removeItemApi, isPending: isRemoving, variables: removingId } = useRemoveFromBasket();
     const { mutate: updateItemApi, isPending: isUpdating } = useUpdateBasketItem();
 
-    // Local Store & Toast
-    const localCart = useCartStore();
+    // Local Store & Toast — alan bazlı selector (tüm-store aboneliği yerine)
+    const localCartItems = useCartStore((s) => s.items);
+    const updateQuantity = useCartStore((s) => s.updateQuantity);
+    const removeLocalItem = useCartStore((s) => s.removeItem);
     const toast = useToastStore();
 
     // Veri Kaynağını Belirle (Çorba olmayı engelleyen kısım)
-    const displayItems = isAuthenticated ? (basket?.items ?? []) : localCart.items;
+    const displayItems = isAuthenticated ? (basket?.items ?? []) : localCartItems;
     const isLoading = isAuthenticated ? isApiLoading : false;
 
     // --- İŞLEM FONKSİYONLARI ---
@@ -47,7 +50,7 @@ const CartPage: React.FC = () => {
                 { onError: () => toast.error('Miktar artırılırken hata oluştu.') }
             );
         } else {
-            localCart.updateQuantity(productId, currentQuantity + 1);
+            updateQuantity(productId, currentQuantity + 1);
         }
     };
 
@@ -62,7 +65,7 @@ const CartPage: React.FC = () => {
                 { onError: () => toast.error('Miktar azaltılırken hata oluştu.') }
             );
         } else {
-            localCart.updateQuantity(productId, currentQuantity - 1);
+            updateQuantity(productId, currentQuantity - 1);
         }
     };
 
@@ -73,7 +76,7 @@ const CartPage: React.FC = () => {
                 onError: () => toast.error('Ürün kaldırılırken hata oluştu.')
             });
         } else {
-            localCart.removeItem(productId);
+            removeLocalItem(productId);
             toast.success('Ürün sepetten kaldırıldı.');
         }
     };
@@ -84,14 +87,14 @@ const CartPage: React.FC = () => {
         if (isAuthenticated) {
             subtotal = basket?.totalPrice ?? 0;
         } else {
-            subtotal = localCart.getTotalPrice();
+            subtotal = localCartItems.reduce((s, it) => s + it.price * it.quantity, 0);
         }
         const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
         const total = subtotal > 0 ? subtotal + shipping : 0;
         const remainingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
         const shippingProgress = Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100);
         return { subtotal, total, shipping, remainingForFreeShipping, shippingProgress };
-    }, [basket, localCart, isAuthenticated]);
+    }, [basket, localCartItems, isAuthenticated]);
 
     // RENDER BLOKLARI
     if (isLoading) {
@@ -105,29 +108,15 @@ const CartPage: React.FC = () => {
     if (displayItems.length === 0) {
         return (
             <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 4 }}>
-                <Container maxWidth="md" sx={{ py: 10, textAlign: 'center' }}>
-                    <Box sx={{
-                        bgcolor: 'grey.100', width: 120, height: 120, borderRadius: '50%',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        mx: 'auto', mb: 3
-                    }}>
-                        <ShoppingCartIcon sx={{ fontSize: 60, color: 'grey.400' }} />
-                    </Box>
-                    <Typography variant="h5" fontWeight="bold" gutterBottom>
-                        Sepetiniz şu an boş
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-                        Binlerce ürünü keşfetmeye ne dersin?
-                    </Typography>
-                    <Button
-                        variant="contained"
-                        size="large"
-                        component={RouterLink}
-                        to={AppRoutes.PRODUCT_LIST}
-                        sx={{ px: 5, borderRadius: 2 }}
-                    >
-                        Alışverişe Başla
-                    </Button>
+                <Container maxWidth="md">
+                    <EmptyState
+                        icon={<ShoppingCartIcon />}
+                        title="Sepetiniz şu an boş"
+                        description="Binlerce ürünü keşfetmeye ne dersin?"
+                        actionLabel="Alışverişe Başla"
+                        actionTo={AppRoutes.PRODUCT_LIST}
+                        fullHeight
+                    />
                 </Container>
             </Box>
         );
@@ -144,7 +133,7 @@ const CartPage: React.FC = () => {
                     <Grid size={{ xs: 12, md: 8 }}>
                         {/* Ücretsiz kargo progress bar */}
                         {totals.remainingForFreeShipping > 0 ? (
-                            <Paper elevation={0} sx={{ p: 2, mb: 3, border: '1px solid', borderColor: 'warning.light', bgcolor: '#fff8e1' }}>
+                            <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'warning.light', bgcolor: 'warning.lighter' }}>
                                 <Stack direction="row" alignItems="center" spacing={1} mb={1}>
                                     <LocalShippingIcon color="warning" fontSize="small" />
                                     <Typography variant="body2" fontWeight="bold">
@@ -159,7 +148,7 @@ const CartPage: React.FC = () => {
                                 />
                             </Paper>
                         ) : (
-                            <Paper elevation={0} sx={{ p: 2, mb: 3, border: '1px solid', borderColor: 'success.light', bgcolor: '#e8f5e9' }}>
+                            <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'success.light', bgcolor: 'success.lighter' }}>
                                 <Stack direction="row" alignItems="center" spacing={1}>
                                     <LocalShippingIcon color="success" />
                                     <Typography variant="body2" fontWeight="bold" color="success.main">
@@ -182,10 +171,12 @@ const CartPage: React.FC = () => {
                                         elevation={0}
                                         sx={{
                                             p: 2,
-                                            border: '1px solid #e0e0e0',
-                                            borderRadius: 2,
+                                            border: '1px solid',
+                                            borderColor: 'divider',
+                                            borderRadius: 3,
                                             opacity: isThisRemoving ? 0.5 : 1,
-                                            transition: 'opacity 0.2s'
+                                            transition: 'opacity 0.2s, box-shadow 0.2s',
+                                            '&:hover': { boxShadow: '0 4px 16px rgba(26,34,56,0.07)' },
                                         }}
                                     >
                                         <Stack
@@ -278,7 +269,7 @@ const CartPage: React.FC = () => {
 
                     <Grid size={{ xs: 12, md: 4 }}>
                         <Box sx={{ position: 'sticky', top: 20 }}>
-                            <Paper elevation={0} sx={{ p: 3, border: '1px solid #e0e0e0', borderRadius: 2 }}>
+                            <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, boxShadow: '0 4px 16px rgba(26,34,56,0.06)' }}>
                                 <Typography variant="h6" fontWeight="bold" gutterBottom>
                                     Sipariş Özeti
                                 </Typography>

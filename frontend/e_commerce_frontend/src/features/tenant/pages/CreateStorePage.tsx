@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Box, Stepper, Step, StepLabel, Button, Typography, TextField,
     Paper, MenuItem, Grid, Radio, RadioGroup, FormControlLabel,
-    CircularProgress, Alert, Stack, Divider
+    CircularProgress, Alert, Divider, Chip
 } from '@mui/material';
 import { useNotification } from '../../../components/shared/NotificationContext';
 import {
@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import { userService } from '../../user/api/userService.ts';
 import { tenantService } from "../api/tenantService.ts";
+import { PlanFeatureList } from '../../../components/shared/PlanFeatureList';
 import type { Address } from '../../../types/user';
 import type {
     CreateTenantRequest,
@@ -220,43 +221,6 @@ const CreateStorePage: React.FC = () => {
         }
     };
 
-    const renderFeatures = (featuresString: string) => {
-        let content;
-        let isList = false;
-
-        try {
-            const parsed = JSON.parse(featuresString);
-            if (Array.isArray(parsed)) {
-                content = parsed;
-                isList = true;
-            } else {
-                content = featuresString;
-            }
-        } catch {
-            content = featuresString;
-        }
-
-        if (isList) {
-            return (
-                <Stack spacing={1.5} sx={{ flexGrow: 1 }}>
-                    {(content as string[]).map((feature, idx) => (
-                        <Stack direction="row" alignItems="center" gap={1} key={idx}>
-                            <CheckMarkIcon color="success" fontSize="small" />
-                            <Typography variant="body2">{feature}</Typography>
-                        </Stack>
-                    ))}
-                </Stack>
-            );
-        }
-
-        return (
-            <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
-                    {String(content)}
-                </Typography>
-            </Box>
-        );
-    };
 
     const renderStep0_PlanSelection = () => (
         <Grid container spacing={3} justifyContent="center">
@@ -266,51 +230,78 @@ const CreateStorePage: React.FC = () => {
                 </Typography>
             </Grid>
 
-            {plans.map((plan) => (
-                <Grid size={{ xs: 12, md: 4 }} key={plan.id}>
-                    <Paper
-                        elevation={selectedPlanId === plan.id ? 8 : 1}
-                        sx={{
-                            p: 3,
-                            borderRadius: 4,
-                            border: '2px solid',
-                            borderColor: selectedPlanId === plan.id ? 'primary.main' : 'transparent',
-                            bgcolor: selectedPlanId === plan.id ? 'primary.50' : 'background.paper',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s',
-                            height: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            '&:hover': { transform: 'translateY(-5px)', borderColor: 'primary.light' }
-                        }}
-                        onClick={() => setSelectedPlanId(plan.id)}
-                    >
-                        <Box sx={{ textAlign: 'center', mb: 2 }}>
-                            <Typography variant="h5" fontWeight="800" color="primary.main">
-                                {plan.name}
-                            </Typography>
-                            <Typography variant="h4" fontWeight="bold" sx={{ mt: 2 }}>
-                                {plan.price} {plan.currency}
-                                <Typography component="span" variant="body2" color="text.secondary">
-                                    / {plan.billingCycle === 'MONTHLY' ? 'Ay' : 'Yıl'}
-                                </Typography>
-                            </Typography>
-                        </Box>
+            {plans.map((plan) => {
+                const isSelected = selectedPlanId === plan.id;
+                const highlight = plan.name === 'Büyüme';
 
-                        <Divider sx={{ my: 2 }} />
-
-                        {renderFeatures(plan.features)}
-
-                        <Button
-                            variant={selectedPlanId === plan.id ? "contained" : "outlined"}
-                            fullWidth
-                            sx={{ mt: 3, borderRadius: 3 }}
+                return (
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }} key={plan.id}>
+                        <Paper
+                            elevation={isSelected ? 8 : 1}
+                            sx={{
+                                p: 3,
+                                borderRadius: 4,
+                                border: '2px solid',
+                                borderColor: isSelected ? 'primary.main' : highlight ? '#818cf8' : 'transparent',
+                                bgcolor: isSelected ? 'primary.50' : 'background.paper',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s',
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                '&:hover': { transform: 'translateY(-5px)', borderColor: 'primary.light' }
+                            }}
+                            onClick={() => setSelectedPlanId(plan.id)}
                         >
-                            {selectedPlanId === plan.id ? 'Seçildi' : 'Seç'}
-                        </Button>
-                    </Paper>
-                </Grid>
-            ))}
+                            {highlight && !isSelected && (
+                                <Chip
+                                    label="En Popüler"
+                                    size="small"
+                                    sx={{
+                                        position: 'absolute', top: 12, right: 12,
+                                        bgcolor: '#818cf8', color: '#fff', fontWeight: 'bold', fontSize: 11
+                                    }}
+                                />
+                            )}
+
+                            <Box sx={{ mb: 2 }}>
+                                <Typography variant="h6" fontWeight="800" color="primary.main" sx={{ pr: highlight ? 9 : 0 }}>
+                                    {plan.name}
+                                </Typography>
+                                <Typography variant="h4" fontWeight="bold" sx={{ mt: 1 }}>
+                                    {plan.price === 0 ? 'Ücretsiz' : `${plan.price} ₺`}
+                                    {plan.price > 0 && (
+                                        <Typography component="span" variant="body2" color="text.secondary">
+                                            /{plan.billingCycle === 'MONTHLY' ? 'ay' : 'yıl'}
+                                        </Typography>
+                                    )}
+                                </Typography>
+                            </Box>
+
+                            <Divider sx={{ my: 1.5 }} />
+
+                            <Box sx={{ flexGrow: 1, my: 1.5 }}>
+                                <PlanFeatureList
+                                    featuresJson={plan.features}
+                                    commissionRate={plan.commissionRate}
+                                    compact
+                                />
+                            </Box>
+
+                            <Button
+                                variant={isSelected ? "contained" : "outlined"}
+                                color={isSelected ? "primary" : highlight ? "secondary" : "primary"}
+                                fullWidth
+                                sx={{ mt: 2, borderRadius: 3 }}
+                            >
+                                {isSelected ? <><CheckMarkIcon sx={{ mr: 1, fontSize: 18 }} />Seçildi</> : 'Seç'}
+                            </Button>
+                        </Paper>
+                    </Grid>
+                );
+            })}
         </Grid>
     );
 

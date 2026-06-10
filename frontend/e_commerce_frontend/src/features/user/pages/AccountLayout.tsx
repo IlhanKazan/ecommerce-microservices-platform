@@ -4,12 +4,20 @@ import { Person as PersonIcon, ShoppingBag as OrderIcon, LocationOn as AddressIc
 import { useAuth } from "react-oidc-context";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { tokens } from '../../../utils/themeTokens';
 
 const AccountLayout: React.FC = () => {
     const auth = useAuth();
-    const { userProfile } = useAuthStore();
+    const { user, oidcProfile } = useAuthStore();
     const location = useLocation();
     const navigate = useNavigate();
+
+    // İsim/email backend user'dan, yoksa OIDC profilinden (refresh/direkt giriş fallback)
+    const firstName = user?.firstName ?? oidcProfile?.given_name ?? '';
+    const lastName = user?.lastName ?? oidcProfile?.family_name ?? '';
+    const email = user?.email ?? oidcProfile?.email ?? '';
+    const avatarUrl = user?.profileImageUrl ?? undefined;
+    const initial = (firstName || email || '?').charAt(0).toUpperCase();
 
     const menuItems = [
         { path: '/user', label: 'Kullanıcı Bilgilerim', icon: <PersonIcon />, exact: true },
@@ -25,17 +33,20 @@ const AccountLayout: React.FC = () => {
 
             <Grid container spacing={3}>
                 <Grid size={{ xs: 12, md: 3 }}>
-                    <Paper elevation={0} sx={{ border: '1px solid #e0e0e0', borderRadius: 2, overflow: 'hidden' }}>
-                        <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2, bgcolor: 'primary.main', color: 'primary.contrastText' }}>
-                            <Avatar sx={{ width: 50, height: 50, bgcolor: 'background.paper', color: 'primary.main' }}>
-                                {userProfile?.given_name?.[0]}
+                    <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 16px rgba(26,34,56,0.06)' }}>
+                        <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2, background: tokens.gradient.dark, color: 'common.white' }}>
+                            <Avatar
+                                src={avatarUrl}
+                                sx={{ width: 56, height: 56, bgcolor: 'primary.main', color: 'common.white', fontWeight: 700, fontSize: '1.4rem', border: '2px solid rgba(255,255,255,0.4)' }}
+                            >
+                                {initial}
                             </Avatar>
                             <Box sx={{ overflow: 'hidden' }}>
-                                <Typography variant="subtitle1" fontWeight="bold" noWrap>
-                                    {userProfile?.given_name} {userProfile?.family_name}
+                                <Typography variant="subtitle1" fontWeight={700} noWrap>
+                                    {firstName} {lastName}
                                 </Typography>
                                 <Typography variant="caption" display="block" noWrap sx={{ opacity: 0.8 }}>
-                                    {userProfile?.email}
+                                    {email}
                                 </Typography>
                             </Box>
                         </Box>
@@ -74,7 +85,7 @@ const AccountLayout: React.FC = () => {
                 </Grid>
 
                 <Grid size={{ xs: 12, md: 9 }}>
-                    <Paper elevation={0} sx={{ p: 4, border: '1px solid #e0e0e0', borderRadius: 2, bgcolor: 'background.paper', minHeight: '500px' }}>
+                    <Paper elevation={0} sx={{ p: { xs: 2.5, md: 4 }, border: '1px solid', borderColor: 'divider', borderRadius: 3, bgcolor: 'background.paper', minHeight: '500px', boxShadow: '0 4px 16px rgba(26,34,56,0.05)' }}>
                         <Outlet />
                     </Paper>
                 </Grid>
