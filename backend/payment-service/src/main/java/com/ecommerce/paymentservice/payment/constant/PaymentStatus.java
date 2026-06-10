@@ -4,5 +4,7 @@ public enum PaymentStatus {
     PENDING,
     SUCCESS,
     FAILURE,
-    REFUNDED
+    REFUNDED,
+    // iyzico ödeme başarılı (para çekildi) ama abonelik provisioning patladı — para izi bu state'le kalıcı kayıt altına alınır
+    PROVISION_FAILED
 }

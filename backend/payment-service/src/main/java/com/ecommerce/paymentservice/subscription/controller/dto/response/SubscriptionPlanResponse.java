@@ -9,6 +9,7 @@ public record SubscriptionPlanResponse(
         BigDecimal price,
         String currency,
         BillingCycle billingCycle,
+        BigDecimal commissionRate,
         String features
 ) {
 }

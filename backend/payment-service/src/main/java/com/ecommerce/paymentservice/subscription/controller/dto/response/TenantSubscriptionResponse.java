@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 public record TenantSubscriptionResponse(
         String planName,
         BigDecimal feeAmount,
+        BigDecimal commissionRate,
         BillingCycle cycleUnit,
         LocalDate nextBillingDate,
         TenantSubscriptionStatus status,

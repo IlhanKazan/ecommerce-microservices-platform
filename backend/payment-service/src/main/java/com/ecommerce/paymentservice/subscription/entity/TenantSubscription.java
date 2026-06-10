@@ -59,4 +59,10 @@ public class TenantSubscription extends BaseEntity {
 
     private String cancellationReason;
 
+    @Column(name = "contact_email")
+    private String contactEmail;
+
+    @Column(name = "commission_rate")
+    private BigDecimal commissionRate;
+
 }

@@ -22,4 +22,6 @@ public class PaymentContext {
     private BigDecimal amount;
     private String currency;
     private String subMerchantKey;
+    private BigDecimal commissionRate;
+    private String contactEmail;
 }
