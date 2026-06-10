@@ -50,7 +50,11 @@ public class IdempotencyAspect {
         try {
             return joinPoint.proceed();
         } catch (Exception e) {
-            redisTemplate.delete(redisKey);
+            // DB/transaction hatası sonrası ödeme alınmış olabilir; key'i koru (TTL sona erince siler)
+            if (!(e instanceof org.springframework.dao.DataAccessException)
+                    && !(e instanceof org.springframework.transaction.TransactionException)) {
+                redisTemplate.delete(redisKey);
+            }
             throw e;
         }
     }
