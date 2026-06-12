@@ -6,6 +6,9 @@ import java.time.LocalDate;
 public interface MailService {
     void sendTenantActivated(String toEmail, String tenantName, String inboxMessageId);
     void sendTenantPaymentFailed(String toEmail, String tenantName, String inboxMessageId);
+    void sendTenantPaused(String toEmail, String tenantName, String inboxMessageId);
+    void sendTenantClosed(String toEmail, String tenantName, String inboxMessageId);
+    void sendTenantReactivated(String toEmail, String tenantName, String inboxMessageId);
     void sendPaymentSuccess(String toEmail, String amount, String currency, String paymentType, String inboxMessageId);
 
     void sendOrderConfirmed(String toEmail, Long orderId, BigDecimal totalAmount, String currency, String messageId);

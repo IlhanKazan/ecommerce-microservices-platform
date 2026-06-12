@@ -11,6 +11,7 @@ import com.ecommerce.contracts.event.payment.SubscriptionRenewalFailedEventPaylo
 import com.ecommerce.contracts.event.payment.SubscriptionRenewalSuccessEventPayload;
 import com.ecommerce.contracts.event.tenant.TenantActivatedEventPayload;
 import com.ecommerce.contracts.event.tenant.TenantPaymentFailedEventPayload;
+import com.ecommerce.contracts.event.tenant.TenantStatusChangedEventPayload;
 import com.ecommerce.mailservice.inbox.service.InboxService;
 import com.ecommerce.mailservice.mail.handler.OrderMailHandler;
 import com.ecommerce.mailservice.mail.handler.SubscriptionMailHandler;
@@ -61,6 +62,11 @@ public class MailEventConsumer {
                     TenantPaymentFailedEventPayload payload =
                             objectMapper.readValue(json, TenantPaymentFailedEventPayload.class);
                     tenantMailHandler.handleTenantPaymentFailed(payload, messageId);
+                }
+                case EventConstants.EVENT_TENANT_STATUS_CHANGED -> {
+                    TenantStatusChangedEventPayload payload =
+                            objectMapper.readValue(json, TenantStatusChangedEventPayload.class);
+                    tenantMailHandler.handleTenantStatusChanged(payload, messageId);
                 }
                 case EventConstants.EVENT_TENANT_CREATED ->
                         log.debug("TENANT_CREATED event mail-service'te işlenmiyor — atlandı");
