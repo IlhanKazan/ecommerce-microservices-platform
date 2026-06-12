@@ -6,5 +6,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public record TenantStorefrontResponse(
         Long id,
         String name,
-        String logoUrl
+        String logoUrl,
+        String status
 ) {}

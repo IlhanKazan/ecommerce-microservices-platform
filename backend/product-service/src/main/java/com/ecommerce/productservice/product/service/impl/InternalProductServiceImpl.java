@@ -2,6 +2,8 @@ package com.ecommerce.productservice.product.service.impl;
 
 import com.ecommerce.common.exception.BusinessException;
 import com.ecommerce.common.exception.ResourceNotFoundException;
+import com.ecommerce.productservice.client.adapter.UserTenantClientAdapter;
+import com.ecommerce.productservice.client.dto.TenantStorefrontResponse;
 import com.ecommerce.productservice.outbox.service.OutboxService;
 import com.ecommerce.productservice.product.constant.ProductStatus;
 import com.ecommerce.productservice.product.constant.SalesStatus;
@@ -23,6 +25,7 @@ public class InternalProductServiceImpl implements InternalProductService {
 
     private final ProductRepository productRepository;
     private final OutboxService outboxService;
+    private final UserTenantClientAdapter userTenantClientAdapter;
 
     @Override
     @Transactional(readOnly = true)
@@ -43,6 +46,15 @@ public class InternalProductServiceImpl implements InternalProductService {
         if (product.getSalesStatus() == SalesStatus.OUT_OF_STOCK) {
             throw new BusinessException(
                     "Bu ürün stokta yok.", "PRODUCT_OUT_OF_STOCK");
+        }
+
+        // Mağaza duraklatılmış/kapalıysa satın alma engellenir. UTS'ye ulaşılamazsa (storefront null)
+        // fail-open: checkout'u kilitlemektense canlı durumu bilmediğimizde geçir.
+        TenantStorefrontResponse storefront = userTenantClientAdapter.getStorefront(tenantId);
+        if (storefront != null && storefront.status() != null
+                && !"ACTIVE".equals(storefront.status())) {
+            throw new BusinessException(
+                    "Bu mağaza şu anda satış yapmıyor.", "STORE_NOT_AVAILABLE");
         }
 
         return new ProductValidationInfo(
