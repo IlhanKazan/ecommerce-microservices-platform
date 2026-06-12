@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import {
-    Paper, Typography, Box, Button, Stack, CircularProgress,
+    Paper, Typography, Button, Stack, CircularProgress,
     Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, TextField,
 } from '@mui/material';
 import {
