@@ -4,6 +4,7 @@ import com.ecommerce.common.dto.PageResponse;
 import com.ecommerce.common.exception.BusinessException;
 import com.ecommerce.productservice.category.entity.Category;
 import com.ecommerce.productservice.category.repository.CategoryRepository;
+import com.ecommerce.productservice.common.service.ImageService;
 import com.ecommerce.productservice.outbox.service.OutboxService;
 import com.ecommerce.productservice.product.constant.ProductStatus;
 import com.ecommerce.productservice.product.constant.SalesStatus;
@@ -27,6 +28,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -36,6 +40,7 @@ public class TenantProductServiceImpl implements TenantProductService {
     private final CategoryRepository categoryRepository;
     private final ProductMapper productMapper;
     private final OutboxService outboxService;
+    private final ImageService imageService;
 
     @Override
     @Transactional
@@ -113,6 +118,13 @@ public class TenantProductServiceImpl implements TenantProductService {
         product.setCurrency(context.currency() != null ? context.currency() : "TRY");
         product.setWeightGrams(context.weightGrams());
         product.setDimensionsCm(context.dimensionsCm());
+
+        // Görsel değişiminde MinIO'da orphan kalmasın — eski URL'leri set ETMEDEN önce yakala
+        String oldMainImageUrl = product.getMainImageUrl();
+        List<String> oldImageUrls = product.getImageUrls() != null
+                ? new ArrayList<>(product.getImageUrls())
+                : new ArrayList<>();
+
         product.setMainImageUrl(context.mainImageUrl());
         product.setImageUrls(context.imageUrls());
         product.setAttributes(context.attributes());
@@ -137,7 +149,30 @@ public class TenantProductServiceImpl implements TenantProductService {
         Product updatedProduct = productRepository.save(product);
         outboxService.publishProductUpdatedEvent(updatedProduct);
 
+        // Save commit'inden sonra: artık kullanılmayan (yeni listede/main'de olmayan) eski görselleri sil
+        deleteOrphanImages(oldMainImageUrl, oldImageUrls, updatedProduct);
+
         return updatedProduct;
+    }
+
+    // Eski görsellerden, yeni imageUrls listesinde de yeni mainImageUrl'de de olmayanlar orphan'dır
+    private void deleteOrphanImages(String oldMainImageUrl, List<String> oldImageUrls, Product updated) {
+        List<String> newImageUrls = updated.getImageUrls() != null ? updated.getImageUrls() : List.of();
+        String newMainImageUrl = updated.getMainImageUrl();
+
+        List<String> orphans = new ArrayList<>();
+        for (String oldUrl : oldImageUrls) {
+            if (oldUrl != null && !newImageUrls.contains(oldUrl) && !oldUrl.equals(newMainImageUrl)) {
+                orphans.add(oldUrl);
+            }
+        }
+        if (oldMainImageUrl != null
+                && !oldMainImageUrl.equals(newMainImageUrl)
+                && !newImageUrls.contains(oldMainImageUrl)
+                && !orphans.contains(oldMainImageUrl)) {
+            orphans.add(oldMainImageUrl);
+        }
+        imageService.deleteImages(orphans);
     }
 
     @Override
@@ -155,12 +190,24 @@ public class TenantProductServiceImpl implements TenantProductService {
             return;
         }
 
+        // Soft delete öncesi görsel URL'lerini topla (DELETED terminal; restore akışı yok → silmek güvenli)
+        List<String> images = new ArrayList<>();
+        if (product.getMainImageUrl() != null) {
+            images.add(product.getMainImageUrl());
+        }
+        if (product.getImageUrls() != null) {
+            images.addAll(product.getImageUrls());
+        }
+
         product.setStatus(ProductStatus.DELETED);
         product.setSalesStatus(SalesStatus.OUT_OF_STOCK);
 
         productRepository.save(product);
 
         outboxService.publishProductDeletedEvent(product);
+
+        // Save sonrası: ürünün tüm görsellerini MinIO'dan temizle
+        imageService.deleteImages(images);
     }
 
     @Override
