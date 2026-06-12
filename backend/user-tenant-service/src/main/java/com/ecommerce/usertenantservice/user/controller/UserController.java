@@ -114,9 +114,8 @@ public class UserController {
         // TODO [11.12.2025 18:54]: Eger bu imageService'i common jar yapacak olursak buradaki folderName:"profiles" kismini "products" vs gibi degistirip servisler arası ortak kullanip duplicate koddan kacinmis oluruz.
         String imageUrl = imageService.uploadImage(file, "profiles");
 
-        User existingUser = userService.getExistingUser(user.keycloakId());
-        existingUser.setProfileImageUrl(imageUrl);
-        User updatedUser = userService.updateUser(existingUser);
+        // Entity mutasyonu + eski görsel temizliği servise ait (controller'da business logic yok)
+        User updatedUser = userService.updateProfileImage(user.keycloakId(), imageUrl);
 
         return ResponseEntity.ok(userMapper.toResponse(updatedUser));
     }

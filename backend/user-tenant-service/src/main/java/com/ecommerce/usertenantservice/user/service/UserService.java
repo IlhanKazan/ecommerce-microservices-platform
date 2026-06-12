@@ -18,10 +18,12 @@ import java.util.UUID;
 public class UserService {
     private final UserRepository userRepository;
     private final PaymentServiceClientAdapter paymentServiceClientAdapter;
+    private final ImageService imageService;
 
-    public UserService(UserRepository userRepository, PaymentServiceClientAdapter paymentServiceClientAdapter) {
+    public UserService(UserRepository userRepository, PaymentServiceClientAdapter paymentServiceClientAdapter, ImageService imageService) {
         this.userRepository = userRepository;
         this.paymentServiceClientAdapter = paymentServiceClientAdapter;
+        this.imageService = imageService;
     }
 
     @Transactional
@@ -46,8 +48,29 @@ public class UserService {
     @Transactional
     public User deleteUser(UUID keycloakId) {
         User user = userRepository.findByKeycloakId(keycloakId);
+        String oldProfileImageUrl = user.getProfileImageUrl();
         user.setIsActive(false);
         userRepository.save(user);
+
+        // Hesap pasifleştirilince profil fotoğrafını MinIO'dan temizle (best-effort)
+        imageService.deleteImage(oldProfileImageUrl);
+        return user;
+    }
+
+    /**
+     * Profil fotoğrafını günceller; eski dosyayı MinIO'dan temizler (orphan kalmasın).
+     * Görsel upload'ı controller'da ImageService ile yapılır, URL buraya geçer.
+     */
+    @Transactional
+    public User updateProfileImage(UUID keycloakId, String newImageUrl) {
+        User user = userRepository.findByKeycloakId(keycloakId);
+        String oldImageUrl = user.getProfileImageUrl();
+        user.setProfileImageUrl(newImageUrl);
+        userRepository.save(user);
+
+        if (oldImageUrl != null && !oldImageUrl.equals(newImageUrl)) {
+            imageService.deleteImage(oldImageUrl);
+        }
         return user;
     }
 
