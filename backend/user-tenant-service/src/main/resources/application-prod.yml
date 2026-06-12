@@ -47,6 +47,7 @@ security:
 
 minio:
   url: http://minio:9000
+  public-url: ${MINIO_PUBLIC_URL:http://localhost:9005}
   access-key: ${MINIO_ACCESS_KEY}
   secret-key: ${MINIO_SECRET_KEY}
   bucket-name: ${USER_MINIO_BUCKET}

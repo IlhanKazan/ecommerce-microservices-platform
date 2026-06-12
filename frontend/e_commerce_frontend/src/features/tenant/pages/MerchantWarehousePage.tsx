@@ -4,7 +4,7 @@ import {
     CircularProgress, Grid, Table, TableBody, TableCell,
     TableContainer, TableHead, TableRow, Dialog, DialogTitle,
     DialogContent, DialogActions, MenuItem, Alert, Chip,
-    InputAdornment, Collapse, IconButton, Tooltip,
+    InputAdornment, Collapse, IconButton, Tooltip, Switch,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -12,11 +12,17 @@ import {
     KeyboardArrowDown as ExpandIcon,
     KeyboardArrowUp as CollapseIcon,
     Remove as RemoveIcon,
+    Edit as EditIcon,
+    DeleteOutline as DeleteIcon,
+    WarningAmberRounded as WarningIcon,
 } from '@mui/icons-material';
 import { useMerchantStore } from '../../../store/useMerchantStore';
 import {
     useGetWarehouses,
     useCreateWarehouse,
+    useUpdateWarehouse,
+    useSetWarehouseStatus,
+    useDeleteWarehouse,
     useAddManualStock,
     useRemoveManualStock,
     useGetTenantProducts,
@@ -24,6 +30,13 @@ import {
 } from '../../../query/useProductQueries';
 import { useNotification } from '../../../components/shared/NotificationContext';
 import type { StockSummaryItem } from '../../../types/product';
+import type { Warehouse } from '../../../types/tenant';
+
+// Axios hata gövdesinden backend mesajını güvenle çıkar (409 vb.)
+const getErrorMessage = (err: unknown, fallback: string): string => {
+    const resp = (err as { response?: { data?: { message?: string } } })?.response;
+    return resp?.data?.message ?? fallback;
+};
 
 // ─── Add Stock Dialog ─────────────────────────────────────────────────────────
 
@@ -313,6 +326,159 @@ const RemoveStockDialog: React.FC<RemoveStockDialogProps> = ({
     );
 };
 
+// ─── Edit Warehouse Dialog ────────────────────────────────────────────────────
+
+interface EditWarehouseDialogProps {
+    open: boolean;
+    onClose: () => void;
+    tenantId: number;
+    warehouse: Warehouse;
+}
+
+const EditWarehouseDialog: React.FC<EditWarehouseDialogProps> = ({
+    open,
+    onClose,
+    tenantId,
+    warehouse,
+}) => {
+    const { notify } = useNotification();
+    const [name, setName] = useState(warehouse.name);
+    const [locationDetails, setLocationDetails] = useState(warehouse.locationDetails ?? '');
+    const { mutate: updateWarehouse, isPending } = useUpdateWarehouse(tenantId);
+
+    const isValid = name.trim().length > 0;
+
+    const handleSubmit = () => {
+        if (!isValid) return;
+        updateWarehouse(
+            { warehouseId: warehouse.id, payload: { name: name.trim(), locationDetails: locationDetails.trim() } },
+            {
+                onSuccess: () => {
+                    notify('Depo güncellendi.', 'success');
+                    onClose();
+                },
+                onError: (err) => notify(getErrorMessage(err, 'Depo güncellenirken hata oluştu.'), 'error'),
+            },
+        );
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+            <DialogTitle fontWeight="bold">Depoyu Düzenle</DialogTitle>
+            <DialogContent dividers>
+                <Stack spacing={2.5} sx={{ pt: 0.5 }}>
+                    <TextField
+                        label="Depo Kodu"
+                        value={warehouse.code}
+                        disabled
+                        fullWidth
+                        helperText="Depo kodu değiştirilemez"
+                        slotProps={{ htmlInput: { style: { fontFamily: 'monospace' } } }}
+                    />
+                    <TextField
+                        label="Depo Adı"
+                        required
+                        fullWidth
+                        autoFocus
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        error={name.trim().length === 0}
+                    />
+                    <TextField
+                        label="Lokasyon / Adres"
+                        fullWidth
+                        value={locationDetails}
+                        onChange={(e) => setLocationDetails(e.target.value)}
+                    />
+                </Stack>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button onClick={onClose} color="inherit" disabled={isPending}>İptal</Button>
+                <Button
+                    onClick={handleSubmit}
+                    variant="contained"
+                    disabled={!isValid || isPending}
+                    startIcon={isPending ? <CircularProgress size={18} color="inherit" /> : <EditIcon />}
+                >
+                    {isPending ? 'Kaydediliyor...' : 'Kaydet'}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
+
+// ─── Delete Warehouse Dialog ──────────────────────────────────────────────────
+
+interface DeleteWarehouseDialogProps {
+    open: boolean;
+    onClose: () => void;
+    tenantId: number;
+    warehouse: Warehouse;
+    stockItemCount: number;
+}
+
+const DeleteWarehouseDialog: React.FC<DeleteWarehouseDialogProps> = ({
+    open,
+    onClose,
+    tenantId,
+    warehouse,
+    stockItemCount,
+}) => {
+    const { notify } = useNotification();
+    const { mutate: deleteWarehouse, isPending } = useDeleteWarehouse(tenantId);
+
+    const hasStock = stockItemCount > 0;
+
+    const handleConfirm = () => {
+        deleteWarehouse(warehouse.id, {
+            onSuccess: () => {
+                notify('Depo silindi.', 'success');
+                onClose();
+            },
+            onError: (err) =>
+                notify(getErrorMessage(err, 'Depo silinirken hata oluştu.'), 'error'),
+        });
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+            <DialogTitle fontWeight="bold">
+                <Stack direction="row" spacing={1} alignItems="center">
+                    <WarningIcon color="error" />
+                    <span>Depoyu Sil</span>
+                </Stack>
+            </DialogTitle>
+            <DialogContent dividers>
+                <Stack spacing={2}>
+                    <Typography variant="body2">
+                        <b>{warehouse.name}</b> ({warehouse.code}) deposunu kalıcı olarak silmek
+                        istediğinize emin misiniz? Bu işlem geri alınamaz.
+                    </Typography>
+                    {hasStock && (
+                        <Alert severity="warning">
+                            Bu depoda {stockItemCount} stok kalemi var. Önce stokları boşaltmanız
+                            gerekir; aksi halde silme reddedilir. Depoyu saklamak istiyorsanız
+                            silmek yerine <b>pasif</b> yapabilirsiniz.
+                        </Alert>
+                    )}
+                </Stack>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button onClick={onClose} color="inherit" disabled={isPending}>İptal</Button>
+                <Button
+                    onClick={handleConfirm}
+                    variant="contained"
+                    color="error"
+                    disabled={isPending}
+                    startIcon={isPending ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon />}
+                >
+                    {isPending ? 'Siliniyor...' : 'Kalıcı Sil'}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const MerchantWarehousePage: React.FC = () => {
@@ -331,12 +497,15 @@ const MerchantWarehousePage: React.FC = () => {
     } | null>(null);
     const [expandedWarehouseId,  setExpandedWarehouseId]  = useState<number | null>(null);
     const [warehouseForm,        setWarehouseForm]         = useState({ code: '', name: '', locationDetails: '' });
+    const [editTarget,           setEditTarget]            = useState<Warehouse | null>(null);
+    const [deleteTarget,         setDeleteTarget]          = useState<Warehouse | null>(null);
 
     const tenantId = activeTenant?.id ?? 0;
 
     const { data: warehouses,  isLoading: loadingWarehouses } = useGetWarehouses(tenantId);
     const { data: stockSummary                               } = useGetTenantStocks(tenantId);
     const { mutate: createWarehouse, isPending: isCreating }   = useCreateWarehouse(tenantId);
+    const { mutate: setWarehouseStatus }                       = useSetWarehouseStatus(tenantId);
 
     // warehouseId → stok kayıtları
     const stockByWarehouse = new Map<number, StockSummaryItem[]>();
@@ -376,6 +545,17 @@ const MerchantWarehousePage: React.FC = () => {
 
     const toggleExpand = (warehouseId: number) => {
         setExpandedWarehouseId((prev) => (prev === warehouseId ? null : warehouseId));
+    };
+
+    const handleToggleActive = (w: Warehouse) => {
+        setWarehouseStatus(
+            { warehouseId: w.id, active: !w.isActive },
+            {
+                onSuccess: () =>
+                    notify(w.isActive ? 'Depo pasif yapıldı.' : 'Depo aktifleştirildi.', 'success'),
+                onError: (err) => notify(getErrorMessage(err, 'Depo durumu değiştirilemedi.'), 'error'),
+            },
+        );
     };
 
     return (
@@ -465,19 +645,20 @@ const MerchantWarehousePage: React.FC = () => {
                                 <TableCell><b>Depo Adı</b></TableCell>
                                 <TableCell><b>Lokasyon</b></TableCell>
                                 <TableCell align="center"><b>Stok Kalemleri</b></TableCell>
+                                <TableCell align="center"><b>Durum</b></TableCell>
                                 <TableCell align="center"><b>İşlem</b></TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {loadingWarehouses ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                                         <CircularProgress size={28} />
                                     </TableCell>
                                 </TableRow>
                             ) : !warehouses || warehouses.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                                    <TableCell colSpan={7} align="center" sx={{ color: 'text.secondary', py: 4 }}>
                                         Henüz depo eklemediniz.
                                     </TableCell>
                                 </TableRow>
@@ -516,20 +697,54 @@ const MerchantWarehousePage: React.FC = () => {
                                                     />
                                                 </TableCell>
                                                 <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                                                    <Button
-                                                        size="small"
-                                                        variant="outlined"
-                                                        startIcon={<AddIcon />}
-                                                        onClick={() => openAddStockDialog(w.id)}
-                                                    >
-                                                        Stok Gir
-                                                    </Button>
+                                                    <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                                                        <Tooltip title={w.isActive ? 'Pasif yap' : 'Aktifleştir'}>
+                                                            <Switch
+                                                                size="small"
+                                                                checked={w.isActive}
+                                                                onChange={() => handleToggleActive(w)}
+                                                            />
+                                                        </Tooltip>
+                                                        <Chip
+                                                            label={w.isActive ? 'Aktif' : 'Pasif'}
+                                                            size="small"
+                                                            color={w.isActive ? 'success' : 'default'}
+                                                            variant={w.isActive ? 'filled' : 'outlined'}
+                                                        />
+                                                    </Stack>
+                                                </TableCell>
+                                                <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                                                    <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                                                        <Tooltip title={w.isActive ? 'Stok Gir' : 'Pasif depoya stok girilemez'}>
+                                                            <span>
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    startIcon={<AddIcon />}
+                                                                    disabled={!w.isActive}
+                                                                    onClick={() => openAddStockDialog(w.id)}
+                                                                >
+                                                                    Stok Gir
+                                                                </Button>
+                                                            </span>
+                                                        </Tooltip>
+                                                        <Tooltip title="Düzenle">
+                                                            <IconButton size="small" color="primary" onClick={() => setEditTarget(w)}>
+                                                                <EditIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Sil">
+                                                            <IconButton size="small" color="error" onClick={() => setDeleteTarget(w)}>
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Stack>
                                                 </TableCell>
                                             </TableRow>
 
                                             {/* Expandable stok detay tablosu */}
                                             <TableRow>
-                                                <TableCell colSpan={6} sx={{ py: 0, border: 0 }}>
+                                                <TableCell colSpan={7} sx={{ py: 0, border: 0 }}>
                                                     <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                                                         <Box sx={{ bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
                                                             {warehouseStocks.length === 0 ? (
@@ -654,6 +869,27 @@ const MerchantWarehousePage: React.FC = () => {
                     currentStock={removeTarget.currentStock}
                     productSku={removeTarget.sku}
                     warehouseName={removeTarget.warehouseName}
+                />
+            )}
+
+            {/* Depo düzenleme dialog */}
+            {editTarget && (
+                <EditWarehouseDialog
+                    open={!!editTarget}
+                    onClose={() => setEditTarget(null)}
+                    tenantId={tenantId}
+                    warehouse={editTarget}
+                />
+            )}
+
+            {/* Depo silme dialog */}
+            {deleteTarget && (
+                <DeleteWarehouseDialog
+                    open={!!deleteTarget}
+                    onClose={() => setDeleteTarget(null)}
+                    tenantId={tenantId}
+                    warehouse={deleteTarget}
+                    stockItemCount={(stockByWarehouse.get(deleteTarget.id) ?? []).length}
                 />
             )}
         </Box>

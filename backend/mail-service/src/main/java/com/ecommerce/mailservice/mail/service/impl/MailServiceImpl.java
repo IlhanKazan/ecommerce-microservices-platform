@@ -48,6 +48,30 @@ public class MailServiceImpl implements MailService {
     }
 
     @Override
+    public void sendTenantPaused(String toEmail, String tenantName, String inboxMessageId) {
+        Context ctx = new Context();
+        ctx.setVariable("tenantName", tenantName);
+        String subject = "Mağazanız Duraklatıldı — " + tenantName;
+        send(toEmail, subject, "mail/tenant-paused", ctx, inboxMessageId, "TENANT_STATUS_CHANGED_EVENT");
+    }
+
+    @Override
+    public void sendTenantClosed(String toEmail, String tenantName, String inboxMessageId) {
+        Context ctx = new Context();
+        ctx.setVariable("tenantName", tenantName);
+        String subject = "Mağazanız Kapatıldı — " + tenantName;
+        send(toEmail, subject, "mail/tenant-closed", ctx, inboxMessageId, "TENANT_STATUS_CHANGED_EVENT");
+    }
+
+    @Override
+    public void sendTenantReactivated(String toEmail, String tenantName, String inboxMessageId) {
+        Context ctx = new Context();
+        ctx.setVariable("tenantName", tenantName);
+        String subject = "Mağazanız Yeniden Açıldı — " + tenantName;
+        send(toEmail, subject, "mail/tenant-reactivated", ctx, inboxMessageId, "TENANT_STATUS_CHANGED_EVENT");
+    }
+
+    @Override
     public void sendPaymentSuccess(String toEmail, String amount, String currency, String paymentType, String inboxMessageId) {
         Context ctx = new Context();
         ctx.setVariable("amount", amount);

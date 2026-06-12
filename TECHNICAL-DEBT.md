@@ -132,6 +132,24 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 - Çözüm: Tenant-bazlı object key prefix (`tenants/<tenantId>/products/...`) veya tenant başına bucket.
 - Notion'da iki yerde geçiyor: "DevOps" ve "user-tenant-service"
 
+### MinIO public URL — container hostname sızıyor ✅ 2026-06-11 (çözüldü)
+- [x] **Bug:** Logo/görsel yükleyince dönen URL `http://minio:9000/...` (container DNS) oluyordu; tarayıcı container-içi adrese erişemiyor, görsel kırık.
+- **Kök neden:** `ImageService` görsel URL'ini **internal** MinIO endpoint'iyle (`minio.url`) kuruyordu. Internal (servis→MinIO upload) ile public (tarayıcı→MinIO indirme) endpoint ayrılmamıştı.
+- **Çözüm (uygulandı):** Yeni `minio.public-url` config'i — `MinioClient` upload eskisi gibi `minio.url`'i (internal) kullanır; `ImageService`'in döndürdüğü URL `public-url` ile kurulur. dev/prod-local: `http://localhost:9005`; prod profilinde `${MINIO_PUBLIC_URL:...}`. Her iki servis (product + UTS) güncellendi.
+- **Kalan:** Gerçek prod domeni için reverse proxy → FB-3.
+- **Not (opsiyonel temizlik):** DB'de eski `http://minio:9000/...` yazılmış kayıtlar kırık kalır; dev verisi olduğu için yeniden upload ya da tek-seferlik `UPDATE ... REPLACE(url,'http://minio:9000','http://localhost:9005')`.
+
+### MinIO güvenliği genel 🟠 (2026-06-11, kısmen çözüldü)
+- [x] **Scoped service account** — `minio-init` container'ı (mc) bucket'a-özel policy'li `ecommerce-app` user'ı yaratır; uygulamalar artık root (`minioadmin`) DEĞİL bunu kullanır. Root yalnız server + console + init. (`infrastructure/minio/init.sh`, `app-policy.json`)
+- [x] **Bucket policy explicit — ListBucket gerçekten kapalı** — `mc anonymous set download` preset'i anonim `s3:ListBucket` de veriyordu (enumerate fiilen AÇIKTI; önceki "kapalı" iddiası yanlıştı). Custom anonim policy (`mc anonymous set-json`, sadece `s3:GetObject` `/*`) ile düzeltildi: bilinen key ile obje GET açık, bucket listeleme `AccessDenied`. `curl` ile doğrulandı.
+- [x] **Upload 500 regresyonu (scoped account'a geçişin yan etkisi) çözüldü** — MinIO Java SDK explicit region verilmeyince her işlemden önce `GetBucketLocation` çağırıyor; scoped policy'de o izin olmadığı için upload `AccessDenied` (500) veriyordu. Fix: `MinioConfig`'e `.region(${minio.region:us-east-1})` (yml'ye dokunmadan default) + `app-policy.json`'a `s3:GetBucketLocation` (defansif). Hem product hem UTS.
+- [x] **Orphan silme** — bkz. `TODO.md` FW-3 (görsel değişimi/silimde `removeObject`).
+- [ ] **Signed (presigned) URL** ile erişim — özel görseller (profil, doğrulama belgesi) için TTL'li imzalı URL gelecekte. Şu an tüm upload'lar public katalog görseli (ürün/logo/profil/review) → public-read kasıtlı.
+- [ ] **Credentials yönetimi** — `.env`'deki MinIO key'leri prod'da secret manager'a; şu an scoped ama hâlâ statik `.env` credential.
+- [ ] **Upload validation zaten var** (boyut/content-type) ama **virus/malware tarama** prod için gözden geçirilmeli.
+- [ ] **Tenant key-prefix izolasyonu** — yukarıdaki "MinIO veri izolasyonu" maddesi (tek bucket, prefix yok).
+- Bağlam: FB-3 + "MinIO veri izolasyonu" ile aynı küme.
+
 ### Frontend lint — CI blocker (42 error, 5 warning) ✅ 2026-06-10
 - [x] **Çözüldü.** Asıl 42 error daha önce (Sprint 1 lint temizliğinde) giderilmiş; 2026-06-10'da kalan 3 warning de düzeltildi (`ProductListPage` categoryTree useMemo, `CartPage` useMemo deps). `npm run lint` → **0 error, 0 warning**. CI yeşil.
 - _(Aşağıdaki eski hata envanteri tarihçe — üzerine dönme.)_

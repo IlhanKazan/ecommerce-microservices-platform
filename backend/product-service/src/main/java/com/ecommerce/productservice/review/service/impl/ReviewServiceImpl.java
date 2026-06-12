@@ -5,6 +5,7 @@ import com.ecommerce.common.exception.BusinessException;
 import com.ecommerce.common.exception.ResourceNotFoundException;
 import java.util.List;
 import com.ecommerce.productservice.client.adapter.OrderClientAdapter;
+import com.ecommerce.productservice.common.service.ImageService;
 import com.ecommerce.productservice.outbox.service.OutboxService;
 import com.ecommerce.productservice.product.entity.Product;
 import com.ecommerce.productservice.product.repository.ProductRepository;
@@ -39,6 +40,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final OutboxService outboxService;
     private final OrderClientAdapter orderClientAdapter;
     private final CacheManager cacheManager;
+    private final ImageService imageService;
 
     @Override
     @Transactional
@@ -158,6 +160,9 @@ public class ReviewServiceImpl implements ReviewService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Yorum bulunamadı veya size ait değil.", "REVIEW_NOT_FOUND"));
 
+        // Hard delete öncesi yorumun görsellerini yakala (sonra MinIO'dan silinecek)
+        List<String> reviewImageUrls = review.getImageUrls();
+
         reviewRepository.delete(review);
 
         // Rating aggregate'ini güncelle
@@ -166,6 +171,9 @@ public class ReviewServiceImpl implements ReviewService {
         Product deletedReviewProduct = productRepository.findById(review.getProduct().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Ürün bulunamadı.", "PRODUCT_NOT_FOUND"));
         outboxService.publishProductUpdatedEvent(deletedReviewProduct);
+
+        // Yorum görsellerini MinIO'dan temizle (best-effort)
+        imageService.deleteImages(reviewImageUrls);
 
         log.info("Yorum silindi ve rating güncellendi. ReviewId: {}", reviewId);
     }

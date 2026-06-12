@@ -56,6 +56,7 @@ Bu dosya servis bazında yapılacak iş listesini tutar. Endpoint, business logi
 - [ ] **Yeni kart ekleme endpoint'i**
 - [ ] **Sub-merchant mantığı tamamlanması** — sub-merchant create, update, suspend tam akış.
 - [ ] **Abonelik bilgileri endpoint'leri** — `GET /subscriptions/me`, `POST /subscriptions/cancel`, upgrade/downgrade.
+- [ ] **🐞 Paket değiştirme endpoint'i YOK (2026-06-11 tespit)** — Frontend `POST /api/v1/subscriptions/change-plan` çağırıyor (`tenantService.changeSubscriptionPlan`) ama `SubscriptionController`'da bu mapping yok → `NoResourceFoundException` ("No static resource ...") 500 dönüyor. Mevcut sadece `GET /plans`, `GET /tenants/{tenantId}`. **Eklenecek:** `POST/PUT /subscriptions/change-plan` (`{tenantId, planId}`) — plan upgrade/downgrade iş kuralı (kalan gün/fiyat farkı/prorate, iyzico yeni tahsilat) netleştirilip yazılacak. Frontend `MerchantSubscription` zaten bağlı, sadece backend eksik.
 - [ ] **Outbox cleanup scheduler** (TECHNICAL-DEBT 🟠)
 - [ ] **PaymentServiceFallback aktifleştir** (TECHNICAL-DEBT 🟠 — yorum satırında + tip hatası)
 
@@ -104,6 +105,9 @@ Mevcut `processPayment` abonelik ödemesi için. Sipariş ödemesi ayrı bir end
 
 **Genel durum:** Manuel stok ekleme, listeleme oturmuş. Sipariş entegrasyonu eksik.
 
+- [x] **Warehouse tam CRUD + yaşam döngüsü** ✅ 2026-06-11 (FW-1) — GET tekil, PUT (ad+lokasyon), PATCH status (aktif/pasif), DELETE (boşsa, stok varsa 409). Pasif depoya stok eklenemez. Frontend `MerchantWarehousePage` düzenle/sil/aktif-pasif aksiyonları.
+- [x] **Depo pasif/aktif → satış senkronu** ✅ 2026-06-11 — `setActive` propagation: depo pasife alınınca o depodaki ürünler için (başka aktif depoda stoğu yoksa) `STOCK_STATUS_CHANGED(inStock=false)`, aktife alınınca `inStock=true`. `existsAvailableInActiveWarehouse` aggregate.
+- [ ] **Pasif depodan sipariş rezervasyonu engeli** 🟡 — `findWithSufficientStockLocked` (PESSIMISTIC_WRITE) hâlâ pasif depodan stok seçebilir. `warehouse.isActive` join'i lock contention riski taşıdığı için FW-1'de dokunulmadı. Çözüm: lock'lu sorguya dokunmadan ya seçim öncesi aktif-depo filtresi ya da `FOR UPDATE OF s` ile dar lock.
 - [ ] **IDOR kapatma — product sahipliği kontrolü** (TECHNICAL-DEBT 🔴).
 - [ ] **Inbox aktif değil — duplicate stok düşmesi riski** (TECHNICAL-DEBT 🔴 → çözüm: `BaseInbox` aktifleşmiş ama `InboxService.isMessageProcessed` consumer'da kullanılmıyor).
 - [ ] **Stok eşik bazlı uyarı** — `low_stock_threshold` field'ı var, mağaza sahibine bildirim event'i (mail-service ile).
@@ -130,8 +134,8 @@ Mevcut `processPayment` abonelik ödemesi için. Sipariş ödemesi ayrı bir end
 **Genel durum:** En zengin servis, en çok eksik de burada (tracer bullet ile çoğu yer placeholder).
 
 ### Mağaza yönetimi (kritik)
-- [ ] **Mağaza dondurma (suspend → reactivate).**
-- [ ] **Mağaza silme** (soft delete + cascade davranışı: ürünler, stok, kart bilgileri).
+- [x] **Mağaza duraklatma → yeniden açma** ✅ 2026-06-11 (FW-2) — owner `pause`/`resume` (ACTIVE↔PASSIVE), ürünler satıştan kalkar/döner (TENANT_STATUS_CHANGED → search/product). Admin `SUSPENDED` akışı henüz yok (platform-admin auth gerekli).
+- [x] **Mağaza kapatma (CLOSED)** ✅ 2026-06-11 (FW-2) — owner `close`, terminal; ürünler satıştan kalkar, üyelerin authz erişimi kesilir. (Cascade soft-delete: ürün/stok/kart kayıtlarının fiziksel temizliği henüz yapılmadı — gerekiyorsa ayrı iş.)
 - [ ] **`updateTenantCritical` business kuralları.** Önemli alanlar (vergi no, IBAN, sub-merchant data) güncelleme — onay süreci, e-mail doğrulama, belki re-verification.
 - [ ] **`updateTenantCritical`'a IBAN ve diğer kritik alan güncellemesi.** Sub-merchant data güncellenecekse iyzico API'sine yansıtılmalı.
 - [ ] **`createTenant` hata kodu dönüşü** — şu an generic 500 dönüyor, frontend stepper'da hatalı alanı işaretleyemiyor. errorCode + field-level validation döndürülecek.

@@ -27,6 +27,7 @@ public final class EventConstants {
     public static final String EVENT_TENANT_CREATED = "TENANT_CREATED_EVENT";
     public static final String EVENT_TENANT_ACTIVATED = "TENANT_ACTIVATED_EVENT";
     public static final String EVENT_TENANT_PAYMENT_FAILED = "TENANT_PAYMENT_FAILED_EVENT";
+    public static final String EVENT_TENANT_STATUS_CHANGED = "TENANT_STATUS_CHANGED_EVENT";
 
     public static final String EVENT_ORDER_CREATED          = "ORDER_CREATED_EVENT";
     public static final String EVENT_ORDER_CONFIRMED        = "ORDER_CONFIRMED_EVENT";

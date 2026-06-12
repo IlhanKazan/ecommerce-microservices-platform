@@ -17,6 +17,7 @@ import {
     Logout as LogoutIcon,
     SwapHoriz as SwitchStoreIcon,
     Warehouse as WarehouseIcon,
+    Storefront as StorefrontIcon,
 } from '@mui/icons-material';
 import { useMerchantStore } from '../../../store/useMerchantStore';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -53,6 +54,14 @@ const MerchantLayout: React.FC = () => {
     const handleSwitchStore = () => {
         clearMerchantSession();
         navigate('/merchant/select');
+    };
+
+    const handleBackToPlatform = () => {
+        // activeTenant'ı BİLEREK temizlemiyoruz: temizlersek MerchantProtectedRoute
+        // (henüz /merchant route'undayken) activeTenant null olunca /merchant/select'e
+        // yönlendiriyor ve ana sayfaya geçişi eziyor. activeTenant müşteri tarafını
+        // etkilemediği için tutmak zararsız; mağaza değiştirmek "Mağaza Değiştir" ile.
+        navigate('/');
     };
 
     const handleLogout = () =>
@@ -202,6 +211,15 @@ const MerchantLayout: React.FC = () => {
                             <Typography variant="body2" fontWeight="bold">
                                 {user?.firstName} {user?.lastName}
                             </Typography>
+                        </MenuItem>
+                        <Divider />
+                        <MenuItem onClick={handleBackToPlatform}>
+                            <StorefrontIcon fontSize="small" sx={{ mr: 1 }} />
+                            Platforma Dön
+                        </MenuItem>
+                        <MenuItem onClick={handleSwitchStore}>
+                            <SwitchStoreIcon fontSize="small" sx={{ mr: 1 }} />
+                            Mağaza Değiştir
                         </MenuItem>
                         <Divider />
                         <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>

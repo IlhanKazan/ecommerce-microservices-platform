@@ -103,22 +103,23 @@ SERVICE-WORK / TECHNICAL-DEBT  →  TODO.md "Aktif"  →  TODO.md "✅ Tamamlanm
 - [x] `HomePage.tsx` + `ProductListPage.tsx`: `inStock: true` zorunlu filtresi kaldırıldı (tüm ürünler listelenir, kart "STOKTA YOK" rozetiyle ayırt eder)
 - **Build gerekiyor:** stock-service + search-service → `docker compose up -d --build stock-service search-service`
 
-### FB-9: Review sistemi (mock + entegrasyon)
-**Sorun:** Ürün sayfalarında review/yorum bölümü yok.
-- [ ] Backend: `review` entity + endpoint'leri (product-service'e ya da ayrı servis — karar verilecek)
-  - `POST /products/{id}/reviews` — yorum ekle (auth gerekli)
-  - `GET /products/{id}/reviews` — sayfalı liste (public)
-  - Rating ortalaması `ProductDetailInfo`'ya ekle
-- [ ] Backend: Geliştirme sırasında mock data üretici (seed script ya da endpoint)
-- [ ] Frontend: ürün detay sayfasına yıldız rating + yorum listesi + yorum formu
-- [ ] Frontend: Yorum gönderme mutation (React Query, idempotency key)
+### FB-9: Review sistemi (mock + entegrasyon) ✅ 2026-06-10 (kod tarafı)
+**Çözüm:** product-service `review/` paketi — full stack.
+- [x] Backend: `ProductReview` + `ReviewVote` entity, `ReviewStatus` enum, `ReviewRepository`/`ReviewVoteRepository`
+  - `POST /api/v1/public/products/{productId}/reviews` — yorum ekle (auth) + görsel upload endpoint'i
+  - `GET /api/v1/public/products/{productId}/reviews` — sayfalı liste (public)
+  - `PATCH .../reviews/...` (vote/seller response), `DELETE .../reviews/...`
+  - `InternalReviewController PATCH /reviews/{id}/sentiment` (AI sentiment için altyapı hazır)
+- [x] Frontend: `ProductDetailPage` yıldız `Rating` + yorum listesi + yorum formu (görsel ekli), `useGetProductReviews` + create mutation (`useProductQueries`)
+- [ ] Mock data üretici (seed) — yapılmadı, opsiyonel (review sistemi onsuz çalışıyor)
+- [ ] **Runtime verify (kullanıcı):** yorum ekle → listede gör → rating ortalaması ürün detayda güncellensin
 
-### FB-10: Public tenant tanıtım sayfası
-**Sorun:** Tenant'ların müşteriye dönük public profil sayfası yok.
-- [ ] Backend: `GET /public/tenants/{tenantId}` — tenant adı, logo, açıklama, kategori
-- [ ] Backend: `GET /public/tenants/{tenantId}/products` — tenant'ın aktif ürünleri (sayfalı, filtreli)
-- [ ] Frontend: `/store/{tenantId}` route — banner, logo, ürün grid
-- [ ] Frontend: Ürün kartlarındaki tenant adı bu sayfaya link versin
+### FB-10: Public tenant tanıtım sayfası ✅ 2026-06-10 (kod tarafı)
+**Çözüm:** storefront endpoint + StorePage.
+- [x] Backend: `PublicTenantController GET /api/v1/public/tenants/{tenantId}/storefront` — tenant adı/logo/açıklama; product + search servisleri tüketip enrich ediyor
+- [x] Frontend: `/store/:tenantId` route + `StorePage.tsx` (banner, logo, ürün grid — ürünler search-service tenant filtresiyle gelir)
+- [x] Frontend: ürün kartlarındaki tenant adı bu sayfaya link veriyor
+- [ ] **Runtime verify (kullanıcı):** ürün kartından `/store/{tenantId}`'a git → banner + tenant ürünleri yüklensin
 
 ### FB-11: UI/UX genel iyileştirme ✅ 2026-06-10
 **Kapsam:** Tüm frontend — tema sistemi + müşteri ekranları + account + merchant. Trendyol/Hepsiburada ayarında.
@@ -152,26 +153,52 @@ SERVICE-WORK / TECHNICAL-DEBT  →  TODO.md "Aktif"  →  TODO.md "✅ Tamamlanm
 
 Tüm controller endpoint'leri tarandı; CRUD asimetrileri ve eksik temel akışlar. **Not:** stok ekle/kaldır (`manual-add`/`manual-remove`), sepet, sipariş, adres, ürün CRUD **simetrik ve tam** — sorun yok.
 
-### FW-1: Depo (warehouse) güncelleme & silme yok 🟠
-- [ ] `WarehouseController` sadece `POST` (create) + `GET` (list). Depo açılıyor ama **düzenlenemiyor/silinemiyor**.
-- [ ] Eklenecek: `PUT /warehouses/{id}` (ad/lokasyon güncelle), `DELETE /warehouses/{id}` (içinde stok yoksa sil — stok varsa 409).
-- Dosya: `stock-service` `WarehouseController` + service/repo. Frontend: `MerchantWarehousePage`'e düzenle/sil aksiyonları.
+### FW-1: Depo (warehouse) tam CRUD + yaşam döngüsü ✅ 2026-06-11 (kod tarafı)
+Salt update/delete değil, warehouse eksiksiz kaynak haline getirildi.
+- [x] `GET /warehouses/{id}` (tekil detay), `PUT /warehouses/{id}` (ad+lokasyon; code immutable), `PATCH /warehouses/{id}/status` (aktif/pasif soft), `DELETE /warehouses/{id}` (boşsa kalıcı sil, stok varsa **409**)
+- [x] 409 için lokal `WarehouseNotEmptyException` + `StockExceptionHandler` mapping; not-found `ResourceNotFoundException`→404
+- [x] `StockRepository.existsByTenantIdAndWarehouseId` (delete ön kontrolü)
+- [x] Pasif depoya stok eklemeyi engelle (`addManualStock` `WAREHOUSE_INACTIVE` guard)
+- [x] Frontend `MerchantWarehousePage`: düzenle/sil dialog, aktif-pasif Switch+chip, 409 toast, pasif depoda "Stok Gir" disabled; `useUpdateWarehouse`/`useSetWarehouseStatus`/`useDeleteWarehouse` hooks (idempotency-key)
+- **Runtime verify (kullanıcı):** build (stock-service) + frontend; düzenle/pasif/sil + stoklu depo 409 testi
 
-### FW-2: Mağaza askıya alma & kapatma akışı yok 🟠
-- [ ] `TenantStatus.SUSPENDED` / `CLOSED` enum'da var ama bu durumlara **geçiren hiçbir endpoint/iş akışı yok** (sadece repo query'de `status != 'CLOSED'` filtresi).
-- [ ] Eklenecek: mağaza sahibi için "mağazayı kapat" (`CLOSED`), admin için "askıya al" (`SUSPENDED`) endpoint'leri + ilgili event/mail + authz cache evict (bkz. TECHNICAL-DEBT "Authz cache evict eksik").
-- Dosya: `user-tenant-service` `TenantController` + `TenantStateService`.
+### FW-2: Mağaza duraklatma & kapatma akışı ✅ 2026-06-11 (kod tarafı)
+Owner-only yaşam döngüsü + tam satış etkisi (ürünler gerçekten satıştan kalkar).
+- [x] `TenantStateService` pause/resume/close (guard'lı: ACTIVE→PASSIVE, PASSIVE→ACTIVE, *→CLOSED terminal) + `TenantLifecycleService` orchestration; `TenantController` `POST /{id}/pause|resume|close` (OWNER)
+- [x] Tek event: `TENANT_STATUS_CHANGED_EVENT` (`TenantStatusChangedEventPayload`, additive) → outbox
+- [x] Authz: `findMemberRole` `status != 'CLOSED'` filtresi + close'ta tüm üyelerin `evictUserCache` + storefront cache evict
+- [x] Tam satış etkisi: **search-service** `TenantEventConsumer` → `updateByQuery` `tenantActive` flip (arama zaten `tenantActive=true` filtreliyor); **product-service** `validateAndGetProduct` storefront status guard → `STORE_NOT_AVAILABLE` (checkout integrity)
+- [x] mail-service: `TENANT_STATUS_CHANGED` case + handler + 3 şablon (paused/closed/reactivated)
+- [x] Frontend: `StoreLifecycleSection` (MerchantSettings "Tehlikeli Bölge" — duraklat/geri aç + KAPAT onaylı dialog), `StorePage` kapalı mağaza durumu, `pauseTenant/resumeTenant/closeTenant` service
+- **iyzico:** yapılacak iş yok (SDK 2.0.140 submerchant disable/delete desteklemiyor)
+- **Kapsam dışı bırakıldı:** Admin `SUSPENDED` akışı (platform-admin auth altyapısı yok — ayrı iş)
+- **Runtime verify (kullanıcı):** build (event-contracts→common-lib→UTS, product, search, mail) → mağaza duraklat → ürünler aramadan/storefront'tan düşsün, checkout `STORE_NOT_AVAILABLE`, Mailhog'da mail; resume → geri gelsin; close → owner erişimi kesilsin
 
-### FW-3: MinIO görsel orphan — silme entegrasyonu yok 🟡
-- [ ] Hiçbir serviste MinIO `removeObject` yok. Ürün/profil/tenant görseli **değiştirilince veya ürün silinince eski dosya MinIO'da kalıyor** (storage leak; zamanla şişer).
-- [ ] Eklenecek: `ImageService.deleteImage(url)`; ürün update'te listeden çıkan görselleri, ürün delete'te tüm görselleri, profil/logo değişiminde eskisini sil. (Tenant-bazlı izolasyon borcuyla birlikte ele alınabilir.)
-- Dosya: `ImageService` (product-service + user-tenant-service).
+### FW-3: MinIO görsel orphan — silme entegrasyonu ✅ 2026-06-11
+- [x] `ImageService.deleteImage(url)` + `deleteImages(collection)` eklendi (product + UTS). Best-effort: hata fırlatmaz, loglar; URL host-agnostik parse (eski `http://minio:9000/...` kayıtları da silinir).
+- [x] Wiring:
+  - **product-service** — `updateProduct` (yeni listede/main'de olmayan eski görseller), `deleteProduct` (tüm görseller), `ReviewServiceImpl.deleteReview` (yorum görselleri).
+  - **user-tenant-service** — `TenantProfileService.uploadLogo` (eski logo), `UserService.updateProfileImage` (eski profil foto; controller'dan servise taşındı), `TenantStateService.closeTenant` (logo), `UserService.deleteUser` (profil foto).
+- Tasarım: silmeler save'den SONRA best-effort; daha sıkı istenirse `TransactionSynchronization.afterCommit`.
+- [x] **Multi-image upload bug FIX** ✅ 2026-06-12 — Frontend `MultiImageUpload` (`ImageUploadField.tsx`) bidirectional-sync feedback loop'u yüzünden ek görseller asla kalıcı olmuyordu (her ürün tek fotoda kalıyordu). İç `items` state + iki `useEffect` (parent↔child mirror) kaldırıldı; bileşen tam kontrollü yapıldı (`valuesRef` ile stale-closure'sız). Detay sayfasına (`ProductDetailPage.tsx`) tıklanabilir lightbox (ileri/geri + thumbnail) eklendi. Multi-foto + galeri artık uçtan uca çalışıyor. Backend zaten destekliyordu (değişmedi).
+- [ ] **Kalan (opsiyonel):** tenant-bazlı key-prefix izolasyonu hâlâ ayrı borç (TECHNICAL-DEBT "MinIO veri izolasyonu").
 
 ### FW-4: Kategori yönetimi (admin CRUD) yok — incelenecek 🟢
-- [ ] `CategoryController` sadece public read (`GET` list + slug). Yeni kategori yalnızca Flyway seed ile ekleniyor; dinamik kategori/admin paneli için `POST/PUT/DELETE` gerekir. Admin paneli kapsama alınırsa iş, değilse kabul edilebilir.
+- [x] **Zengin kategori seed eklendi** ✅ 2026-06-11 — `V7__seed_categories.sql` (product-service): Trendyol-vari 10 ana + ~55 alt kategori (2 seviye, slug+full_path+level), `ON CONFLICT (slug) DO NOTHING` ile idempotent.
+- [ ] `CategoryController` sadece public read (`GET` list + slug). Dinamik kategori/admin paneli için `POST/PUT/DELETE` gerekir → **FW-6 Süper Admin Panel** kapsamında ele alınacak.
 
 ### FW-5: SubMerchant silme yok — değerlendirilecek 🟢
-- [ ] `SubMerchantController` create + update var, delete yok. iyzico alt üye işyeri kaldırma gerekli mi (mağaza kapatma akışıyla — FW-2 — bağlantılı) değerlendirilmeli.
+- [ ] `SubMerchantController` create + update var, delete yok. iyzico alt üye işyeri kaldırma gerekli mi (mağaza kapatma akışıyla — FW-2 — bağlantılı) değerlendirilmeli. **Not:** iyzico marketplace modelinde submerchant bağımsız ödeme almaz (para sadece platform split-payment başlatınca akar) + SDK 2.0.140 disable/delete sunmuyor → mağaza kapatınca iyzico tarafı işlem GEREKMİYOR. Açık kalan tek konu: CLOSED'da tenant'ın **platform aboneliğinin** yenileme tahsilatı durmalı (payment-service subscription, submerchant değil).
+
+### FW-6: Süper Admin (Platform Yönetim) Paneli 🟠 — planlanacak
+Platformun tamamını yöneten ayrı bir admin arayüzü + backend yetkilendirme katmanı. Şu an **hiç yok** (`UserType.PLATFORM_ADMIN` enum'da duruyor ama hiçbir yere bağlı değil; mevcut `/public/admin/*` endpoint'leri korumasız).
+- [ ] **Platform-admin auth altyapısı** — Keycloak realm role (ör. `platform-admin`) veya `UserType.PLATFORM_ADMIN` kontrolü; `@PreAuthorize` ile korunan `/api/v1/admin/**` katmanı. (Mevcut korumasız `/public/admin/reindex|resync` da buraya taşınmalı.)
+- [ ] **Tüm mağazaları yönet** — listele/filtrele, **askıya al (`SUSPENDED`)** + reaktive et (FW-2'nin admin tarafı buraya), mağaza detayını gör.
+- [ ] **Kategori yönetimi (CRUD)** — FW-4: `POST/PUT/DELETE` kategori, ağaç düzenleme, görsel/ikon.
+- [ ] **Kullanıcı yönetimi** — platform kullanıcıları listele, rol/ban.
+- [ ] **Platform metrikleri** — toplam mağaza/ürün/sipariş, aktif abonelikler (Grafana zaten var ama iş-metriği ekranı ayrı).
+- [ ] **Frontend** — ayrı `/admin` route grubu, `PlatformAdminProtectedRoute`, admin layout. Mevcut `MerchantProtectedRoute` pattern'i örnek.
+- Bağlam: FW-2 admin SUSPENDED + FW-4 kategori CRUD bu panelin parçaları. Kapsam geniş → kendi sprint'i olmalı.
 
 ---
 

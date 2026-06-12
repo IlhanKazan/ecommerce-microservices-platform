@@ -10,7 +10,11 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist_keycloak
 *.local
+
+# Keycloakify build/dev sırasında üretilen Keycloak default kaynakları
+public/keycloakify-dev-resources
 
 # Editor directories and files
 .vscode/*

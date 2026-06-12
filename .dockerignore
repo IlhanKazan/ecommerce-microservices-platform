@@ -1,0 +1,22 @@
+# Bu dosya yalnızca build context = repo kökü olan image'ı etkiler (keycloak servisi).
+# Backend servisleri `./backend` context kullandığından bundan etkilenmez.
+# keycloak Dockerfile'ı sadece backend/keycloak-spi + frontend/e_commerce_frontend kaynağına ihtiyaç duyar;
+# gerisini context'e dahil etmeyip build'i hızlandırıyoruz.
+
+**/node_modules
+**/target
+**/dist
+**/dist-ssr
+**/dist_keycloak
+**/build
+**/storybook-static
+
+.git
+.github
+.idea
+.vscode
+**/*.log
+
+# Ağır runtime veri dizinleri
+infrastructure/elasticsearch_data
+infrastructure/**/data

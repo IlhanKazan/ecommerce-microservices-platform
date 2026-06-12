@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import {
     Box, Typography, IconButton, CircularProgress,
     Paper, Stack,
@@ -110,21 +110,15 @@ interface MultiImageUploadProps {
 }
 
 export function MultiImageUpload({ label, values, onChange, onError, max = 8, tenantId, uploadFn }: MultiImageUploadProps) {
-    // Internal state — upload süresince parent closure stale kalmaması için
-    const [items, setItems] = useState<ImagePreview[]>(values);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Edit mode açılışında ya da parent reset'te sync et
-    useEffect(() => { setItems(values); }, [values]);
-
-    // Uploading olmayan hazır URL'leri parent'a bildir
-    useEffect(() => {
-        onChange(items.filter((i) => !i.uploading && !!i.url));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [items]);
+    // Tam kontrollü: parent `values` tek doğruluk kaynağı (placeholder'lar dahil).
+    // Async upload callback'lerinde stale closure'a düşmemek için son değeri ref'te tut.
+    const valuesRef = useRef(values);
+    valuesRef.current = values;
 
     const handleFiles = useCallback(async (files: File[]) => {
-        const remaining = max - items.length;
+        const remaining = max - valuesRef.current.length;
         if (remaining <= 0) { onError(`En fazla ${max} görsel eklenebilir.`); return; }
 
         const toProcess = files.slice(0, remaining).filter((f) => {
@@ -135,7 +129,7 @@ export function MultiImageUpload({ label, values, onChange, onError, max = 8, te
         if (!toProcess.length) return;
 
         const placeholders = toProcess.map(createImagePreviewPlaceholder);
-        setItems((prev) => [...prev, ...placeholders]);
+        onChange([...valuesRef.current, ...placeholders]);
 
         const doUpload = uploadFn ?? ((f: File) => productService.uploadProductImage(tenantId!, f));
 
@@ -144,24 +138,24 @@ export function MultiImageUpload({ label, values, onChange, onError, max = 8, te
             try {
                 const url = await doUpload(file);
                 URL.revokeObjectURL(ph.previewUrl);
-                setItems((prev) => prev.map((item) =>
+                onChange(valuesRef.current.map((item) =>
                     item.id === ph.id ? createImagePreviewFromUrl(url) : item,
                 ));
             } catch {
                 URL.revokeObjectURL(ph.previewUrl);
                 onError(`"${file.name}" yüklenemedi.`);
-                setItems((prev) => prev.filter((item) => item.id !== ph.id));
+                onChange(valuesRef.current.filter((item) => item.id !== ph.id));
             }
         });
-    }, [items, max, onError, tenantId, uploadFn]);
+    }, [max, onChange, onError, tenantId, uploadFn]);
 
-    const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
+    const removeItem = (id: string) => onChange(valuesRef.current.filter((i) => i.id !== id));
 
     return (
         <Box>
             <Typography variant="caption" color="text.secondary" fontWeight={500}>{label}</Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, mt: 0.5 }}>
-                {items.map((img) => (
+                {values.map((img) => (
                     <Paper key={img.id} variant="outlined"
                            sx={{ aspectRatio: '1', position: 'relative', overflow: 'hidden' }}>
                         <Box component="img" src={img.previewUrl}
@@ -179,12 +173,12 @@ export function MultiImageUpload({ label, values, onChange, onError, max = 8, te
                         )}
                     </Paper>
                 ))}
-                {items.length < max && (
+                {values.length < max && (
                     <Paper variant="outlined" onClick={() => inputRef.current?.click()}
                            sx={{ aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', borderStyle: 'dashed', '&:hover': { borderColor: 'primary.main' } }}>
                         <Stack alignItems="center" color="text.disabled" spacing={0.5}>
                             <AddPhotoAlternate />
-                            <Typography variant="caption">{items.length}/{max}</Typography>
+                            <Typography variant="caption">{values.length}/{max}</Typography>
                         </Stack>
                     </Paper>
                 )}

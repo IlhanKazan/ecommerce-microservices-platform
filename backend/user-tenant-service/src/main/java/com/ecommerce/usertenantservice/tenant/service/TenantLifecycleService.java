@@ -31,6 +31,7 @@ public class TenantLifecycleService {
     private final PaymentServiceClientAdapter paymentServiceClientAdapter;
     private final TenantProfileService tenantProfileService;
     private final TenantAddressService tenantAddressService;
+    private final AuthzCacheService authzCacheService;
 
     // TODO [10.02.2026 15:04]: Kullanıcının mevcutta ödemesi tamamlanamamış bir mağazası varsa o mağaza için abonelik ödemesi alınacak bir metoda ihtiyacımız var.
     // TODO [10.02.2026 11:21]: Idompotency dusunulecek!
@@ -102,6 +103,35 @@ public class TenantLifecycleService {
             log.warn("Telafi ödemesi YİNE başarısız.");
             throw new PaymentFailedException(paymentResult.errorMessage(), tenant.getId());
         }
+    }
+
+    /** Mağaza sahibi mağazasını duraklatır. Ürünleri satıştan kalkar (TENANT_STATUS_CHANGED event). */
+    @Transactional
+    public void pauseTenant(Long tenantId) {
+        Tenant tenant = tenantProfileService.getTenantById(tenantId);
+        tenantStateService.pauseTenant(tenant);
+        tenantProfileService.evictStorefrontCache(tenantId);
+        log.info("Mağaza duraklatıldı. TenantId: {}", tenantId);
+    }
+
+    /** Duraklatılmış mağazayı yeniden açar. Ürünleri tekrar satışa döner. */
+    @Transactional
+    public void resumeTenant(Long tenantId) {
+        Tenant tenant = tenantProfileService.getTenantById(tenantId);
+        tenantStateService.resumeTenant(tenant);
+        tenantProfileService.evictStorefrontCache(tenantId);
+        log.info("Mağaza yeniden açıldı. TenantId: {}", tenantId);
+    }
+
+    /** Mağazayı kalıcı kapatır. Tüm üyelerin authz cache'i temizlenir (rol artık NONE). */
+    @Transactional
+    public void closeTenant(Long tenantId) {
+        Tenant tenant = tenantProfileService.getTenantById(tenantId);
+        tenantStateService.closeTenant(tenant);
+        tenant.getMembers().forEach(member ->
+                authzCacheService.evictUserCache(member.getUser().getKeycloakId()));
+        tenantProfileService.evictStorefrontCache(tenantId);
+        log.info("Mağaza kalıcı olarak kapatıldı. TenantId: {}", tenantId);
     }
 
     public PaymentProcessRequest formatFeignRequest(PaymentCardInfo cardInfo, Long planId, User user, Address addressToUse, Tenant tenant){

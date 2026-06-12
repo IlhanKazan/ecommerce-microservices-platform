@@ -28,6 +28,7 @@ import type { TenantDetail, UpdateTenantGeneralRequest, UpdateTenantCriticalRequ
 import type { Address, CreateAddressRequest } from '../../../types/user';
 import { BusinessType, AddressType } from '../../../types/enums';
 import TeamManagementSection from "../components/TeamManagementSection.tsx";
+import StoreLifecycleSection from "../components/StoreLifecycleSection.tsx";
 
 interface MerchantFormState {
     name: string;
@@ -567,6 +568,13 @@ const MerchantSettings: React.FC = () => {
                             <TeamManagementSection
                                 tenantId={activeTenant!.id}
                                 members={tenantData.tenant.members}
+                            />
+                        )}
+
+                        {tenantData?.tenant && (
+                            <StoreLifecycleSection
+                                tenantId={activeTenant!.id}
+                                status={tenantData.tenant.status}
                             />
                         )}
 

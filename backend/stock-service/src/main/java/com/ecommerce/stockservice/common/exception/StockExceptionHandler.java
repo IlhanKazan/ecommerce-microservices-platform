@@ -48,4 +48,19 @@ public class StockExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
+
+    @ExceptionHandler(WarehouseNotEmptyException.class)
+    public ResponseEntity<ApiErrorResponse> handleWarehouseNotEmpty(
+            WarehouseNotEmptyException ex, WebRequest request) {
+        log.warn("Stoklu depo silme reddedildi: {}", ex.getMessage());
+        ApiErrorResponse body = new ApiErrorResponse(
+                ex.getMessage(),
+                request.getDescription(false).replace("uri=", ""),
+                HttpStatus.CONFLICT.value(),
+                LocalDateTime.now(),
+                ex.getErrorCode(),
+                null
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
 }

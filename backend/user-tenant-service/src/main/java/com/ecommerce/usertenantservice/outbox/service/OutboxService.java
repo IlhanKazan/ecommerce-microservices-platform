@@ -6,4 +6,5 @@ public interface OutboxService {
     void publishTenantCreatedEvent(Tenant tenant);
     void publishTenantActivatedEvent(Tenant tenant);
     void publishTenantPaymentFailedEvent(Tenant tenant);
+    void publishTenantStatusChangedEvent(Tenant tenant);
 }

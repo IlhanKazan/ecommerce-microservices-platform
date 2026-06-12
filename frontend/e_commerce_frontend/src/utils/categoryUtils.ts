@@ -34,6 +34,29 @@ export function collectCategoryIds(
 }
 
 /**
+ * Hedef kategoriye giden kök→hedef ID zincirini döner (hedef dahil).
+ * Sidebar'da seçili kategorinin ata düğümlerini açık başlatmak için kullanılır.
+ *
+ * @example
+ * findCategoryPath(18, tree); // [5, 12, 18]  (Giyim → Üst Giyim → Kazak)
+ */
+export function findCategoryPath(
+    targetId: number,
+    tree: CategoryResponse[]
+): number[] {
+    function dfs(cats: CategoryResponse[], trail: number[]): number[] | null {
+        for (const cat of cats) {
+            const next = [...trail, cat.id];
+            if (cat.id === targetId) return next;
+            const found = dfs(cat.subCategories, next);
+            if (found) return found;
+        }
+        return null;
+    }
+    return dfs(tree, []) ?? [];
+}
+
+/**
  * Ağacı düz liste haline getirir — dropdown render için kullanışlı.
  * level bilgisi indent için kullanılabilir.
  */

@@ -43,6 +43,7 @@ export default function StorePage() {
 
     const products = productsPage?.content ?? [];
     const totalPages = productsPage?.totalPages ?? 1;
+    const isStoreOpen = storefront.status === 'ACTIVE';
 
     return (
         <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', pb: 6 }}>
@@ -96,7 +97,19 @@ export default function StorePage() {
                     </Box>
                 </Paper>
 
+                {/* Mağaza kapalı/duraklatılmış uyarısı */}
+                {!isStoreOpen && (
+                    <Box sx={{ mt: 5 }}>
+                        <EmptyState
+                            icon={<StorefrontOutlined />}
+                            title="Bu mağaza şu an kapalı"
+                            description="Mağaza geçici olarak satışa kapatılmıştır. Lütfen daha sonra tekrar deneyin."
+                        />
+                    </Box>
+                )}
+
                 {/* Ürünler */}
+                {isStoreOpen && (
                 <Box sx={{ mt: 5 }}>
                     <Typography variant="h5" fontWeight={800} sx={{ mb: 3 }}>
                         Mağaza Ürünleri
@@ -139,6 +152,7 @@ export default function StorePage() {
                         </>
                     )}
                 </Box>
+                )}
             </Container>
         </Box>
     );
