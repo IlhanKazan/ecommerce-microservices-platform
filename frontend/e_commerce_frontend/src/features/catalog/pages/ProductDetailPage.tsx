@@ -21,6 +21,9 @@ import {
     CheckCircle,
     RateReview,
     Delete as DeleteIcon,
+    Close as CloseIcon,
+    ChevronLeft,
+    ChevronRight,
 } from '@mui/icons-material';
 
 import { useAddToBasket } from '../../../query/useBasketQueries';
@@ -80,6 +83,7 @@ const ProductDetailPage: React.FC = () => {
     const [quantity, setQuantity] = useState(1);
     const [tabValue, setTabValue] = useState(0);
     const [activeImage, setActiveImage] = useState<string | null>(null);
+    const [lightboxOpen, setLightboxOpen] = useState(false);
 
     // Yorumlar — sayfalama
     const [reviewPage] = useState(0);
@@ -196,6 +200,13 @@ const ProductDetailPage: React.FC = () => {
 
     const isAvailableToBuy = product.status === 'ACTIVE' && product.salesStatus === 'ON_SALE';
     const allImages = [product.mainImageUrl, ...(product.imageUrls ?? [])].filter(Boolean) as string[];
+    const hasImages = allImages.length > 0;
+    const activeIndex = Math.max(0, allImages.indexOf(activeImage ?? ''));
+    const showImageAt = (idx: number) => {
+        if (allImages.length === 0) return;
+        const len = allImages.length;
+        setActiveImage(allImages[((idx % len) + len) % len]);
+    };
 
     return (
         <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', pb: 8 }}>
@@ -243,7 +254,13 @@ const ProductDetailPage: React.FC = () => {
                             >
                                 <FavoriteBorder />
                             </IconButton>
-                            <Box sx={{ p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: 450 }}>
+                            <Box
+                                onClick={() => hasImages && setLightboxOpen(true)}
+                                sx={{
+                                    p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: 450,
+                                    cursor: hasImages ? 'zoom-in' : 'default',
+                                }}
+                            >
                                 <img
                                     src={activeImage || photo}
                                     alt={product.name}
@@ -272,6 +289,72 @@ const ProductDetailPage: React.FC = () => {
                                 ))}
                             </Stack>
                         )}
+
+                        {/* ─── Lightbox ──────────────────────────────────── */}
+                        <Dialog
+                            open={lightboxOpen}
+                            onClose={() => setLightboxOpen(false)}
+                            maxWidth="lg"
+                            fullWidth
+                            slotProps={{ paper: { sx: { bgcolor: 'rgba(20,20,20,0.97)', backgroundImage: 'none' } } }}
+                        >
+                            <DialogContent sx={{ p: 0, position: 'relative' }}>
+                                <IconButton
+                                    onClick={() => setLightboxOpen(false)}
+                                    sx={{ position: 'absolute', top: 8, right: 8, zIndex: 2, color: 'white', bgcolor: 'rgba(0,0,0,.4)', '&:hover': { bgcolor: 'rgba(0,0,0,.6)' } }}
+                                >
+                                    <CloseIcon />
+                                </IconButton>
+
+                                {allImages.length > 1 && (
+                                    <IconButton
+                                        onClick={() => showImageAt(activeIndex - 1)}
+                                        sx={{ position: 'absolute', top: '50%', left: 8, transform: 'translateY(-50%)', zIndex: 2, color: 'white', bgcolor: 'rgba(0,0,0,.4)', '&:hover': { bgcolor: 'rgba(0,0,0,.6)' } }}
+                                    >
+                                        <ChevronLeft fontSize="large" />
+                                    </IconButton>
+                                )}
+
+                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '75vh', p: 2 }}>
+                                    <img
+                                        src={activeImage || photo}
+                                        alt={product.name}
+                                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                                    />
+                                </Box>
+
+                                {allImages.length > 1 && (
+                                    <IconButton
+                                        onClick={() => showImageAt(activeIndex + 1)}
+                                        sx={{ position: 'absolute', top: '50%', right: 8, transform: 'translateY(-50%)', zIndex: 2, color: 'white', bgcolor: 'rgba(0,0,0,.4)', '&:hover': { bgcolor: 'rgba(0,0,0,.6)' } }}
+                                    >
+                                        <ChevronRight fontSize="large" />
+                                    </IconButton>
+                                )}
+
+                                {allImages.length > 1 && (
+                                    <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ overflowX: 'auto', px: 2, pb: 2 }}>
+                                        {allImages.map((imgUrl, idx) => (
+                                            <Box
+                                                key={idx}
+                                                component="img"
+                                                src={imgUrl}
+                                                alt="thumbnail"
+                                                onClick={() => setActiveImage(imgUrl)}
+                                                sx={{
+                                                    width: 64, height: 64, flexShrink: 0, cursor: 'pointer',
+                                                    objectFit: 'cover', borderRadius: 1,
+                                                    border: '2px solid',
+                                                    borderColor: activeImage === imgUrl ? 'primary.main' : 'transparent',
+                                                    opacity: activeImage === imgUrl ? 1 : 0.6,
+                                                    transition: 'opacity .2s',
+                                                }}
+                                            />
+                                        ))}
+                                    </Stack>
+                                )}
+                            </DialogContent>
+                        </Dialog>
                     </Grid>
 
                     {/* ─── Sağ — Bilgiler ────────────────────────────────── */}

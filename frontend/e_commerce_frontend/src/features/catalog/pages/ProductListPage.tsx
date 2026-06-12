@@ -3,19 +3,21 @@ import { useSearchParams } from 'react-router-dom';
 import {
     Box, Typography, Alert, Pagination, Select, MenuItem, FormControl,
     Container, Stack, Paper, List, ListItemButton, ListItemText, Divider,
-    TextField, Button, Switch, FormControlLabel, IconButton, Drawer,
+    TextField, Button, Switch, FormControlLabel, IconButton, Drawer, Collapse,
     InputAdornment, type SelectChangeEvent,
 } from '@mui/material';
 import TuneIcon from '@mui/icons-material/Tune';
 import CloseIcon from '@mui/icons-material/Close';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { useSearchProducts, useGetCategories } from '../../../query/useProductQueries';
 import { useCategoryStore } from '../../../store/useCategoryStore';
-import { collectCategoryIds, flattenCategories } from '../../../utils/categoryUtils';
+import { collectCategoryIds, findCategoryPath } from '../../../utils/categoryUtils';
 import ProductCard from '../../../components/customer/ProductCard';
 import { ProductGridSkeleton } from '../../../components/shared/ProductCardSkeleton';
 import EmptyState from '../../../components/shared/EmptyState';
-import type { ProductSearchPayload } from '../../../types/product';
+import type { ProductSearchPayload, CategoryResponse } from '../../../types/product';
 
 const ITEMS_PER_PAGE = 12;
 
@@ -52,7 +54,27 @@ const ProductListPage: React.FC = () => {
         () => (categoriesLoaded ? storedCategories : (fetchedCategories ?? [])),
         [categoriesLoaded, storedCategories, fetchedCategories],
     );
-    const flatCategories = useMemo(() => flattenCategories(categoryTree), [categoryTree]);
+    // Sidebar'da açık (genişletilmiş) kategori düğümleri — varsayılan hepsi kapalı
+    const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
+
+    const toggleCategoryExpand = (id: number) => {
+        setExpandedCategories((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    // URL'den/dışarıdan bir kategori seçilince ata zincirini açık başlat
+    useEffect(() => {
+        if (selectedCategoryId !== '' && categoryTree.length > 0) {
+            const path = findCategoryPath(selectedCategoryId, categoryTree);
+            if (path.length > 0) {
+                setExpandedCategories((prev) => new Set([...prev, ...path]));
+            }
+        }
+    }, [selectedCategoryId, categoryTree]);
 
     // URL → state senkron
     useEffect(() => {
@@ -121,6 +143,45 @@ const ProductListPage: React.FC = () => {
     // Sadece ilk yüklemede (henüz veri yokken) skeleton; sonraki fetch'lerde keepPreviousData ile grid korunur
     const showSkeleton = isLoading;
 
+    const renderCategoryNodes = (nodes: CategoryResponse[], depth = 0): React.ReactNode =>
+        nodes.map((cat) => {
+            const hasChildren = cat.subCategories.length > 0;
+            const isOpen = expandedCategories.has(cat.id);
+            return (
+                <React.Fragment key={cat.id}>
+                    <ListItemButton
+                        selected={selectedCategoryId === cat.id}
+                        onClick={() => selectCategory(cat.id)}
+                        sx={{
+                            borderRadius: 1.5, pl: 1 + depth * 1.5, pr: 0.5,
+                            '&.Mui-selected': { bgcolor: 'primary.lighter', color: 'primary.dark' },
+                        }}
+                    >
+                        <ListItemText
+                            primary={cat.name}
+                            primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: selectedCategoryId === cat.id ? 700 : 500 }}
+                        />
+                        {hasChildren && (
+                            <IconButton
+                                size="small"
+                                edge="end"
+                                aria-label={isOpen ? 'Daralt' : 'Genişlet'}
+                                onClick={(e) => { e.stopPropagation(); toggleCategoryExpand(cat.id); }}
+                                sx={{ ml: 0.5, color: 'text.secondary' }}
+                            >
+                                {isOpen ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+                            </IconButton>
+                        )}
+                    </ListItemButton>
+                    {hasChildren && (
+                        <Collapse in={isOpen} timeout="auto" unmountOnExit>
+                            {renderCategoryNodes(cat.subCategories, depth + 1)}
+                        </Collapse>
+                    )}
+                </React.Fragment>
+            );
+        });
+
     const FilterPanel = (
         <Stack spacing={3}>
             {/* Kategoriler */}
@@ -134,22 +195,7 @@ const ProductListPage: React.FC = () => {
                     >
                         <ListItemText primary="Tümü" primaryTypographyProps={{ fontWeight: selectedCategoryId === '' ? 700 : 500 }} />
                     </ListItemButton>
-                    {flatCategories.map((cat) => (
-                        <ListItemButton
-                            key={cat.id}
-                            selected={selectedCategoryId === cat.id}
-                            onClick={() => selectCategory(cat.id)}
-                            sx={{
-                                borderRadius: 1.5, pl: 1 + cat.depth * 1.5,
-                                '&.Mui-selected': { bgcolor: 'primary.lighter', color: 'primary.dark' },
-                            }}
-                        >
-                            <ListItemText
-                                primary={cat.name}
-                                primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: selectedCategoryId === cat.id ? 700 : 500 }}
-                            />
-                        </ListItemButton>
-                    ))}
+                    {renderCategoryNodes(categoryTree)}
                 </List>
             </Box>
 

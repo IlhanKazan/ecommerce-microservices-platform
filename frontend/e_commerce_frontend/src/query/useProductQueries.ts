@@ -226,6 +226,53 @@ export const useCreateWarehouse = (tenantId: number) => {
     });
 };
 
+export const useUpdateWarehouse = (tenantId: number) => {
+    const queryClient = useQueryClient();
+    const idempotencyKey = useRef(generateIdempotencyKey());
+
+    return useMutation({
+        mutationFn: ({
+                         warehouseId,
+                         payload,
+                     }: {
+            warehouseId: number;
+            payload: { name: string; locationDetails: string };
+        }) => tenantService.updateWarehouse(tenantId, warehouseId, payload, idempotencyKey.current),
+        onSuccess: () => {
+            idempotencyKey.current = generateIdempotencyKey();
+            queryClient.invalidateQueries({ queryKey: QueryKeys.WAREHOUSES(tenantId) });
+        },
+        retry: 1,
+    });
+};
+
+export const useSetWarehouseStatus = (tenantId: number) => {
+    const queryClient = useQueryClient();
+    const idempotencyKey = useRef(generateIdempotencyKey());
+
+    return useMutation({
+        mutationFn: ({ warehouseId, active }: { warehouseId: number; active: boolean }) =>
+            tenantService.setWarehouseStatus(tenantId, warehouseId, active, idempotencyKey.current),
+        onSuccess: () => {
+            idempotencyKey.current = generateIdempotencyKey();
+            queryClient.invalidateQueries({ queryKey: QueryKeys.WAREHOUSES(tenantId) });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.TENANT_STOCKS(tenantId) });
+        },
+        retry: 1,
+    });
+};
+
+export const useDeleteWarehouse = (tenantId: number) => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (warehouseId: number) => tenantService.deleteWarehouse(tenantId, warehouseId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: QueryKeys.WAREHOUSES(tenantId) });
+            queryClient.invalidateQueries({ queryKey: QueryKeys.TENANT_STOCKS(tenantId) });
+        },
+    });
+};
+
 /**
  * Stok ekleme — en kritik idempotency noktası.
  * Duplicate stok girişi direkt envanter hatasına yol açar.
