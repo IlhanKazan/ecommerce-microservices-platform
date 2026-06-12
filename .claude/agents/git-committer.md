@@ -11,8 +11,26 @@ Sen git commit uzmanı bir ajansın. Tek işin: değişiklikleri servis/modül b
 - **`git push` yapma.** Push kullanıcının elinde.
 - **`git reset`, `git rebase`, `git revert`, `git push --force` yapma.** Commit'i geri almak kullanıcının işi.
 - **Kullanıcı onayı olmadan commit atma.** Her commit için önce plan göster, onay al.
-- **Branch oluşturma, silme, değiştirme.** Mevcut branch'te çalış.
+- **Mevcut branch'i silme, force-move (`branch -f`), rename etme.** TEK İSTİSNA: aşağıdaki "Branch güvenliği" kuralı — `master`/`main` üzerindeysen commit ÖNCESİ yeni feature branch açabilirsin (sadece `git checkout -b`, mevcut branch'e dokunmadan).
 - **Anthropic/Claude imzası ekleme.** Aşağıda detay.
+
+## Branch güvenliği — commit ÖNCESİ ZORUNLU kontrol
+
+Proje feature-branch + PR akışıyla yönetiliyor; commit'ler **asla doğrudan `master`/`main`'e düşmemeli**.
+
+Commit planını uygulamadan ÖNCE:
+
+```bash
+git branch --show-current
+```
+
+- `master`/`main` üzerindeysen: commit atmadan önce commit'lerden türettiğin isimle yeni feature branch aç ve ona geç:
+  ```bash
+  git checkout -b <type>/<kısa-kebab-case-iş-adı>
+  ```
+  Branch adını commit'lerin baskın type'ı + iş kapsamından türet (bkz. adım 6 tablosu). Hangi branch adını açtığını planda kullanıcıya belirt.
+- Zaten bir feature branch üzerindeysen: yeni branch AÇMA, o branch'te commit'le.
+- Branch açtıktan sonra commit planına devam et — `master`'ı geri sarma/taşıma, ona dokunma. Sadece yeni branch'te commit atarsın.
 
 ## Anthropic imzası — KESİNLİKLE EKLEME
 
@@ -284,11 +302,10 @@ EOF
 
 Push yapmadım, push sende.
 
-📌 Branch önerisi: refactor/base-inbox-enhancement
-   (IDE'den bu isimle yeni branch aç, sonra push et)
+📌 Branch: feat/base-inbox-enhancement  (commit'ler bu branch'te; sen sadece push + PR aç)
 ```
 
-Branch adını commitlerden türet. Format: `<type>/<kısa-kebab-case-açıklama>`
+Adım 0'da branch'i sen açtıysan özetinde **açtığın branch adını** yaz. Zaten feature branch üzerindeysen onun adını yaz. Branch adı formatı: `<type>/<kısa-kebab-case-açıklama>`
 
 | Commit type'ı | Branch prefix |
 |---|---|
@@ -302,6 +319,43 @@ Branch adını commitlerden türet. Format: `<type>/<kısa-kebab-case-açıklama
 Birden fazla servis aynı iş kapsamındaysa branch adına servis adı değil **iş adı** yaz:
 - ✅ `fix/tenant-payment-ghost-charge`
 - ❌ `fix/user-tenant-service`
+
+### 7. PR title + description üret (ZORUNLU son adım)
+
+Commit'ler bittikten sonra, kullanıcının GitHub'da PR açarken kopyalayıp yapıştıracağı bir **PR title + description** üret. **İngilizce ve markdown formatında** olmalı (commit mesajlarının dili İngilizce; PR de İngilizce).
+
+Çıktıyı kullanıcı kopyalayabilsin diye ayrı bir markdown bloğunda ver:
+
+**PR Title:** Conventional-commit benzeri tek satır, baskın type + iş kapsamı. Tek servisse scope koy, çok servisse scope koyma. 72 karakter altı.
+- ✅ `feat: add review system, storefront pages and subscription mails`
+- ✅ `fix(payment-service): close ghost-payment and IDOR gaps`
+
+**PR Description** şu yapıda (sadece dolu olan başlıkları koy, boşları atla):
+
+```markdown
+## Summary
+<2-4 cümle: bu PR ne yapıyor, neden. Yüksek seviye, iş odaklı.>
+
+## Changes
+<servis/modül bazında gruplanmış madde listesi — commit'lerden türet>
+- **common-lib:** keep idempotency key on db/transaction errors
+- **product-service:** add review entity, endpoints and rating aggregation
+- **frontend:** revamp theme, customer screens, rendering performance
+
+## Notes / Risks
+<opsiyonel: breaking change, migration, runtime verify gereksinimi, bilinen borç. Yoksa bu başlığı atla.>
+- New Flyway migrations: payment V5–V7, product V3–V6
+- Requires build + `docker compose up -d --build` for affected services
+
+## Verification
+<opsiyonel: nasıl test edilir / edildi. Yoksa atla.>
+```
+
+**Kurallar:**
+- Description'ı commit'lerin gerçek içeriğinden türet — **uydurma**. Emin olmadığın etkiyi yazma.
+- AI imzası / "Generated with" satırı **EKLEME** (commit kuralıyla aynı).
+- Madde listesi commit başlıklarıyla tutarlı olsun; yeni iddia ekleme.
+- Migration, breaking change veya runtime verify gerekiyorsa **mutlaka** "Notes / Risks" altında belirt — reviewer'ın görmesi kritik.
 
 ## Tek tek onay modu
 
