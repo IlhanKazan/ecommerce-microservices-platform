@@ -1,11 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
+import { keycloakify } from 'keycloakify/vite-plugin'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    keycloakify({
+      themeName: 'ilhan-e-ticaret',
+      // Account teması Multi-Page (v1 fork) — self-contained, extra extension gerektirmez.
+      accountThemeImplementation: 'Multi-Page',
+      // Sadece KC 26.2+ jar'ını üret (deploy ettiğimiz tek sürüm) → Docker build hızlanır, isim sabit.
+      keycloakVersionTargets: {
+        hasAccountTheme: true,
+        '21-and-below': false,
+        '23': false,
+        '24': false,
+        '25': false,
+        '26.0-to-26.1': false,
+        '26.2-and-above': 'ilhan-e-ticaret.jar',
+      },
+    }),
     // Bundle haritası — build sonrası dist/stats.html üretir (chunk boyutları, gzip/brotli)
     visualizer({
       filename: 'dist/stats.html',
