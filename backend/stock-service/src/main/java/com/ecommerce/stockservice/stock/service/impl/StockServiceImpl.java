@@ -79,6 +79,10 @@ public class StockServiceImpl implements StockService {
         Warehouse warehouse = warehouseService.findByTenantIdAndId(tenantId, warehouseId)
                 .orElseThrow(() -> new BusinessException("Geçersiz depo veya bu depoda yetkiniz yok!", "WAREHOUSE_NOT_FOUND"));
 
+        if (Boolean.FALSE.equals(warehouse.getIsActive())) {
+            throw new BusinessException("Pasif depoya stok eklenemez. Önce depoyu aktifleştirin.", "WAREHOUSE_INACTIVE");
+        }
+
         ProductResponse product = productClientAdapter.validateAndGetProduct(productId, tenantId);
 
         Stock stock = stockRepository.findByTenantIdAndWarehouseIdAndProductId(tenantId, warehouseId, productId)

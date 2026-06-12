@@ -10,4 +10,8 @@ public interface WarehouseService {
     Optional<Warehouse> findByTenantIdAndId(Long tenantId, Long warehouseId);
     Warehouse createWarehouse(Long tenantId, String code, String name, String locationDetails);
     List<Warehouse> getWarehousesByTenant(Long tenantId);
+    Warehouse getWarehouse(Long tenantId, Long warehouseId);
+    Warehouse updateWarehouse(Long tenantId, Long warehouseId, String name, String locationDetails);
+    Warehouse setActive(Long tenantId, Long warehouseId, boolean active);
+    void deleteWarehouse(Long tenantId, Long warehouseId);
 }

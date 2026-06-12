@@ -19,6 +19,9 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     // MANUEL İŞLEMLER VE OKUMALAR İÇİN (Pessimistic Lock yok, sadece Optimistic @Version koruması var)
     Optional<Stock> findByTenantIdAndWarehouseIdAndProductId(Long tenantId, Long warehouseId, Long productId);
 
+    // Depo silme ön kontrolü — depoda hiç stok kaydı var mı
+    boolean existsByTenantIdAndWarehouseId(Long tenantId, Long warehouseId);
+
     // Tenant'ın tüm stok kayıtları — JOIN FETCH ile N+1 önlendi
     @Query("SELECT s FROM Stock s JOIN FETCH s.warehouse WHERE s.tenantId = :tenantId")
     List<Stock> findAllByTenantIdWithWarehouse(@Param("tenantId") Long tenantId);
@@ -47,5 +50,15 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     // RESYNC: availableQuantity > 0 olan tüm stok kayıtları — ES senkronizasyonu için
     @Query("SELECT s FROM Stock s WHERE s.availableQuantity > 0")
     List<Stock> findAllWithPositiveQuantity();
+
+    // DEPO DURUM GEÇİŞİ: belli bir depodaki stoğu olan kayıtlar — aktif/pasif olunca ES'e yansıtmak için
+    @Query("SELECT s FROM Stock s WHERE s.tenantId = :tenantId AND s.warehouse.id = :warehouseId AND s.availableQuantity > 0")
+    List<Stock> findPositiveStocksByWarehouse(@Param("tenantId") Long tenantId, @Param("warehouseId") Long warehouseId);
+
+    // inStock AGGREGATE: ürünün herhangi bir AKTİF depoda satılabilir stoğu var mı
+    @Query("SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END FROM Stock s " +
+           "WHERE s.tenantId = :tenantId AND s.productId = :productId " +
+           "AND s.availableQuantity > 0 AND s.warehouse.isActive = true")
+    boolean existsAvailableInActiveWarehouse(@Param("tenantId") Long tenantId, @Param("productId") Long productId);
 
 }
