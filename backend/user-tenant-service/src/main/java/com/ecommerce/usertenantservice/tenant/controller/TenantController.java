@@ -251,6 +251,36 @@ public class TenantController {
         return ResponseEntity.ok().build();
     }
 
+    @Operation(summary = "Pause store", description = "Temporarily pauses the store (ACTIVE → PASSIVE). Products are pulled from sale/search. Reversible via resume.")
+    @ApiResponse(responseCode = "200", description = "Store paused")
+    @ApiResponse(responseCode = "400", description = "Store is not ACTIVE")
+    @PostMapping("/{tenantId}/pause")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<Void> pauseTenant(@PathVariable Long tenantId) {
+        tenantLifecycleService.pauseTenant(tenantId);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Resume store", description = "Re-opens a paused store (PASSIVE → ACTIVE). Products return to sale/search.")
+    @ApiResponse(responseCode = "200", description = "Store resumed")
+    @ApiResponse(responseCode = "400", description = "Store is not PASSIVE")
+    @PostMapping("/{tenantId}/resume")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<Void> resumeTenant(@PathVariable Long tenantId) {
+        tenantLifecycleService.resumeTenant(tenantId);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Close store permanently", description = "Permanently closes the store (→ CLOSED, terminal). Products are pulled from sale and all members lose access.")
+    @ApiResponse(responseCode = "200", description = "Store closed")
+    @ApiResponse(responseCode = "400", description = "Store already closed")
+    @PostMapping("/{tenantId}/close")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<Void> closeTenant(@PathVariable Long tenantId) {
+        tenantLifecycleService.closeTenant(tenantId);
+        return ResponseEntity.ok().build();
+    }
+
     @Operation(summary = "Get active subscription", description = "Returns current subscription plan, billing cycle, next billing date and commission rate.")
     @ApiResponse(responseCode = "200", description = "Subscription detail")
     @GetMapping("/{tenantId}/subscription")

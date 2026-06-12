@@ -7,7 +7,9 @@ import com.ecommerce.usertenantservice.tenant.controller.dto.response.TenantSubs
 import com.ecommerce.usertenantservice.tenant.entity.Tenant;
 import com.ecommerce.usertenantservice.tenant.query.TenantStorefrontInfo;
 import com.ecommerce.usertenantservice.tenant.repository.TenantRepository;
+import com.ecommerce.usertenantservice.user.service.ImageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +24,7 @@ public class TenantProfileService {
 
     private final TenantRepository tenantRepository;
     private final PaymentServiceClientAdapter paymentServiceClientAdapter;
+    private final ImageService imageService;
     private static final String NO_MERCHANT_DESCRIPTION = "Mağaza bulunamadı";
 
 
@@ -38,8 +41,15 @@ public class TenantProfileService {
     @Transactional
     public Tenant uploadLogo(Long id, String logoUrl){
         Tenant tenant = getTenantById(id);
+        String oldLogoUrl = tenant.getLogoUrl();
         tenant.setLogoUrl(logoUrl);
-        return tenantRepository.save(tenant);
+        Tenant saved = tenantRepository.save(tenant);
+
+        // Logo değiştiyse eski dosyayı MinIO'dan temizle (best-effort)
+        if (oldLogoUrl != null && !oldLogoUrl.equals(logoUrl)) {
+            imageService.deleteImage(oldLogoUrl);
+        }
+        return saved;
     }
 
     public Optional<TenantSubscriptionResponse> getSubscriptionDetail(Long tenantId){
@@ -65,6 +75,12 @@ public class TenantProfileService {
                 tenant.getStatus(),
                 tenant.getIsVerified()
         );
+    }
+
+    /** Mağaza durumu (pause/resume/close) değişince storefront cache'i bayatlamasın diye temizler. */
+    @CacheEvict(cacheNames = "public-tenant-storefront", key = "#tenantId")
+    public void evictStorefrontCache(Long tenantId){
+        // @CacheEvict yan etkisi — gövde boş.
     }
 
 }

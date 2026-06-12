@@ -25,7 +25,8 @@ public interface UserTenantRepository extends JpaRepository<UserTenant, Long> {
     @Query("SELECT ut FROM UserTenant ut " +
             "WHERE ut.user.keycloakId = :keycloakId " +
             "AND ut.tenant.id = :tenantId " +
-            "AND ut.isActive = true")
+            "AND ut.isActive = true " +
+            "AND ut.tenant.status != 'CLOSED'")
     Optional<UserTenant> findMemberRole(
             @Param("keycloakId") UUID keycloakId,
             @Param("tenantId") Long tenantId
