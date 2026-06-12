@@ -1,6 +1,8 @@
 {
   "id": "42da3bd4-ff64-498c-829a-928eab33be89",
   "realm": "E-Commerce",
+  "loginTheme": "ilhan-e-ticaret",
+  "accountTheme": "ilhan-e-ticaret",
   "notBefore": 0,
   "defaultSignatureAlgorithm": "RS256",
   "revokeRefreshToken": true,
