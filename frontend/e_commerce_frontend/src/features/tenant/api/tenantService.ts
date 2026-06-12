@@ -4,7 +4,7 @@ import type {
     CreateTenantRequest, SubscriptionPlan, TenantDetail, TenantSummary,
     UpdateTenantCriticalRequest,
     UpdateTenantGeneralRequest, TenantAddress, TenantRole, PaymentCardInfo, SubscriptionDetail, PaymentHistoryResponse,
-    PageResponse,  AddMemberRequest
+    PageResponse,  AddMemberRequest, Warehouse
 } from '../../../types/tenant.ts';
 import type { StockSummaryItem } from '../../../types/product';
 import type {CreateAddressRequest, Address} from "../../../types/user.ts";
@@ -185,11 +185,25 @@ export const tenantService = {
     verifyTenant: async (tenantId: number, data: { legalCompanyTitle: string; taxOffice: string; iban: string }) => {
         await api.put(API_ENDPOINTS.TENANT.VERIFY_TENANT(tenantId), data);
     },
+
+    pauseTenant: async (tenantId: number): Promise<void> => {
+        await api.post(API_ENDPOINTS.TENANT.PAUSE(tenantId));
+    },
+
+    resumeTenant: async (tenantId: number): Promise<void> => {
+        await api.post(API_ENDPOINTS.TENANT.RESUME(tenantId));
+    },
+
+    closeTenant: async (tenantId: number, idempotencyKey: string): Promise<void> => {
+        await api.post(API_ENDPOINTS.TENANT.CLOSE(tenantId), undefined, {
+            headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
+        });
+    },
    /* changeSubscriptionPlan: async (tenantId: number, planId: number): Promise<void> => {
         await api.put(`/tenants/${tenantId}/subscription/plan`, { planId });
     }*/
-    getWarehouses: async (tenantId: number) => {
-        const response = await api.get(API_ENDPOINTS.STOCK.WAREHOUSES(tenantId));
+    getWarehouses: async (tenantId: number): Promise<Warehouse[]> => {
+        const response = await api.get<Warehouse[]>(API_ENDPOINTS.STOCK.WAREHOUSES(tenantId));
         return response.data;
     },
 
@@ -203,6 +217,38 @@ export const tenantService = {
             payload,
             { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
         );
+    },
+
+    updateWarehouse: async (
+        tenantId: number,
+        warehouseId: number,
+        payload: { name: string; locationDetails: string },
+        idempotencyKey: string,
+    ): Promise<Warehouse> => {
+        const response = await api.put<Warehouse>(
+            API_ENDPOINTS.STOCK.WAREHOUSE_BY_ID(tenantId, warehouseId),
+            payload,
+            { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+        );
+        return response.data;
+    },
+
+    setWarehouseStatus: async (
+        tenantId: number,
+        warehouseId: number,
+        active: boolean,
+        idempotencyKey: string,
+    ): Promise<Warehouse> => {
+        const response = await api.patch<Warehouse>(
+            API_ENDPOINTS.STOCK.WAREHOUSE_STATUS(tenantId, warehouseId),
+            { active },
+            { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+        );
+        return response.data;
+    },
+
+    deleteWarehouse: async (tenantId: number, warehouseId: number): Promise<void> => {
+        await api.delete(API_ENDPOINTS.STOCK.WAREHOUSE_BY_ID(tenantId, warehouseId));
     },
 
     addManualStock: async (

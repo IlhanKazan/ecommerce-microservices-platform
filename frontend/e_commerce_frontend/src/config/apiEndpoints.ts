@@ -31,6 +31,9 @@ export const API_ENDPOINTS = {
         PAYMENT_HISTORY: (tenantId: number) => `/tenants/${tenantId}/payment-details`,
         RETRY_PAYMENT: (tenantId: number) => `/tenants/${tenantId}/retry-payment`,
         VERIFY_TENANT: (tenantId: number) => `/tenants/${tenantId}/verification`,
+        PAUSE: (tenantId: number) => `/tenants/${tenantId}/pause`,
+        RESUME: (tenantId: number) => `/tenants/${tenantId}/resume`,
+        CLOSE: (tenantId: number) => `/tenants/${tenantId}/close`,
         STOREFRONT: (id: number) => `/public/tenants/${id}/storefront`,
     },
     SUBSCRIPTION: {
@@ -92,6 +95,10 @@ export const API_ENDPOINTS = {
     },
     STOCK: {
         WAREHOUSES: (tenantId: number) => `/stocks/tenant/${tenantId}/warehouses`,
+        WAREHOUSE_BY_ID: (tenantId: number, warehouseId: number) =>
+            `/stocks/tenant/${tenantId}/warehouses/${warehouseId}`,
+        WAREHOUSE_STATUS: (tenantId: number, warehouseId: number) =>
+            `/stocks/tenant/${tenantId}/warehouses/${warehouseId}/status`,
         MANUAL_ADD: (tenantId: number) => `/stocks/tenant/${tenantId}/manual-add`,
         MANUAL_REMOVE: (tenantId: number) => `/stocks/tenant/${tenantId}/manual-remove`,
         SUMMARY: (tenantId: number) => `/stocks/tenant/${tenantId}`,

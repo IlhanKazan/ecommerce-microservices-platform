@@ -39,7 +39,10 @@ const SelectStorePage = () => {
                             onClick={() => handleSelect(tenant)}
                         >
                             <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                                <Avatar sx={{ width: 64, height: 64, mx: 'auto', mb: 2, bgcolor: 'primary.main' }}>
+                                <Avatar
+                                    src={tenant.logoUrl ?? undefined}
+                                    sx={{ width: 64, height: 64, mx: 'auto', mb: 2, bgcolor: 'primary.main' }}
+                                >
                                     <StoreIcon fontSize="large" />
                                 </Avatar>
                                 <Typography variant="h6" fontWeight="bold">{tenant.name}</Typography>

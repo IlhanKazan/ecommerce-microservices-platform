@@ -10,6 +10,14 @@ export type TenantRole = EnumTenantRole;
 
 export type AddressType = EnumAddressType;
 
+export interface Warehouse {
+    id: number;
+    code: string;
+    name: string;
+    locationDetails?: string | null;
+    isActive: boolean;
+}
+
 export const TENANT_ROLES: { value: TenantRole; label: string }[] = [
     { value: 'OWNER', label: 'Sahip (Owner)' },
     { value: 'ADMIN', label: 'Yönetici (Admin)' },
