@@ -39,6 +39,9 @@ export const API_ENDPOINTS = {
     SUBSCRIPTION: {
         PLANS: '/subscriptions/plans',
         CHANGE_PLAN: '/subscriptions/change-plan',
+        CARDS: '/subscriptions/cards',
+        CARD_BY_ID: (cardId: number) => `/subscriptions/cards/${cardId}`,
+        CARD_DEFAULT: (cardId: number) => `/subscriptions/cards/${cardId}/default`,
     },
     PAYMENT: {},
     SEARCH: {

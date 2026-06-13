@@ -2,14 +2,18 @@ import React, { useState, useRef } from 'react';
 import {
     Box, Typography, Paper, Button, Chip, Divider,
     Stack, CircularProgress, Grid, Alert, Dialog, DialogTitle,
-    DialogContent, DialogActions, TextField, Tooltip,
+    DialogContent, DialogActions, TextField, Tooltip, IconButton,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination
 } from '@mui/material';
 import {
     CheckCircle as CheckIcon,
     Star as StarIcon,
+    StarBorder as StarBorderIcon,
     ErrorOutline as ErrorIcon,
     CreditCard as CardIcon,
+    CreditCardOff as CreditCardOffIcon,
+    AddCard as AddCardIcon,
+    DeleteOutline as DeleteIcon,
     Person as PersonIcon,
     Autorenew as AutoRenewIcon,
     History as HistoryIcon,
@@ -19,8 +23,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMerchantStore } from '../../../store/useMerchantStore';
 import { useNotification } from '../../../components/shared/NotificationContext';
 import { tenantService } from '../api/tenantService.ts';
-import type { SubscriptionPlan, PaymentCardInfo, PaymentStatus, PaymentType } from '../../../types/tenant';
+import type { SubscriptionPlan, PaymentCardInfo, PaymentStatus, PaymentType, ChangePlanResult } from '../../../types/tenant';
 import { PlanFeatureList } from '../../../components/shared/PlanFeatureList';
+import { generateIdempotencyKey } from '../../../utils/idempotencyUtils';
 
 /**
  * SECURITY: Sensitive card data is captured via refs at submit time,
@@ -84,16 +89,110 @@ const MerchantSubscription: React.FC = () => {
         enabled: !!activeTenant
     });
 
+    const { data: cards } = useQuery({
+        queryKey: ['tenantCards', activeTenant?.id],
+        queryFn: async () => {
+            if (!activeTenant) throw new Error("Tenant yok");
+            return tenantService.getCards(activeTenant.id);
+        },
+        enabled: !!activeTenant
+    });
+
+    const [addCardOpen, setAddCardOpen] = useState(false);
+    const newCardRefs: Omit<CardInputRefs, 'cvc'> & { alias: React.RefObject<HTMLInputElement> } = {
+        alias: useRef<HTMLInputElement>(null),
+        holderName: useRef<HTMLInputElement>(null),
+        number: useRef<HTMLInputElement>(null),
+        expireMonth: useRef<HTMLInputElement>(null),
+        expireYear: useRef<HTMLInputElement>(null),
+    };
+
     const changePlanMutation = useMutation({
         mutationFn: async (planId: number) => {
             if (!activeTenant) throw new Error("Tenant yok");
-            return tenantService.changeSubscriptionPlan(activeTenant.id, planId);
+            return tenantService.changeSubscriptionPlan(activeTenant.id, planId, generateIdempotencyKey());
+        },
+        onSuccess: (result: ChangePlanResult) => {
+            queryClient.invalidateQueries({ queryKey: ['tenantSubscription', activeTenant?.id] });
+            queryClient.invalidateQueries({ queryKey: ['tenantPaymentHistory', activeTenant?.id] });
+            if (result.changeType === 'UPGRADE') {
+                const charged = result.chargedAmount > 0 ? ` Kalan döneme göre ${result.chargedAmount} ₺ tahsil edildi.` : '';
+                notify(`${result.newPlanName} paketine yükseltildiniz.${charged}`, 'success');
+            } else if (result.changeType === 'DOWNGRADE_SCHEDULED') {
+                notify(`${result.newPlanName} paketine geçiş ${formatDate(result.effectiveDate)} tarihinde uygulanacak.`, 'success');
+            } else {
+                notify('Bekleyen paket değişikliği iptal edildi.', 'success');
+            }
+        },
+        onError: (error: unknown) => {
+            const err = error as { response?: { data?: { errorCode?: string; message?: string } } };
+            const code = err.response?.data?.errorCode;
+            if (code === 'NO_DEFAULT_CARD') {
+                notify('Üst plana geçmek için önce bir kart eklemelisiniz.', 'error');
+                setAddCardOpen(true);
+                return;
+            }
+            notify(err.response?.data?.message || 'Paket değiştirilirken bir hata oluştu.', 'error');
+        }
+    });
+
+    const addCardMutation = useMutation({
+        mutationFn: async () => {
+            if (!activeTenant) throw new Error("Tenant yok");
+            const cardNumber = newCardRefs.number.current?.value?.trim() || '';
+            const holderName = newCardRefs.holderName.current?.value?.trim() || '';
+            const expireMonth = newCardRefs.expireMonth.current?.value?.trim() || '';
+            const expireYear = newCardRefs.expireYear.current?.value?.trim() || '';
+            const cardAlias = newCardRefs.alias.current?.value?.trim() || '';
+            if (!cardNumber || !holderName || !expireMonth || !expireYear) {
+                throw new Error('Lütfen kart bilgilerini eksiksiz doldurun.');
+            }
+            return tenantService.addCard(
+                { tenantId: activeTenant.id, cardAlias, cardHolderName: holderName, cardNumber, expireMonth, expireYear },
+                generateIdempotencyKey(),
+            );
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tenantSubscription', activeTenant?.id] });
-            notify('Paket değişikliği başarıyla uygulandı.', 'success');
+            queryClient.invalidateQueries({ queryKey: ['tenantCards', activeTenant?.id] });
+            if (newCardRefs.number.current) newCardRefs.number.current.value = '';
+            setAddCardOpen(false);
+            notify('Kart başarıyla eklendi.', 'success');
         },
-        onError: () => notify('Paket değiştirilirken bir hata oluştu.', 'error')
+        onError: (error: unknown) => {
+            const err = error as { response?: { data?: { message?: string } }; message?: string };
+            notify(err.response?.data?.message || err.message || 'Kart eklenemedi.', 'error');
+        }
+    });
+
+    const deleteCardMutation = useMutation({
+        mutationFn: async (cardId: number) => {
+            if (!activeTenant) throw new Error("Tenant yok");
+            return tenantService.deleteCard(activeTenant.id, cardId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tenantCards', activeTenant?.id] });
+            notify('Kart silindi.', 'success');
+        },
+        onError: (error: unknown) => {
+            const err = error as { response?: { data?: { errorCode?: string; message?: string } } };
+            if (err.response?.data?.errorCode === 'LAST_CARD_ON_ACTIVE_SUBSCRIPTION') {
+                notify('Aktif aboneliğinizin tek kartını silemezsiniz. Önce başka bir kart ekleyin.', 'error');
+                return;
+            }
+            notify(err.response?.data?.message || 'Kart silinemedi.', 'error');
+        }
+    });
+
+    const setDefaultCardMutation = useMutation({
+        mutationFn: async (cardId: number) => {
+            if (!activeTenant) throw new Error("Tenant yok");
+            return tenantService.setDefaultCard(activeTenant.id, cardId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tenantCards', activeTenant?.id] });
+            notify('Varsayılan kart güncellendi.', 'success');
+        },
+        onError: () => notify('Varsayılan kart güncellenemedi.', 'error')
     });
 
     const retryPaymentMutation = useMutation({
@@ -135,7 +234,8 @@ const MerchantSubscription: React.FC = () => {
             notify('İşlem başarıyla tamamlandı!', 'success');
         },
         onError: (error: unknown) => {
-            const message = (error as { message?: string })?.message || "İşlem başarısız oldu. Lütfen kart bilgilerinizi kontrol edin.";
+            const err = error as { response?: { data?: { message?: string } }; message?: string };
+            const message = err.response?.data?.message || err.message || "İşlem başarısız oldu. Lütfen kart bilgilerinizi kontrol edin.";
             notify(message, 'error');
         }
     });
@@ -320,15 +420,85 @@ const MerchantSubscription: React.FC = () => {
                             variant="contained"
                             color={isPaymentFailed ? "error" : "info"}
                             size="large"
-                            startIcon={<CardIcon />}
-                            onClick={() => handleRetryOpen()}
+                            startIcon={subDetail && !isPaymentFailed ? <AddCardIcon /> : <CardIcon />}
+                            onClick={() => (subDetail && !isPaymentFailed) ? setAddCardOpen(true) : handleRetryOpen()}
                             sx={{ px: 4, py: 1.5, borderRadius: 3, fontWeight: 'bold' }}
                         >
-                            {!subDetail ? "Ödeme Yap / Abonelik Başlat" : (isPaymentFailed ? "Ödemeyi Yenile" : "Ödeme Yöntemini Güncelle")}
+                            {!subDetail ? "Ödeme Yap / Abonelik Başlat" : (isPaymentFailed ? "Ödemeyi Yenile" : "Kart Ekle / Güncelle")}
                         </Button>
                     </Grid>
                 </Grid>
             </Paper>
+
+            <Box sx={{ mb: 5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CardIcon color="primary" />
+                        <Typography variant="h6" fontWeight="bold">Kayıtlı Kartlar</Typography>
+                    </Box>
+                    <Button startIcon={<AddCardIcon />} variant="outlined" onClick={() => setAddCardOpen(true)}>
+                        Kart Ekle
+                    </Button>
+                </Box>
+
+                <Paper variant="outlined" sx={{ borderRadius: 3, p: cards && cards.length > 0 ? 1 : 4 }}>
+                    {!cards || cards.length === 0 ? (
+                        <Stack alignItems="center" spacing={1} sx={{ py: 2, color: 'text.secondary' }}>
+                            <CreditCardOffIcon fontSize="large" />
+                            <Typography variant="body2">Henüz kayıtlı kartınız yok.</Typography>
+                            <Typography variant="caption">Otomatik yenileme ve plan yükseltme için bir kart ekleyin.</Typography>
+                        </Stack>
+                    ) : (
+                        <Stack divider={<Divider flexItem />}>
+                            {cards.map((card) => (
+                                <Stack key={card.id} direction="row" alignItems="center" spacing={2} sx={{ px: 2, py: 1.5 }}>
+                                    <CardIcon color="action" />
+                                    <Box sx={{ flexGrow: 1 }}>
+                                        <Typography fontWeight="bold">
+                                            •••• {card.lastFour || '----'}
+                                            {card.cardAssociation && (
+                                                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                                                    {card.cardAssociation}{card.cardFamily ? ` · ${card.cardFamily}` : ''}
+                                                </Typography>
+                                            )}
+                                        </Typography>
+                                        {card.cardAlias && (
+                                            <Typography variant="caption" color="text.secondary">{card.cardAlias}</Typography>
+                                        )}
+                                    </Box>
+                                    {card.isDefault ? (
+                                        <Chip icon={<StarIcon sx={{ fontSize: 16 }} />} label="Varsayılan" color="primary" size="small" />
+                                    ) : (
+                                        <Tooltip title="Varsayılan yap">
+                                            <span>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => setDefaultCardMutation.mutate(card.id)}
+                                                    disabled={setDefaultCardMutation.isPending}
+                                                >
+                                                    <StarBorderIcon />
+                                                </IconButton>
+                                            </span>
+                                        </Tooltip>
+                                    )}
+                                    <Tooltip title="Kartı sil">
+                                        <span>
+                                            <IconButton
+                                                size="small"
+                                                color="error"
+                                                onClick={() => deleteCardMutation.mutate(card.id)}
+                                                disabled={deleteCardMutation.isPending}
+                                            >
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </span>
+                                    </Tooltip>
+                                </Stack>
+                            ))}
+                        </Stack>
+                    )}
+                </Paper>
+            </Box>
 
             <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>Tüm Paketler</Typography>
 
@@ -555,17 +725,80 @@ const MerchantSubscription: React.FC = () => {
             >
                 <DialogTitle sx={{ fontWeight: 'bold' }}>Paket Değişikliğini Onayla</DialogTitle>
                 <DialogContent>
-                    <Typography>
-                        {planChangeDialog.plan
-                            ? `${planChangeDialog.plan.name} paketine geçmek istediğinize emin misiniz?`
-                            : 'Paket bilgisi alınamadı.'
-                        }
-                    </Typography>
+                    {planChangeDialog.plan ? (() => {
+                        const isUpgrade = !!subDetail && planChangeDialog.plan!.price > subDetail.feeAmount;
+                        return (
+                            <>
+                                <Typography sx={{ mb: 1 }}>
+                                    <strong>{planChangeDialog.plan!.name}</strong> paketine geçmek istediğinize emin misiniz?
+                                </Typography>
+                                {isUpgrade ? (
+                                    <Alert severity="info" sx={{ mt: 1 }}>
+                                        Üst plana geçiyorsunuz. Kalan döneme göre hesaplanan fiyat farkı kayıtlı
+                                        varsayılan kartınızdan <strong>hemen tahsil edilecek</strong>; yenileme tarihiniz değişmez.
+                                        {(!cards || cards.length === 0) && ' Önce bir kart eklemeniz gerekir.'}
+                                    </Alert>
+                                ) : (
+                                    <Alert severity="info" sx={{ mt: 1 }}>
+                                        Alt plana geçiyorsunuz. Değişiklik <strong>bu dönemin sonunda</strong>
+                                        {subDetail ? ` (${formatDate(subDetail.nextBillingDate)})` : ''} yürürlüğe girecek;
+                                        şimdi herhangi bir tahsilat yapılmaz.
+                                    </Alert>
+                                )}
+                            </>
+                        );
+                    })() : (
+                        <Typography>Paket bilgisi alınamadı.</Typography>
+                    )}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={cancelChangePlan} color="inherit">İptal</Button>
                     <Button onClick={confirmChangePlan} variant="contained" color="primary" disabled={changePlanMutation.isPending}>
                         {changePlanMutation.isPending ? 'Uygulanıyor...' : 'Onayla'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={addCardOpen} onClose={() => setAddCardOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ fontWeight: 'bold' }}>Yeni Kart Ekle</DialogTitle>
+                <DialogContent dividers>
+                    <Alert severity="info" sx={{ mb: 3 }}>
+                        <Typography variant="caption">
+                            Kart bilgileriniz güvenli şekilde iyzico'da saklanır; sistemimizde kart numarası tutulmaz.
+                            Sonraki abonelik ödemeleri varsayılan kartınızdan otomatik tahsil edilir.
+                        </Typography>
+                    </Alert>
+                    <Grid container spacing={2}>
+                        <Grid size={12}>
+                            <TextField label="Kart Adı (opsiyonel)" fullWidth placeholder="İş kartım"
+                                       defaultValue="" inputRef={newCardRefs.alias} />
+                        </Grid>
+                        <Grid size={12}>
+                            <TextField label="Kart Üzerindeki İsim" fullWidth required defaultValue=""
+                                       inputRef={newCardRefs.holderName}
+                                       InputProps={{ startAdornment: <PersonIcon sx={{ mr: 1, color: 'text.secondary' }} /> }} />
+                        </Grid>
+                        <Grid size={12}>
+                            <TextField label="Kart Numarası" fullWidth required placeholder="0000 0000 0000 0000"
+                                       defaultValue="" inputRef={newCardRefs.number} autoComplete="cc-number"
+                                       InputProps={{ startAdornment: <CardIcon sx={{ mr: 1, color: 'text.secondary' }} /> }} />
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                            <TextField label="Ay (MM)" fullWidth required placeholder="01"
+                                       defaultValue="" inputRef={newCardRefs.expireMonth} autoComplete="cc-exp-month" />
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                            <TextField label="Yıl (YYYY)" fullWidth required placeholder="2030"
+                                       defaultValue="" inputRef={newCardRefs.expireYear} autoComplete="cc-exp-year" />
+                        </Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setAddCardOpen(false)} color="inherit" disabled={addCardMutation.isPending}>
+                        İptal
+                    </Button>
+                    <Button onClick={() => addCardMutation.mutate()} variant="contained" disabled={addCardMutation.isPending}>
+                        {addCardMutation.isPending ? <CircularProgress size={24} color="inherit" /> : 'Kartı Kaydet'}
                     </Button>
                 </DialogActions>
             </Dialog>
