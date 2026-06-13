@@ -341,6 +341,11 @@ const CreateStorePage: React.FC = () => {
             </Grid>
 
             <Grid size={12}>
+                <TextField label="Website (opsiyonel)" fullWidth placeholder="https://..."
+                           value={storeData.websiteUrl} onChange={e => setStoreData({...storeData, websiteUrl: e.target.value})} />
+            </Grid>
+
+            <Grid size={12}>
                 <TextField label="Mağaza Açıklaması" fullWidth multiline rows={3}
                            value={storeData.description} onChange={e => setStoreData({...storeData, description: e.target.value})} />
             </Grid>

@@ -39,14 +39,21 @@ export const API_ENDPOINTS = {
     SUBSCRIPTION: {
         PLANS: '/subscriptions/plans',
         CHANGE_PLAN: '/subscriptions/change-plan',
+        CARDS: '/subscriptions/cards',
+        CARD_BY_ID: (cardId: number) => `/subscriptions/cards/${cardId}`,
+        CARD_DEFAULT: (cardId: number) => `/subscriptions/cards/${cardId}/default`,
     },
     PAYMENT: {},
     SEARCH: {
         PRODUCTS: '/public/search/products',
         AUTOCOMPLETE: '/public/search/autocomplete',
+        BRANDS: '/public/search/brands',
     },
     PRODUCT: {
         BY_ID_PUBLIC: (id: number) => `/public/products/${id}`,
+        FAVORITE: (id: number) => `/public/products/${id}/favorite`,
+        FAVORITES: '/public/products/me/favorites',
+        FAVORITE_IDS: '/public/products/me/favorite-ids',
         REVIEWS: (id: number) => `/public/products/${id}/reviews`,
         REVIEW_HELPFUL: (productId: number, reviewId: number) =>
             `/public/products/${productId}/reviews/${reviewId}/helpful`,
@@ -80,6 +87,7 @@ export const API_ENDPOINTS = {
     BASKET: {
         GET:         '/baskets/me',
         ADD:         '/baskets/me/items',
+        MERGE:       '/baskets/me/merge',
         REMOVE_ITEM: (productId: number) => `/baskets/me/items/${productId}`,
         UPDATE_ITEM: (productId: number) => `/baskets/me/items/${productId}`,
         CLEAR:       '/baskets/me'

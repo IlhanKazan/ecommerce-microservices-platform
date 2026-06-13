@@ -20,4 +20,5 @@ public interface MailService {
     void sendSubscriptionActivated(String toEmail, String planName, LocalDate nextBillingDate, String messageId);
     void sendSubscriptionRenewalSuccess(String toEmail, String planName, LocalDate nextBillingDate, String messageId);
     void sendSubscriptionRenewalFailed(String toEmail, String planName, String failureReason, int failedAttempts, boolean suspended, String messageId);
+    void sendSubscriptionPlanChanged(String toEmail, String oldPlanName, String newPlanName, String changeType, LocalDate effectiveDate, BigDecimal chargedAmount, String messageId);
 }

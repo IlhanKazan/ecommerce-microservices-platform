@@ -7,6 +7,6 @@ import java.math.BigDecimal;
 
 public interface PaymentService {
     Payment processPayment(PaymentContext context);
-    Payment processRenewalPayment(Long tenantId, String cardToken, BigDecimal amount);
+    Payment processTokenCharge(Long tenantId, String cardToken, String cardUserKey, BigDecimal amount);
     void refundByOrderId(Long orderId, String transactionId);
 }

@@ -1,6 +1,7 @@
 package com.ecommerce.mailservice.mail.handler;
 
 import com.ecommerce.contracts.event.payment.SubscriptionActivatedEventPayload;
+import com.ecommerce.contracts.event.payment.SubscriptionPlanChangedEventPayload;
 import com.ecommerce.contracts.event.payment.SubscriptionRenewalFailedEventPayload;
 import com.ecommerce.contracts.event.payment.SubscriptionRenewalSuccessEventPayload;
 import com.ecommerce.mailservice.mail.service.MailService;
@@ -43,5 +44,17 @@ public class SubscriptionMailHandler {
         mailService.sendSubscriptionRenewalFailed(
                 payload.contactEmail(), payload.planName(), payload.failureReason(),
                 payload.failedAttempts(), payload.suspended(), messageId);
+    }
+
+    public void handlePlanChanged(SubscriptionPlanChangedEventPayload payload, String messageId) {
+        if (payload.contactEmail() == null) {
+            log.warn("SUBSCRIPTION_PLAN_CHANGED — contactEmail null, mail atlanıyor. tenantId: {}", payload.tenantId());
+            return;
+        }
+        log.info("Plan değişikliği maili — tenantId: {}, tip: {}, {} → {}",
+                payload.tenantId(), payload.changeType(), payload.oldPlanName(), payload.newPlanName());
+        mailService.sendSubscriptionPlanChanged(
+                payload.contactEmail(), payload.oldPlanName(), payload.newPlanName(),
+                payload.changeType(), payload.effectiveDate(), payload.chargedAmount(), messageId);
     }
 }

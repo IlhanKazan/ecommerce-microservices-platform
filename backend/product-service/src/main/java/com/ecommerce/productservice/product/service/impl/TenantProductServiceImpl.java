@@ -57,6 +57,7 @@ public class TenantProductServiceImpl implements TenantProductService {
         Product product = productMapper.toEntity(context);
         product.setCategory(category);
         product.setCreatedByUserId(context.keycloakId());
+        product.setDiscountedPrice(sanitizeDiscount(context.price(), context.discountedPrice()));
 
         if (context.parentProductId() != null) {
             Product parent = productRepository.findByIdAndTenantId(context.parentProductId(), context.tenantId())
@@ -115,6 +116,7 @@ public class TenantProductServiceImpl implements TenantProductService {
         product.setSku(context.sku());
         product.setBrand(context.brand());
         product.setPrice(context.price());
+        product.setDiscountedPrice(sanitizeDiscount(context.price(), context.discountedPrice()));
         product.setCurrency(context.currency() != null ? context.currency() : "TRY");
         product.setWeightGrams(context.weightGrams());
         product.setDimensionsCm(context.dimensionsCm());
@@ -153,6 +155,14 @@ public class TenantProductServiceImpl implements TenantProductService {
         deleteOrphanImages(oldMainImageUrl, oldImageUrls, updatedProduct);
 
         return updatedProduct;
+    }
+
+    // İndirimli fiyat ancak pozitif ve asıl fiyattan küçükse geçerli; aksi halde indirim yok (null)
+    private java.math.BigDecimal sanitizeDiscount(java.math.BigDecimal price, java.math.BigDecimal discountedPrice) {
+        if (price == null || discountedPrice == null) return null;
+        if (discountedPrice.compareTo(java.math.BigDecimal.ZERO) <= 0) return null;
+        if (discountedPrice.compareTo(price) >= 0) return null;
+        return discountedPrice;
     }
 
     // Eski görsellerden, yeni imageUrls listesinde de yeni mainImageUrl'de de olmayanlar orphan'dır

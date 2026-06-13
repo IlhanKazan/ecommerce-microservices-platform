@@ -40,6 +40,7 @@ public final class EventConstants {
 
     public static final String EVENT_SUBSCRIPTION_RENEWAL_SUCCESS = "SUBSCRIPTION_RENEWAL_SUCCESS_EVENT";
     public static final String EVENT_SUBSCRIPTION_RENEWAL_FAILED  = "SUBSCRIPTION_RENEWAL_FAILED_EVENT";
+    public static final String EVENT_SUBSCRIPTION_PLAN_CHANGED    = "SUBSCRIPTION_PLAN_CHANGED_EVENT";
 
     public static final String AGGREGATE_REVIEW = "REVIEW";
     public static final String EVENT_REVIEW_CREATED = "REVIEW_CREATED_EVENT";

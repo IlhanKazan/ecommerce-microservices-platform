@@ -25,6 +25,8 @@ import type { AutocompleteSuggestion } from '../../types/product';
 const Header: React.FC = () => {
     const auth = useAuth();
     const { user } = useAuthStore();
+    // Sepet için auth kaynağı: ProductCard/CartPage ile aynı (useAuthStore) — react-oidc ile desync olmasın
+    const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
     const navigate = useNavigate();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -40,7 +42,7 @@ const Header: React.FC = () => {
     // --- SEPET SAYISI MANTIĞINI DEĞİŞTİRDİK ---
     const localItemCount = useCartStore((state) => state.getItemCount());
     const apiItemCount = useBasketItemCount();
-    const itemCount = auth.isAuthenticated ? apiItemCount : localItemCount;
+    const itemCount = isAuthenticated ? apiItemCount : localItemCount;
 
     const login = () => auth.signinRedirect();
     const logout = () => auth.signoutRedirect({

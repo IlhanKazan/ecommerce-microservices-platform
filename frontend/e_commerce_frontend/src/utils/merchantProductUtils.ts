@@ -76,6 +76,7 @@ export function formValuesToRequest(values: ProductFormValues): ProductCreateReq
         brand:          values.brand || undefined,
         description:    values.description || undefined,
         price:          parseFloat(values.price),
+        discountedPrice: values.discountedPrice ? parseFloat(values.discountedPrice) : undefined,
         currency:       values.currency,
         categoryId:     parseInt(values.categoryId, 10),
         mainImageUrl:   values.mainImage?.url || undefined,

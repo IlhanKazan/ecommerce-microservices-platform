@@ -4,13 +4,14 @@ import type {
     CreateTenantRequest, SubscriptionPlan, TenantDetail, TenantSummary,
     UpdateTenantCriticalRequest,
     UpdateTenantGeneralRequest, TenantAddress, TenantRole, PaymentCardInfo, SubscriptionDetail, PaymentHistoryResponse,
-    PageResponse,  AddMemberRequest, Warehouse
+    PageResponse,  AddMemberRequest, Warehouse, SavedCard, AddCardPayload, ChangePlanResult
 } from '../../../types/tenant.ts';
 import type { StockSummaryItem } from '../../../types/product';
 import type {CreateAddressRequest, Address} from "../../../types/user.ts";
 import { asRecord, getString, getNumber, getBoolean } from '../../../utils/normalizers.ts';
 import type { AddressType as EnumAddressType } from '../../../types/enums.ts';
 import { IDEMPOTENCY_KEY_HEADER } from '../../../utils/idempotencyUtils';
+import { normalizePage } from '../../../utils/pageResponse';
 
 const normalizeTenantAddress = (raw: unknown): TenantAddress => {
     const r = asRecord(raw);
@@ -96,8 +97,39 @@ export const tenantService = {
         return normalizeTenantDetail(response.data);
     },
 
-    changeSubscriptionPlan: async (tenantId: number, planId: number): Promise<void> => {
-        await api.post(API_ENDPOINTS.SUBSCRIPTION.CHANGE_PLAN, { tenantId, planId });
+    changeSubscriptionPlan: async (tenantId: number, planId: number, idempotencyKey: string): Promise<ChangePlanResult> => {
+        const response = await api.post<ChangePlanResult>(
+            API_ENDPOINTS.SUBSCRIPTION.CHANGE_PLAN,
+            { tenantId, planId },
+            { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+        );
+        return response.data;
+    },
+
+    getCards: async (tenantId: number): Promise<SavedCard[]> => {
+        const response = await api.get<SavedCard[]>(API_ENDPOINTS.SUBSCRIPTION.CARDS, {
+            params: { tenantId },
+        });
+        return response.data;
+    },
+
+    addCard: async (payload: AddCardPayload, idempotencyKey: string): Promise<SavedCard> => {
+        const response = await api.post<SavedCard>(API_ENDPOINTS.SUBSCRIPTION.CARDS, payload, {
+            headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
+        });
+        return response.data;
+    },
+
+    deleteCard: async (tenantId: number, cardId: number): Promise<void> => {
+        await api.delete(API_ENDPOINTS.SUBSCRIPTION.CARD_BY_ID(cardId), {
+            params: { tenantId },
+        });
+    },
+
+    setDefaultCard: async (tenantId: number, cardId: number): Promise<void> => {
+        await api.patch(API_ENDPOINTS.SUBSCRIPTION.CARD_DEFAULT(cardId), undefined, {
+            params: { tenantId },
+        });
     },
 
     updateGeneralInfo: async (id: number, data: UpdateTenantGeneralRequest): Promise<void> => {
@@ -176,10 +208,10 @@ export const tenantService = {
     },
 
     getPaymentHistory: async (tenantId: number, page: number, size: number): Promise<PageResponse<PaymentHistoryResponse>> => {
-        const response = await api.get<PageResponse<PaymentHistoryResponse>>(API_ENDPOINTS.TENANT.PAYMENT_HISTORY(tenantId), {
+        const response = await api.get<unknown>(API_ENDPOINTS.TENANT.PAYMENT_HISTORY(tenantId), {
             params: { page, size }
         });
-        return response.data;
+        return normalizePage<PaymentHistoryResponse>(response.data);
     },
 
     verifyTenant: async (tenantId: number, data: { legalCompanyTitle: string; taxOffice: string; iban: string }) => {
@@ -199,9 +231,7 @@ export const tenantService = {
             headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
         });
     },
-   /* changeSubscriptionPlan: async (tenantId: number, planId: number): Promise<void> => {
-        await api.put(`/tenants/${tenantId}/subscription/plan`, { planId });
-    }*/
+
     getWarehouses: async (tenantId: number): Promise<Warehouse[]> => {
         const response = await api.get<Warehouse[]>(API_ENDPOINTS.STOCK.WAREHOUSES(tenantId));
         return response.data;

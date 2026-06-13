@@ -20,5 +20,6 @@ public record ProductUpdatedEventPayload(
         String status,
         String salesStatus,
         BigDecimal ratingAverage,   // nullable — only set on rating recalculate
-        Integer reviewCount         // nullable — only set on rating recalculate
+        Integer reviewCount,        // nullable — only set on rating recalculate
+        BigDecimal discountedPrice  // additive — nullable, indirim yoksa null
 ) {}

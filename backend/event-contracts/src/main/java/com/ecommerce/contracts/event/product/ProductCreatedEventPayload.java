@@ -16,5 +16,6 @@ public record ProductCreatedEventPayload(
         String currency,
         String mainImageUrl,
         Map<String, String> attributes,
-        List<String> tags
+        List<String> tags,
+        BigDecimal discountedPrice   // additive — nullable, indirim yoksa null
 ) {}

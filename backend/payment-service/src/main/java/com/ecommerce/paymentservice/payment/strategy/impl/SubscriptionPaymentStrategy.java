@@ -110,8 +110,8 @@ public class SubscriptionPaymentStrategy implements PaymentStrategy {
         return request;
     }
 
-    // Override yok cunku normal product odemelerinde boyle bir is yok, yani interfacede yok bu metot
-    public CreatePaymentRequest prepareRenewalRequest(Payment payment, String cardToken) {
+    @Override
+    public CreatePaymentRequest prepareRenewalRequest(Payment payment, String cardToken, String cardUserKey) {
         CreatePaymentRequest request = new CreatePaymentRequest();
         request.setLocale(Locale.TR.getValue());
         request.setConversationId(UUID.randomUUID().toString());
@@ -120,8 +120,12 @@ public class SubscriptionPaymentStrategy implements PaymentStrategy {
         request.setCurrency(Currency.TRY.name());
         request.setPaymentGroup(PaymentGroup.SUBSCRIPTION.name());
 
+        // Kayıtlı kartla tahsilat: iyzico cardToken + cardUserKey ikilisini birlikte ister.
         com.iyzipay.model.PaymentCard paymentCard = new com.iyzipay.model.PaymentCard();
         paymentCard.setCardToken(cardToken);
+        if (cardUserKey != null && !cardUserKey.isBlank()) {
+            paymentCard.setCardUserKey(cardUserKey);
+        }
         request.setPaymentCard(paymentCard);
 
         // Iyzico zorunlu tutarsa diye dummy data

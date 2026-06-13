@@ -4,14 +4,14 @@ import {
     Box, Typography, Alert, Pagination, Select, MenuItem, FormControl,
     Container, Stack, Paper, List, ListItemButton, ListItemText, Divider,
     TextField, Button, Switch, FormControlLabel, IconButton, Drawer, Collapse,
-    InputAdornment, type SelectChangeEvent,
+    InputAdornment, Checkbox, Radio, RadioGroup, type SelectChangeEvent,
 } from '@mui/material';
 import TuneIcon from '@mui/icons-material/Tune';
 import CloseIcon from '@mui/icons-material/Close';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { useSearchProducts, useGetCategories } from '../../../query/useProductQueries';
+import { useSearchProducts, useGetCategories, useBrandFacets } from '../../../query/useProductQueries';
 import { useCategoryStore } from '../../../store/useCategoryStore';
 import { collectCategoryIds, findCategoryPath } from '../../../utils/categoryUtils';
 import ProductCard from '../../../components/customer/ProductCard';
@@ -42,6 +42,8 @@ const ProductListPage: React.FC = () => {
     const [keyword, setKeyword] = useState(keywordFromUrl);
     const [sortBy, setSortBy] = useState<SortOption>('newest');
     const [inStockOnly, setInStockOnly] = useState(false);
+    const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+    const [minRating, setMinRating] = useState<number | undefined>(undefined);
     // Fiyat taslağı (apply'a basınca uygulanır → her tuşta refetch yok)
     const [priceDraft, setPriceDraft] = useState<{ min: string; max: string }>({ min: '', max: '' });
     const [appliedPrice, setAppliedPrice] = useState<{ min?: number; max?: number }>({});
@@ -102,12 +104,30 @@ const ProductListPage: React.FC = () => {
             inStock: inStockOnly ? true : undefined,
             minPrice: appliedPrice.min,
             maxPrice: appliedPrice.max,
+            minRating,
+            brands: selectedBrands.length ? selectedBrands : undefined,
             sortBy,
         }),
-        [page, resolvedCategoryIds, keyword, inStockOnly, appliedPrice.min, appliedPrice.max, sortBy],
+        [page, resolvedCategoryIds, keyword, inStockOnly, appliedPrice.min, appliedPrice.max, minRating, selectedBrands, sortBy],
     );
 
     const { data, isLoading, isError, isFetching } = useSearchProducts(searchPayload);
+
+    // Marka facet'i — markanın kendi filtresi hariç diğer aktif filtrelere göre bağlam
+    const facetPayload = useMemo(
+        () => ({
+            page: 0,
+            size: 1,
+            categoryIds: resolvedCategoryIds,
+            keyword: keyword === '' ? undefined : keyword,
+            inStock: inStockOnly ? true : undefined,
+            minPrice: appliedPrice.min,
+            maxPrice: appliedPrice.max,
+            minRating,
+        }),
+        [resolvedCategoryIds, keyword, inStockOnly, appliedPrice.min, appliedPrice.max, minRating],
+    );
+    const { data: brandFacets } = useBrandFacets(facetPayload);
 
     const handlePageChange = (_e: React.ChangeEvent<unknown>, value: number) => {
         setPage(value);
@@ -128,14 +148,27 @@ const ProductListPage: React.FC = () => {
         setPage(1);
     };
 
+    const toggleBrand = (brand: string) => {
+        setSelectedBrands((prev) => prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand]);
+        setPage(1);
+    };
+
+    const handleRatingChange = (value: number | undefined) => {
+        setMinRating(value);
+        setPage(1);
+    };
+
     const hasActiveFilters =
-        selectedCategoryId !== '' || inStockOnly || appliedPrice.min != null || appliedPrice.max != null;
+        selectedCategoryId !== '' || inStockOnly || appliedPrice.min != null || appliedPrice.max != null
+        || selectedBrands.length > 0 || minRating != null;
 
     const clearFilters = () => {
         setSelectedCategoryId('');
         setInStockOnly(false);
         setPriceDraft({ min: '', max: '' });
         setAppliedPrice({});
+        setSelectedBrands([]);
+        setMinRating(undefined);
         setSortBy('newest');
         setPage(1);
     };
@@ -201,6 +234,37 @@ const ProductListPage: React.FC = () => {
 
             <Divider />
 
+            {/* Marka — facet'ten gelen markalar (sayılarıyla) */}
+            {brandFacets && brandFacets.length > 0 && (
+                <>
+                    <Box>
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Marka</Typography>
+                        <List dense disablePadding sx={{ maxHeight: 220, overflowY: 'auto' }}>
+                            {brandFacets.map((f) => (
+                                <ListItemButton
+                                    key={f.brand}
+                                    dense
+                                    onClick={() => toggleBrand(f.brand)}
+                                    sx={{ borderRadius: 1.5, py: 0, pl: 0 }}
+                                >
+                                    <Checkbox
+                                        edge="start" size="small" disableRipple tabIndex={-1}
+                                        checked={selectedBrands.includes(f.brand)}
+                                        sx={{ py: 0.25 }}
+                                    />
+                                    <ListItemText
+                                        primary={f.brand}
+                                        primaryTypographyProps={{ fontSize: '0.83rem' }}
+                                    />
+                                    <Typography variant="caption" color="text.disabled">{f.count}</Typography>
+                                </ListItemButton>
+                            ))}
+                        </List>
+                    </Box>
+                    <Divider />
+                </>
+            )}
+
             {/* Fiyat aralığı */}
             <Box>
                 <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>Fiyat Aralığı</Typography>
@@ -218,6 +282,24 @@ const ProductListPage: React.FC = () => {
                     />
                 </Stack>
                 <Button fullWidth size="small" variant="outlined" onClick={applyPrice}>Uygula</Button>
+            </Box>
+
+            <Divider />
+
+            {/* Değerlendirme */}
+            <Box>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>Değerlendirme</Typography>
+                <RadioGroup
+                    value={minRating ?? ''}
+                    onChange={(e) => handleRatingChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                >
+                    <FormControlLabel value={4} control={<Radio size="small" />}
+                        label={<Typography variant="body2">4★ ve üzeri</Typography>} />
+                    <FormControlLabel value={3} control={<Radio size="small" />}
+                        label={<Typography variant="body2">3★ ve üzeri</Typography>} />
+                    <FormControlLabel value="" control={<Radio size="small" />}
+                        label={<Typography variant="body2">Tümü</Typography>} />
+                </RadioGroup>
             </Box>
 
             <Divider />

@@ -46,6 +46,12 @@ public class TenantSubscription extends BaseEntity {
     @Column(name = "iyzico_card_token")
     private String iyzicoCardToken;
 
+    @Column(name = "iyzico_card_user_key")
+    private String iyzicoCardUserKey;
+
+    @Column(name = "scheduled_plan_id")
+    private Long scheduledPlanId;
+
     @Enumerated(EnumType.STRING)
     private TenantSubscriptionStatus status;
 

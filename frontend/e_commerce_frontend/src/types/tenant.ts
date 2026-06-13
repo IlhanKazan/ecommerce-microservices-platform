@@ -96,6 +96,33 @@ export interface SubscriptionDetail {
     cancellationReason: string | null;
 }
 
+export interface SavedCard {
+    id: number;
+    cardAlias: string | null;
+    lastFour: string | null;
+    cardAssociation: string | null;
+    cardFamily: string | null;
+    isDefault: boolean;
+}
+
+export interface AddCardPayload {
+    tenantId: number;
+    cardAlias: string;
+    cardHolderName: string;
+    cardNumber: string;
+    expireMonth: string;
+    expireYear: string;
+}
+
+export type PlanChangeType = 'UPGRADE' | 'DOWNGRADE_SCHEDULED' | 'DOWNGRADE_CANCELED';
+
+export interface ChangePlanResult {
+    changeType: PlanChangeType;
+    chargedAmount: number;
+    effectiveDate: string;
+    newPlanName: string;
+}
+
 export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILURE' | 'REFUNDED';
 export type PaymentType = 'SUBSCRIPTION' | 'PRODUCT_ORDER';
 

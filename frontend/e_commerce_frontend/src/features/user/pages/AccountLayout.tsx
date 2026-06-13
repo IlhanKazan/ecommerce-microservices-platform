@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Paper, Typography, List, ListItemButton, ListItemIcon, ListItemText, Divider, Grid, Avatar } from '@mui/material';
-import { Person as PersonIcon, ShoppingBag as OrderIcon, LocationOn as AddressIcon, Logout as LogoutIcon } from '@mui/icons-material';
+import { Person as PersonIcon, ShoppingBag as OrderIcon, LocationOn as AddressIcon, FavoriteBorder as FavoriteIcon, Logout as LogoutIcon } from '@mui/icons-material';
 import { useAuth } from "react-oidc-context";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -22,6 +22,7 @@ const AccountLayout: React.FC = () => {
     const menuItems = [
         { path: '/user', label: 'Kullanıcı Bilgilerim', icon: <PersonIcon />, exact: true },
         { path: '/user/orders', label: 'Siparişlerim', icon: <OrderIcon /> },
+        { path: '/user/favorites', label: 'Favorilerim', icon: <FavoriteIcon /> },
         { path: '/user/addresses', label: 'Adres Bilgilerim', icon: <AddressIcon /> },
     ];
 

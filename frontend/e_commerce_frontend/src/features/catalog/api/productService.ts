@@ -1,6 +1,8 @@
 import { api } from '../../../lib/axios';
 import { API_ENDPOINTS } from '../../../config/apiEndpoints';
 import { IDEMPOTENCY_KEY_HEADER } from '../../../utils/idempotencyUtils';
+import { asRecord, getString, getNumber } from '../../../utils/normalizers';
+import { normalizePage } from '../../../utils/pageResponse';
 import type {
     ProductSearchPayload,
     ProductDetail,
@@ -15,6 +17,7 @@ import type {
     ProductUpdateRequest,
     AutocompleteSuggestion,
     TenantStorefront,
+    BrandFacet,
 } from '../../../types/product';
 import type { BasketResponse, AddItemRequest } from '../../../types';
 
@@ -27,16 +30,41 @@ function idempotencyHeader(key?: string): Record<string, string> {
     return key ? { [IDEMPOTENCY_KEY_HEADER]: key } : {};
 }
 
+/** Backend ProductResponse → ProductCard'ın beklediği ProductSummary (favori listesi için).
+ *  Favori endpoint'i stok bilgisi taşımaz; inStock varsayılan true. */
+function toProductSummary(raw: unknown): ProductSummary {
+    const r = asRecord(raw);
+    return {
+        id: String(getNumber(r, 'id') ?? 0),
+        tenantId: getNumber(r, 'tenantId') ?? 0,
+        categoryId: getNumber(r, 'categoryId') ?? null,
+        categoryName: getString(r, 'categoryName') ?? null,
+        sku: getString(r, 'sku') ?? '',
+        name: getString(r, 'name') ?? '',
+        brand: getString(r, 'brand') ?? null,
+        price: getNumber(r, 'price') ?? 0,
+        discountedPrice: getNumber(r, 'discountedPrice') ?? null,
+        currency: getString(r, 'currency') ?? 'TRY',
+        mainImageUrl: getString(r, 'mainImageUrl') ?? null,
+        ratingAverage: getNumber(r, 'ratingAverage') ?? null,
+        reviewCount: getNumber(r, 'reviewCount') ?? 0,
+        salesStatus: getString(r, 'salesStatus') ?? 'ON_SALE',
+        inStock: true,
+        tenantName: getString(r, 'tenantName') ?? null,
+        tenantLogoUrl: getString(r, 'tenantLogoUrl') ?? null,
+    };
+}
+
 // ─── Product Service ──────────────────────────────────────────────────────────
 
 export const productService = {
 
     searchProducts: async (body: ProductSearchPayload): Promise<PageResponse<ProductSummary>> => {
-        const response = await api.post<PageResponse<ProductSummary>>(
+        const response = await api.post<unknown>(
             API_ENDPOINTS.SEARCH.PRODUCTS,
             body,
         );
-        return response.data;
+        return normalizePage<ProductSummary>(response.data);
     },
 
     autocomplete: async (q: string, size = 5): Promise<AutocompleteSuggestion[]> => {
@@ -47,9 +75,34 @@ export const productService = {
         return response.data;
     },
 
+    getBrandFacets: async (body: ProductSearchPayload): Promise<BrandFacet[]> => {
+        const response = await api.post<BrandFacet[]>(API_ENDPOINTS.SEARCH.BRANDS, body);
+        return response.data;
+    },
+
     getProductDetail: async (id: number): Promise<ProductDetail> => {
         const response = await api.get<ProductDetail>(API_ENDPOINTS.PRODUCT.BY_ID_PUBLIC(id));
         return response.data;
+    },
+
+    // ─── Favorites ───────────────────────────────────────────────────────────
+
+    getFavoriteIds: async (): Promise<number[]> => {
+        const response = await api.get<number[]>(API_ENDPOINTS.PRODUCT.FAVORITE_IDS);
+        return response.data;
+    },
+
+    getFavorites: async (): Promise<ProductSummary[]> => {
+        const response = await api.get<unknown[]>(API_ENDPOINTS.PRODUCT.FAVORITES);
+        return Array.isArray(response.data) ? response.data.map(toProductSummary) : [];
+    },
+
+    addFavorite: async (productId: number): Promise<void> => {
+        await api.put(API_ENDPOINTS.PRODUCT.FAVORITE(productId));
+    },
+
+    removeFavorite: async (productId: number): Promise<void> => {
+        await api.delete(API_ENDPOINTS.PRODUCT.FAVORITE(productId));
     },
 
     // ─── Reviews ─────────────────────────────────────────────────────────────
@@ -59,11 +112,11 @@ export const productService = {
         page = 0,
         size = 10,
     ): Promise<PageResponse<ProductReviewDTO>> => {
-        const response = await api.get<PageResponse<ProductReviewDTO>>(
+        const response = await api.get<unknown>(
             API_ENDPOINTS.PRODUCT.REVIEWS(id),
             { params: { page, size } },
         );
-        return response.data;
+        return normalizePage<ProductReviewDTO>(response.data);
     },
 
     createReview: async (
@@ -121,11 +174,11 @@ export const productService = {
         page = 0,
         size = 20,
     ): Promise<PageResponse<TenantProductResponse>> => {
-        const response = await api.get<PageResponse<TenantProductResponse>>(
+        const response = await api.get<unknown>(
             API_ENDPOINTS.PRODUCT.TENANT_LIST(tenantId),
             { params: { page, size } },
         );
-        return response.data;
+        return normalizePage<TenantProductResponse>(response.data);
     },
 
     createTenantProduct: async (
@@ -242,6 +295,11 @@ export const basketService = {
             payload,
             { headers: idempotencyHeader(idempotencyKey) },
         );
+    },
+
+    /** Guest sepetini hesap sepetine birleştir — tek atomik çağrı (miktarlar toplanır). */
+    mergeCart: async (items: AddItemRequest[]): Promise<void> => {
+        await api.post(API_ENDPOINTS.BASKET.MERGE, { items });
     },
 
     removeItem: async (productId: number): Promise<void> => {

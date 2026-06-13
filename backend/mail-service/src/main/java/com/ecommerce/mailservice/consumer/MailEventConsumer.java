@@ -7,6 +7,7 @@ import com.ecommerce.contracts.event.order.OrderDeliveredEventPayload;
 import com.ecommerce.contracts.event.order.OrderRefundedEventPayload;
 import com.ecommerce.contracts.event.order.OrderShippedEventPayload;
 import com.ecommerce.contracts.event.payment.SubscriptionActivatedEventPayload;
+import com.ecommerce.contracts.event.payment.SubscriptionPlanChangedEventPayload;
 import com.ecommerce.contracts.event.payment.SubscriptionRenewalFailedEventPayload;
 import com.ecommerce.contracts.event.payment.SubscriptionRenewalSuccessEventPayload;
 import com.ecommerce.contracts.event.tenant.TenantActivatedEventPayload;
@@ -171,6 +172,11 @@ public class MailEventConsumer {
                     SubscriptionRenewalFailedEventPayload payload =
                             objectMapper.readValue(json, SubscriptionRenewalFailedEventPayload.class);
                     subscriptionMailHandler.handleRenewalFailed(payload, messageId);
+                }
+                case EventConstants.EVENT_SUBSCRIPTION_PLAN_CHANGED -> {
+                    SubscriptionPlanChangedEventPayload payload =
+                            objectMapper.readValue(json, SubscriptionPlanChangedEventPayload.class);
+                    subscriptionMailHandler.handlePlanChanged(payload, messageId);
                 }
                 case null, default ->
                         log.debug("Mail-service için PAYMENT event ilgisiz: {}", eventType);

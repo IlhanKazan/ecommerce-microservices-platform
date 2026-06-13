@@ -55,6 +55,7 @@ public interface ProductMapper {
                 request.sku(),
                 request.brand(),
                 request.price(),
+                request.discountedPrice(),
                 request.currency() != null ? request.currency() : "TRY",
                 request.weightGrams(),
                 request.dimensionsCm(),

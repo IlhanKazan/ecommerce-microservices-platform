@@ -112,11 +112,17 @@ export interface ProductSearchPayload {
     brands?: string[];
     minPrice?: number;
     maxPrice?: number;
+    minRating?: number;
     inStock?: boolean;
     sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'popular' | 'rating';
     tenantId?: number;
     page: number;
     size: number;
+}
+
+export interface BrandFacet {
+    brand: string;
+    count: number;
 }
 
 // ─── Tenant Storefront ────────────────────────────────────────────────────────
@@ -208,6 +214,7 @@ export interface ProductCreateRequest {
     sku: string;
     brand?: string;
     price: number;
+    discountedPrice?: number;
     currency?: string;
     weightGrams?: number;
     dimensionsCm?: string;

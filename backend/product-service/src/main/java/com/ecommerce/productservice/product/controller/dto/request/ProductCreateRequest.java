@@ -21,6 +21,8 @@ public record ProductCreateRequest(
         String brand,
         @Schema(description = "Selling price", example = "299.99")
         @NotNull(message = "Fiyat zorunludur") @Positive BigDecimal price,
+        @Schema(description = "İndirimli fiyat (asıl fiyattan küçük olmalı); null = indirim yok", example = "249.99")
+        BigDecimal discountedPrice,
         String currency,
 
         @Schema(description = "Package weight in grams for shipping calculation", example = "500")

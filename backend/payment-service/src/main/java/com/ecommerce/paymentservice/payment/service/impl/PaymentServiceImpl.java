@@ -8,11 +8,13 @@ import com.ecommerce.paymentservice.payment.constant.PaymentType;
 import com.ecommerce.paymentservice.payment.entity.Payment;
 import com.ecommerce.paymentservice.payment.domain.PaymentContext;
 import com.ecommerce.paymentservice.payment.repository.PaymentRepository;
+import com.ecommerce.paymentservice.payment.domain.IyzicoStoredCard;
 import com.ecommerce.paymentservice.payment.service.PaymentProvisioningFailureRecorder;
 import com.ecommerce.paymentservice.payment.service.PaymentService;
 import com.ecommerce.paymentservice.payment.strategy.PaymentStrategy;
 import com.ecommerce.paymentservice.subscription.constant.TenantSubscriptionStatus;
 import com.ecommerce.paymentservice.subscription.entity.TenantSubscription;
+import com.ecommerce.paymentservice.subscription.service.CardService;
 import com.ecommerce.paymentservice.subscription.service.TenantSubscriptionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iyzipay.Options;
@@ -41,6 +43,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
     private final PaymentProvisioningFailureRecorder provisioningFailureRecorder;
+    private final CardService cardService;
 
     @Override
     @Transactional
@@ -128,7 +131,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public Payment processRenewalPayment(Long tenantId, String cardToken, BigDecimal amount) {
+    public Payment processTokenCharge(Long tenantId, String cardToken, String cardUserKey, BigDecimal amount) {
         PaymentStrategy strategy = findStrategy(PaymentType.SUBSCRIPTION);
 
         Payment payment = Payment.builder()
@@ -142,7 +145,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         paymentRepository.save(payment);
 
-        CreatePaymentRequest iyzicoRequest = strategy.prepareRenewalRequest(payment, cardToken);
+        CreatePaymentRequest iyzicoRequest = strategy.prepareRenewalRequest(payment, cardToken, cardUserKey);
 
         com.iyzipay.model.Payment iyzicoResponse = callIyzico(payment, iyzicoRequest);
 
@@ -196,10 +199,30 @@ public class PaymentServiceImpl implements PaymentService {
                             context.getTenantId(),
                             context.getReferenceId(),
                             iyzicoResponse.getCardToken(),
+                            iyzicoResponse.getCardUserKey(),
                             payment.getAmount(),
                             context.getContactEmail()
                     );
                     outboxService.publishSubscriptionActivatedEvent(sub);
+
+                    // Abonelik ödemesinde registerCard ile saklanan kartı vault'a varsayılan olarak ekle.
+                    // Best-effort: kart seed'i ödemeyi bozmamalı.
+                    try {
+                        cardService.seedDefaultCard(
+                                context.getTenantId(),
+                                context.getCustomerId(),
+                                new IyzicoStoredCard(
+                                        iyzicoResponse.getCardToken(),
+                                        iyzicoResponse.getCardUserKey(),
+                                        iyzicoResponse.getLastFourDigits(),
+                                        iyzicoResponse.getCardAssociation(),
+                                        iyzicoResponse.getCardFamily(),
+                                        iyzicoResponse.getBinNumber()
+                                )
+                        );
+                    } catch (Exception cardEx) {
+                        log.warn("Abonelik kartı vault'a kaydedilemedi (ödeme etkilenmez): {}", cardEx.getMessage());
+                    }
                 } catch (Exception e) {
                     // iyzico parayı çekti ama abonelik provisioning'i patladı.
                     // Para izini AYRI tx'te (REQUIRES_NEW) kalıcı yaz, sonra ana tx'in rollback olmasına izin ver.

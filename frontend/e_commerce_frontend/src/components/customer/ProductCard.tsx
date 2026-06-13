@@ -1,11 +1,13 @@
 import React from 'react';
 import { Typography, Card, CardMedia, Box, IconButton, Button, Rating, Avatar } from '@mui/material';
-import { FavoriteBorder, ShoppingCartOutlined } from '@mui/icons-material';
+import { Favorite, FavoriteBorder, ShoppingCartOutlined } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
+import { useAuth } from 'react-oidc-context';
 import type { ProductSummary } from '../../types';
 import { useToastStore } from '../../store/useToastStore';
 import { useCartStore } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useFavoriteStore } from '../../store/useFavoriteStore';
 import { useAddToBasket } from '../../query/useBasketQueries';
 
 interface ProductCardProps {
@@ -17,9 +19,22 @@ const formatPrice = (price: number): string =>
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     const toast = useToastStore();
+    const auth = useAuth();
     const addItem = useCartStore((s) => s.addItem);
     const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+    const isFavorite = useFavoriteStore((s) => s.ids.has(Number(product.id)));
+    const toggleFavorite = useFavoriteStore((s) => s.toggle);
     const { mutate: addApiItem, isPending } = useAddToBasket();
+
+    const handleFavorite = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isAuthenticated) {
+            auth.signinRedirect();
+            return;
+        }
+        toggleFavorite(Number(product.id));
+    };
 
     const imageUrl = product.mainImageUrl ?? 'https://placehold.co/400x400/f5f5f5/bdbdbd?text=Resim+Yok';
     const displayPrice = product.discountedPrice ?? product.price;
@@ -128,14 +143,19 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                 {/* Favori — sağ üst */}
                 <IconButton
                     size="small"
+                    onClick={handleFavorite}
+                    aria-label={isFavorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}
                     sx={{
                         position: 'absolute', top: 6, right: 6, zIndex: 2,
                         bgcolor: 'rgba(255,255,255,0.85)',
                         width: 28, height: 28,
+                        color: isFavorite ? 'error.main' : 'inherit',
                         '&:hover': { bgcolor: 'white', color: 'error.main' },
                     }}
                 >
-                    <FavoriteBorder sx={{ fontSize: 15 }} />
+                    {isFavorite
+                        ? <Favorite sx={{ fontSize: 15 }} />
+                        : <FavoriteBorder sx={{ fontSize: 15 }} />}
                 </IconButton>
 
                 {/* Hover sepet butonu */}

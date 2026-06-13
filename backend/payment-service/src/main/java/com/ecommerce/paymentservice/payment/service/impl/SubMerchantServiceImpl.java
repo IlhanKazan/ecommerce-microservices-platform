@@ -1,5 +1,6 @@
 package com.ecommerce.paymentservice.payment.service.impl;
 
+import com.ecommerce.common.exception.ExternalServiceException;
 import com.ecommerce.paymentservice.payment.controller.dto.request.SubMerchantCreateRequest;
 import com.ecommerce.paymentservice.payment.controller.dto.request.SubMerchantUpdateRequest;
 import com.ecommerce.paymentservice.payment.service.SubMerchantService;
@@ -49,15 +50,36 @@ public class SubMerchantServiceImpl implements SubMerchantService {
 
         log.info("SUB MERCHANT CREATE REQUEST >> {}", request);
         // iyzicoya gönder
-        SubMerchant subMerchant = SubMerchant.create(request, iyzicoOptions);
+        SubMerchant subMerchant = callIyzicoCreate(request);
 
         if ("success".equalsIgnoreCase(subMerchant.getStatus())){
-            return subMerchant.getSubMerchantKey();
-        }else{
-            log.error("Iyzico SubMerchant Oluşturma Hatası: {}", subMerchant.getErrorMessage());
-            throw new RuntimeException("Alt üye iş yeri açılamadı: " + subMerchant.getErrorMessage());
+            String key = subMerchant.getSubMerchantKey();
+            if (key == null || key.isBlank()) {
+                // iyzico "success" dedi ama key boş — güvenmiyoruz, hata sayıyoruz
+                log.error("Iyzico submerchant 'success' döndü ama subMerchantKey boş. tenantId: {}", dto.tenantId());
+                throw new ExternalServiceException("Alt üye iş yeri anahtarı alınamadı.", "SUBMERCHANT_KEY_MISSING");
+            }
+            return key;
         }
+        log.error("Iyzico SubMerchant Oluşturma Hatası — code: {}, msg: {}",
+                subMerchant.getErrorCode(), subMerchant.getErrorMessage());
+        throw new ExternalServiceException(
+                "Alt üye iş yeri açılamadı: " + iyzicoError(subMerchant),
+                "SUBMERCHANT_CREATE_FAILED");
+    }
 
+    private SubMerchant callIyzicoCreate(CreateSubMerchantRequest request) {
+        try {
+            return SubMerchant.create(request, iyzicoOptions);
+        } catch (Exception e) {
+            log.error("Iyzico submerchant create çağrısı hata fırlattı: {}", e.getMessage(), e);
+            throw new ExternalServiceException("iyzico'ya ulaşılamadı: " + e.getMessage(), "IYZICO_UNAVAILABLE");
+        }
+    }
+
+    private String iyzicoError(SubMerchant subMerchant) {
+        String msg = subMerchant.getErrorMessage();
+        return msg != null ? msg : "bilinmeyen iyzico hatası";
     }
 
     @Override
@@ -84,16 +106,23 @@ public class SubMerchantServiceImpl implements SubMerchantService {
             request.setIdentityNumber(dto.taxId());
         }
 
-        SubMerchant subMerchant = SubMerchant.update(request, iyzicoOptions);
+        SubMerchant subMerchant;
+        try {
+            subMerchant = SubMerchant.update(request, iyzicoOptions);
+        } catch (Exception e) {
+            log.error("Iyzico submerchant update çağrısı hata fırlattı: {}", e.getMessage(), e);
+            throw new ExternalServiceException("iyzico'ya ulaşılamadı: " + e.getMessage(), "IYZICO_UNAVAILABLE");
+        }
 
         if ("success".equalsIgnoreCase(subMerchant.getStatus())) {
             log.info("SubMerchant başarıyla güncellendi. Key: {}", dto.existingSubMerchantKey());
             return dto.existingSubMerchantKey();
-        } else {
-            log.error("Iyzico SubMerchant Güncelleme Hatası: {}", subMerchant.getErrorMessage());
-            throw new RuntimeException("Alt üye işyeri güncellenemedi: " + subMerchant.getErrorMessage());
         }
-
+        log.error("Iyzico SubMerchant Güncelleme Hatası — code: {}, msg: {}",
+                subMerchant.getErrorCode(), subMerchant.getErrorMessage());
+        throw new ExternalServiceException(
+                "Alt üye işyeri güncellenemedi: " + iyzicoError(subMerchant),
+                "SUBMERCHANT_UPDATE_FAILED");
     }
 
     private String formatPhone(String phone) {

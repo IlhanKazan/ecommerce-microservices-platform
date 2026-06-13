@@ -15,5 +15,5 @@ public interface PaymentStrategy {
 
     CreatePaymentRequest prepareIyzicoRequest(Payment payment, PaymentContext context);
 
-    CreatePaymentRequest prepareRenewalRequest(Payment payment, String cardToken);
+    CreatePaymentRequest prepareRenewalRequest(Payment payment, String cardToken, String cardUserKey);
 }

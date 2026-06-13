@@ -36,7 +36,7 @@ public class TenantSubscriptionServiceImpl implements TenantSubscriptionService 
 
     @Override
     @Transactional
-    public TenantSubscription createActiveSubscription(Long tenantId, Long planId, String cardToken, BigDecimal amountPaid, String contactEmail) {
+    public TenantSubscription createActiveSubscription(Long tenantId, Long planId, String cardToken, String cardUserKey, BigDecimal amountPaid, String contactEmail) {
 
         SubscriptionPlan plan = subscriptionPlanService.findByIdAndIsActive(planId, true)
                 .orElseThrow(() -> new RuntimeException("Plan bulunamadı"));
@@ -49,6 +49,7 @@ public class TenantSubscriptionServiceImpl implements TenantSubscriptionService 
                 .commissionRate(plan.getCommissionRate())
                 .status(TenantSubscriptionStatus.ACTIVE)
                 .iyzicoCardToken(cardToken)
+                .iyzicoCardUserKey(cardUserKey)
                 .autoRenew(true)
                 .startedAt(LocalDateTime.now())
                 .lastSuccessfulPaymentDate(LocalDateTime.now())
