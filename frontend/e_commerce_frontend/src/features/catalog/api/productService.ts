@@ -1,6 +1,7 @@
 import { api } from '../../../lib/axios';
 import { API_ENDPOINTS } from '../../../config/apiEndpoints';
 import { IDEMPOTENCY_KEY_HEADER } from '../../../utils/idempotencyUtils';
+import { normalizePage } from '../../../utils/pageResponse';
 import type {
     ProductSearchPayload,
     ProductDetail,
@@ -32,11 +33,11 @@ function idempotencyHeader(key?: string): Record<string, string> {
 export const productService = {
 
     searchProducts: async (body: ProductSearchPayload): Promise<PageResponse<ProductSummary>> => {
-        const response = await api.post<PageResponse<ProductSummary>>(
+        const response = await api.post<unknown>(
             API_ENDPOINTS.SEARCH.PRODUCTS,
             body,
         );
-        return response.data;
+        return normalizePage<ProductSummary>(response.data);
     },
 
     autocomplete: async (q: string, size = 5): Promise<AutocompleteSuggestion[]> => {
@@ -59,11 +60,11 @@ export const productService = {
         page = 0,
         size = 10,
     ): Promise<PageResponse<ProductReviewDTO>> => {
-        const response = await api.get<PageResponse<ProductReviewDTO>>(
+        const response = await api.get<unknown>(
             API_ENDPOINTS.PRODUCT.REVIEWS(id),
             { params: { page, size } },
         );
-        return response.data;
+        return normalizePage<ProductReviewDTO>(response.data);
     },
 
     createReview: async (
@@ -121,11 +122,11 @@ export const productService = {
         page = 0,
         size = 20,
     ): Promise<PageResponse<TenantProductResponse>> => {
-        const response = await api.get<PageResponse<TenantProductResponse>>(
+        const response = await api.get<unknown>(
             API_ENDPOINTS.PRODUCT.TENANT_LIST(tenantId),
             { params: { page, size } },
         );
-        return response.data;
+        return normalizePage<TenantProductResponse>(response.data);
     },
 
     createTenantProduct: async (

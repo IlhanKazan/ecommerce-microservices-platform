@@ -11,6 +11,7 @@ import type {CreateAddressRequest, Address} from "../../../types/user.ts";
 import { asRecord, getString, getNumber, getBoolean } from '../../../utils/normalizers.ts';
 import type { AddressType as EnumAddressType } from '../../../types/enums.ts';
 import { IDEMPOTENCY_KEY_HEADER } from '../../../utils/idempotencyUtils';
+import { normalizePage } from '../../../utils/pageResponse';
 
 const normalizeTenantAddress = (raw: unknown): TenantAddress => {
     const r = asRecord(raw);
@@ -176,10 +177,10 @@ export const tenantService = {
     },
 
     getPaymentHistory: async (tenantId: number, page: number, size: number): Promise<PageResponse<PaymentHistoryResponse>> => {
-        const response = await api.get<PageResponse<PaymentHistoryResponse>>(API_ENDPOINTS.TENANT.PAYMENT_HISTORY(tenantId), {
+        const response = await api.get<unknown>(API_ENDPOINTS.TENANT.PAYMENT_HISTORY(tenantId), {
             params: { page, size }
         });
-        return response.data;
+        return normalizePage<PaymentHistoryResponse>(response.data);
     },
 
     verifyTenant: async (tenantId: number, data: { legalCompanyTitle: string; taxOffice: string; iban: string }) => {
