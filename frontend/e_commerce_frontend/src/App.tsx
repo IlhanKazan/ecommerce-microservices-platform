@@ -7,6 +7,7 @@ import { NotificationProvider } from './components/shared/NotificationProvider';
 import { AppRoutes } from './utils/routes';
 import { useAuthStore } from "./store/useAuthStore";
 import { useCartStore } from "./store/useCartStore";
+import { useFavoriteStore } from "./store/useFavoriteStore";
 import { useMe } from './query/useUserQueries';
 import { useAuth } from "react-oidc-context";
 import ProtectedRoute from "./components/shared/ProtectedRoute";
@@ -26,6 +27,7 @@ const AccountLayout = lazy(() => import('./features/user/pages/AccountLayout'));
 const AccountOrders = lazy(() => import("./features/user/pages/AccountOrders"));
 const AccountProfile = lazy(() => import("./features/user/pages/AccountProfile"));
 const AccountAddresses = lazy(() => import("./features/user/pages/AccountAddresses"));
+const AccountFavorites = lazy(() => import("./features/user/pages/AccountFavorites"));
 
 const CartPage = lazy(() => import('./features/checkout/pages/CartPage'));
 const CheckoutPage = lazy(() => import('./features/checkout/pages/CheckoutPage'));
@@ -109,6 +111,15 @@ function App() {
         }
     }, [categoryData, setCategories]);
 
+    // Favori id'lerini girişte yükle, çıkışta temizle
+    useEffect(() => {
+        if (isAuthenticated) {
+            useFavoriteStore.getState().loadIds();
+        } else {
+            useFavoriteStore.getState().clear();
+        }
+    }, [isAuthenticated]);
+
     if (auth.isLoading) return <LoadingSpinner />;
 
     return (
@@ -126,6 +137,7 @@ function App() {
                     <Route path={AppRoutes.ACCOUNT.slice(1)} element={<ProtectedRoute><AccountLayout /></ProtectedRoute>}>
                         <Route index element={<AccountProfile />} />
                         <Route path="orders" element={<AccountOrders />} />
+                        <Route path="favorites" element={<AccountFavorites />} />
                         <Route path="addresses" element={<AccountAddresses />} />
                     </Route>
 

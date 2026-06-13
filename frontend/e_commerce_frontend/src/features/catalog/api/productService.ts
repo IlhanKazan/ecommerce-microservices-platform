@@ -1,6 +1,7 @@
 import { api } from '../../../lib/axios';
 import { API_ENDPOINTS } from '../../../config/apiEndpoints';
 import { IDEMPOTENCY_KEY_HEADER } from '../../../utils/idempotencyUtils';
+import { asRecord, getString, getNumber } from '../../../utils/normalizers';
 import { normalizePage } from '../../../utils/pageResponse';
 import type {
     ProductSearchPayload,
@@ -28,6 +29,31 @@ function idempotencyHeader(key?: string): Record<string, string> {
     return key ? { [IDEMPOTENCY_KEY_HEADER]: key } : {};
 }
 
+/** Backend ProductResponse → ProductCard'ın beklediği ProductSummary (favori listesi için).
+ *  Favori endpoint'i stok bilgisi taşımaz; inStock varsayılan true. */
+function toProductSummary(raw: unknown): ProductSummary {
+    const r = asRecord(raw);
+    return {
+        id: String(getNumber(r, 'id') ?? 0),
+        tenantId: getNumber(r, 'tenantId') ?? 0,
+        categoryId: getNumber(r, 'categoryId') ?? null,
+        categoryName: getString(r, 'categoryName') ?? null,
+        sku: getString(r, 'sku') ?? '',
+        name: getString(r, 'name') ?? '',
+        brand: getString(r, 'brand') ?? null,
+        price: getNumber(r, 'price') ?? 0,
+        discountedPrice: getNumber(r, 'discountedPrice') ?? null,
+        currency: getString(r, 'currency') ?? 'TRY',
+        mainImageUrl: getString(r, 'mainImageUrl') ?? null,
+        ratingAverage: getNumber(r, 'ratingAverage') ?? null,
+        reviewCount: getNumber(r, 'reviewCount') ?? 0,
+        salesStatus: getString(r, 'salesStatus') ?? 'ON_SALE',
+        inStock: true,
+        tenantName: getString(r, 'tenantName') ?? null,
+        tenantLogoUrl: getString(r, 'tenantLogoUrl') ?? null,
+    };
+}
+
 // ─── Product Service ──────────────────────────────────────────────────────────
 
 export const productService = {
@@ -51,6 +77,26 @@ export const productService = {
     getProductDetail: async (id: number): Promise<ProductDetail> => {
         const response = await api.get<ProductDetail>(API_ENDPOINTS.PRODUCT.BY_ID_PUBLIC(id));
         return response.data;
+    },
+
+    // ─── Favorites ───────────────────────────────────────────────────────────
+
+    getFavoriteIds: async (): Promise<number[]> => {
+        const response = await api.get<number[]>(API_ENDPOINTS.PRODUCT.FAVORITE_IDS);
+        return response.data;
+    },
+
+    getFavorites: async (): Promise<ProductSummary[]> => {
+        const response = await api.get<unknown[]>(API_ENDPOINTS.PRODUCT.FAVORITES);
+        return Array.isArray(response.data) ? response.data.map(toProductSummary) : [];
+    },
+
+    addFavorite: async (productId: number): Promise<void> => {
+        await api.put(API_ENDPOINTS.PRODUCT.FAVORITE(productId));
+    },
+
+    removeFavorite: async (productId: number): Promise<void> => {
+        await api.delete(API_ENDPOINTS.PRODUCT.FAVORITE(productId));
     },
 
     // ─── Reviews ─────────────────────────────────────────────────────────────

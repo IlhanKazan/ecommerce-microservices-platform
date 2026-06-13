@@ -47,6 +47,9 @@ export const API_ENDPOINTS = {
     },
     PRODUCT: {
         BY_ID_PUBLIC: (id: number) => `/public/products/${id}`,
+        FAVORITE: (id: number) => `/public/products/${id}/favorite`,
+        FAVORITES: '/public/products/me/favorites',
+        FAVORITE_IDS: '/public/products/me/favorite-ids',
         REVIEWS: (id: number) => `/public/products/${id}/reviews`,
         REVIEW_HELPFUL: (productId: number, reviewId: number) =>
             `/public/products/${productId}/reviews/${reviewId}/helpful`,

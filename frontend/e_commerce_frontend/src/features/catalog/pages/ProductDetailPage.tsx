@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import {
     ShoppingCart as ShoppingCartIcon,
+    Favorite,
     FavoriteBorder,
     LocalShipping,
     VerifiedUser,
@@ -26,10 +27,12 @@ import {
     ChevronRight,
 } from '@mui/icons-material';
 
+import { useAuth } from 'react-oidc-context';
 import { useAddToBasket } from '../../../query/useBasketQueries';
 import { useCartStore } from '../../../store/useCartStore';
 import photo from '../../../components/customer/react.svg';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { useFavoriteStore } from '../../../store/useFavoriteStore';
 import {
     useGetProductDetail,
     useGetProductReviews,
@@ -75,10 +78,21 @@ const ProductDetailPage: React.FC = () => {
 
     const { data: product, isLoading, isError } = useGetProductDetail(id);
 
+    const auth = useAuth();
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
     const currentUser = useAuthStore((state) => state.oidcProfile);
     const { mutate: addToCartApi, isPending: isAddingToCart } = useAddToBasket();
     const localAddItem = useCartStore((state) => state.addItem);
+    const isFavorite = useFavoriteStore((s) => s.ids.has(id));
+    const toggleFavorite = useFavoriteStore((s) => s.toggle);
+
+    const handleFavorite = () => {
+        if (!isAuthenticated) {
+            auth.signinRedirect();
+            return;
+        }
+        toggleFavorite(id);
+    };
 
     const [quantity, setQuantity] = useState(1);
     const [tabValue, setTabValue] = useState(0);
@@ -250,9 +264,11 @@ const ProductDetailPage: React.FC = () => {
                             }}
                         >
                             <IconButton
-                                sx={{ position: 'absolute', top: 15, right: 15, bgcolor: 'white', boxShadow: 1, '&:hover': { color: 'red' } }}
+                                onClick={handleFavorite}
+                                aria-label={isFavorite ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+                                sx={{ position: 'absolute', top: 15, right: 15, bgcolor: 'white', boxShadow: 1, color: isFavorite ? 'error.main' : 'inherit', '&:hover': { color: 'error.main' } }}
                             >
-                                <FavoriteBorder />
+                                {isFavorite ? <Favorite /> : <FavoriteBorder />}
                             </IconButton>
                             <Box
                                 onClick={() => hasImages && setLightboxOpen(true)}
