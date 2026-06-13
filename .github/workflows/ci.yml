@@ -21,6 +21,7 @@ jobs:
           - search-service
           - basket-service
           - mail-service
+          - order-service
           - api-gateway
 
     steps:
