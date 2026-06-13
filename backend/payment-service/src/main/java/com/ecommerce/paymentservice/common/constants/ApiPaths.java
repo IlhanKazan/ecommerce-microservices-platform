@@ -20,6 +20,13 @@ public class ApiPaths {
     }
 
     @NoArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class Card{
+        // api-gateway yalnızca /api/v1/subscriptions/** path'ini payment-service'e yönlendirdiği için
+        // kart endpoint'leri de bu prefix altında tutulur (gateway config değişmeden).
+        public static final String CARDS = BASE_PATH_V1 + "/subscriptions/cards";
+    }
+
+    @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class SubMerchant{
         public static final String SUBMERCHANT = BASE_PATH_V1 + "/submerchant";
     }

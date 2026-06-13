@@ -5,6 +5,7 @@ import com.ecommerce.common.exception.SystemException;
 import com.ecommerce.contracts.event.payment.PaymentFailedEventPayload;
 import com.ecommerce.contracts.event.payment.PaymentSuccessEventPayload;
 import com.ecommerce.contracts.event.payment.SubscriptionActivatedEventPayload;
+import com.ecommerce.contracts.event.payment.SubscriptionPlanChangedEventPayload;
 import com.ecommerce.contracts.event.payment.SubscriptionRenewalFailedEventPayload;
 import com.ecommerce.contracts.event.payment.SubscriptionRenewalSuccessEventPayload;
 import com.ecommerce.paymentservice.outbox.entity.Outbox;
@@ -19,6 +20,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
@@ -164,6 +168,35 @@ public class OutboxServiceImpl implements OutboxService {
             outboxRepository.save(outboxEvent);
             log.info("Outbox kaydı oluşturuldu: SUBSCRIPTION_RENEWAL_FAILED_EVENT - Subscription ID: {}, askıya alındı: {}",
                     subscription.getId(), suspended);
+        } catch (JsonProcessingException e) {
+            log.error("Outbox payload JSON çevrim hatası: {}", e.getMessage());
+            throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void publishSubscriptionPlanChangedEvent(TenantSubscription subscription, String oldPlanName, String newPlanName,
+                                                    String changeType, LocalDate effectiveDate, BigDecimal chargedAmount) {
+        try {
+            SubscriptionPlanChangedEventPayload payload = new SubscriptionPlanChangedEventPayload(
+                    subscription.getTenantId(),
+                    subscription.getContactEmail(),
+                    oldPlanName,
+                    newPlanName,
+                    changeType,
+                    effectiveDate,
+                    chargedAmount
+            );
+            Outbox outboxEvent = Outbox.builder()
+                    .aggregateType(EventConstants.AGGREGATE_PAYMENT)
+                    .aggregateId(subscription.getId().toString())
+                    .messageType(EventConstants.EVENT_SUBSCRIPTION_PLAN_CHANGED)
+                    .messagePayload(objectMapper.writeValueAsString(payload))
+                    .build();
+            outboxRepository.save(outboxEvent);
+            log.info("Outbox kaydı oluşturuldu: SUBSCRIPTION_PLAN_CHANGED_EVENT - Subscription ID: {}, tip: {}",
+                    subscription.getId(), changeType);
         } catch (JsonProcessingException e) {
             log.error("Outbox payload JSON çevrim hatası: {}", e.getMessage());
             throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");

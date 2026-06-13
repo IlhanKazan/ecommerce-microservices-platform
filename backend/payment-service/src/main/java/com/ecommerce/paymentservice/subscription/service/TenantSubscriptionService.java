@@ -7,7 +7,7 @@ import java.util.Optional;
 
 public interface TenantSubscriptionService {
     TenantSubscription save(TenantSubscription tenantSubscription);
-    TenantSubscription createActiveSubscription(Long tenantId, Long planId, String cardToken, BigDecimal amountPaid, String contactEmail);
+    TenantSubscription createActiveSubscription(Long tenantId, Long planId, String cardToken, String cardUserKey, BigDecimal amountPaid, String contactEmail);
     TenantSubscription getSubscriptionDetails(Long tenantId);
     Optional<TenantSubscription> findLatestSubscription(Long tenantId);
 }

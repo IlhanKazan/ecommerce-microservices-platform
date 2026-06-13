@@ -1,5 +1,6 @@
 package com.ecommerce.paymentservice.payment.strategy.impl;
 
+import com.ecommerce.common.exception.BusinessException;
 import com.ecommerce.paymentservice.payment.constant.PaymentType;
 import com.ecommerce.paymentservice.payment.domain.AddressInfo;
 import com.ecommerce.paymentservice.payment.domain.PaymentContext;
@@ -84,10 +85,13 @@ public class ProductPaymentStrategy implements PaymentStrategy {
         item.setCategory1("Ürün");
         item.setItemType(BasketItemType.PHYSICAL.name());
         item.setPrice(totalAmount);
-        if (context.getSubMerchantKey() != null) {
-            item.setSubMerchantKey(context.getSubMerchantKey());
-            item.setSubMerchantPrice(subMerchantAmount);
+        // Marketplace modelinde subMerchantKey zorunlu — yoksa komisyon/para routing yapılamaz.
+        // Boş key ile ödeme almak yerine reddet (sessizce mağazasız ödeme alınmasın).
+        if (context.getSubMerchantKey() == null || context.getSubMerchantKey().isBlank()) {
+            throw new BusinessException("Mağaza ödeme altyapısı henüz hazır değil.", "SUBMERCHANT_NOT_READY");
         }
+        item.setSubMerchantKey(context.getSubMerchantKey());
+        item.setSubMerchantPrice(subMerchantAmount);
         request.setBasketItems(Collections.singletonList(item));
 
         if (context.getCardInfo() != null) {
@@ -104,7 +108,7 @@ public class ProductPaymentStrategy implements PaymentStrategy {
     }
 
     @Override
-    public CreatePaymentRequest prepareRenewalRequest(Payment payment, String cardToken) {
+    public CreatePaymentRequest prepareRenewalRequest(Payment payment, String cardToken, String cardUserKey) {
         return null;
     }
 
