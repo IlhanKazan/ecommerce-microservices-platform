@@ -13,5 +13,6 @@ public class ApiPaths {
         public static final String BASE         = BASE_PATH_V1 + "/public/search";
         public static final String PRODUCTS     = "/products";
         public static final String AUTOCOMPLETE = "/autocomplete";
+        public static final String BRANDS       = "/brands";
     }
 }

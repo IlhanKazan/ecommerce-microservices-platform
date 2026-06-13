@@ -4,6 +4,7 @@ import com.ecommerce.searchservice.common.constants.ApiPaths;
 import com.ecommerce.searchservice.product.controller.dto.ProductSearchRequest;
 import com.ecommerce.searchservice.product.document.ProductDocument;
 import com.ecommerce.searchservice.product.query.AutocompleteSuggestionInfo;
+import com.ecommerce.searchservice.product.query.BrandFacet;
 import com.ecommerce.searchservice.product.service.ProductSearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -48,5 +49,16 @@ public class PublicProductSearchController {
             @RequestParam String q,
             @RequestParam(defaultValue = "5") int size) {
         return ResponseEntity.ok(searchService.autocomplete(q, size));
+    }
+
+    @Operation(
+        summary = "Brand facets",
+        description = "Mevcut filtre bağlamındaki (kategori/arama/fiyat/puan/stok) markaları ürün sayısıyla döner. Marka filtresi panelini doldurmak için.",
+        security = {}
+    )
+    @ApiResponse(responseCode = "200", description = "Marka + ürün sayısı listesi")
+    @PostMapping(ApiPaths.PublicProduct.BRANDS)
+    public ResponseEntity<List<BrandFacet>> getBrands(@RequestBody ProductSearchRequest request) {
+        return ResponseEntity.ok(searchService.getBrandFacets(request));
     }
 }

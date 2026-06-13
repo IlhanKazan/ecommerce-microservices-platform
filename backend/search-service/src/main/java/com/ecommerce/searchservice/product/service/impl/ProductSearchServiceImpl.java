@@ -1,13 +1,16 @@
 package com.ecommerce.searchservice.product.service.impl;
 
 import co.elastic.clients.elasticsearch._types.FieldValue;
+import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.QueryBuilders;
 import com.ecommerce.searchservice.product.document.ProductDocument;
 import com.ecommerce.searchservice.product.controller.dto.ProductSearchRequest;
 import com.ecommerce.searchservice.product.query.AutocompleteSuggestionInfo;
+import com.ecommerce.searchservice.product.query.BrandFacet;
 import com.ecommerce.searchservice.product.service.ProductSearchService;
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchAggregations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -33,6 +36,65 @@ public class ProductSearchServiceImpl implements ProductSearchService {
     public Page<ProductDocument> searchProducts(ProductSearchRequest request) {
         log.info("Arama başlatıldı. Kriterler: {}", request);
 
+        BoolQuery.Builder boolQueryBuilder = buildBaseQuery(request, true);
+
+        // Sort
+        List<co.elastic.clients.elasticsearch._types.SortOptions> sortOptions =
+                buildSort(request.sortBy());
+
+        Pageable pageable = PageRequest.of(request.page(), request.size());
+
+        NativeQuery nativeQuery = NativeQuery.builder()
+                .withQuery(boolQueryBuilder.build()._toQuery())
+                .withSort(sortOptions)
+                .withPageable(pageable)
+                .build();
+
+        SearchHits<ProductDocument> searchHits =
+                elasticsearchOperations.search(nativeQuery, ProductDocument.class);
+
+        List<ProductDocument> documents = searchHits.getSearchHits().stream()
+                .map(SearchHit::getContent)
+                .toList();
+
+        return new PageImpl<>(documents, pageable, searchHits.getTotalHits());
+    }
+
+    @Override
+    public List<BrandFacet> getBrandFacets(ProductSearchRequest request) {
+        // Marka facet'i: mevcut filtre bağlamı (kategori/arama/fiyat/puan/stok) için markaları say.
+        // Markanın kendi filtresi HARİÇ tutulur ki seçili markalar listeyi daraltmasın.
+        BoolQuery.Builder boolQueryBuilder = buildBaseQuery(request, false);
+
+        Aggregation brandAgg = Aggregation.of(a -> a.terms(t -> t.field("brand").size(100)));
+
+        NativeQuery nativeQuery = NativeQuery.builder()
+                .withQuery(boolQueryBuilder.build()._toQuery())
+                .withAggregation("brands", brandAgg)
+                .withPageable(PageRequest.of(0, 1))
+                .build();
+
+        SearchHits<ProductDocument> hits =
+                elasticsearchOperations.search(nativeQuery, ProductDocument.class);
+
+        if (!(hits.getAggregations() instanceof ElasticsearchAggregations aggregations)) {
+            return List.of();
+        }
+        var brandAggregation = aggregations.get("brands");
+        if (brandAggregation == null) {
+            return List.of();
+        }
+
+        return brandAggregation.aggregation().getAggregate().sterms().buckets().array().stream()
+                .map(bucket -> new BrandFacet(bucket.key().stringValue(), bucket.docCount()))
+                .toList();
+    }
+
+    /**
+     * Ortak filtre bloğu — hem arama hem marka-facet sorgusu kullanır.
+     * @param includeBrandFilter false ise marka filtresi atlanır (facet bağlamı için).
+     */
+    private BoolQuery.Builder buildBaseQuery(ProductSearchRequest request, boolean includeBrandFilter) {
         BoolQuery.Builder boolQueryBuilder = QueryBuilders.bool();
 
         // Sadece aktif ve doğrulanmış mağazaların ürünleri görünsün
@@ -85,8 +147,8 @@ public class ProductSearchServiceImpl implements ProductSearchService {
             );
         }
 
-        // Brand filtresi
-        if (request.brands() != null && !request.brands().isEmpty()) {
+        // Brand filtresi (facet sorgusunda atlanır)
+        if (includeBrandFilter && request.brands() != null && !request.brands().isEmpty()) {
             List<FieldValue> brandValues = request.brands().stream()
                     .map(FieldValue::of)
                     .toList();
@@ -110,26 +172,15 @@ public class ProductSearchServiceImpl implements ProductSearchService {
             ));
         }
 
-        // Sort
-        List<co.elastic.clients.elasticsearch._types.SortOptions> sortOptions =
-                buildSort(request.sortBy());
+        // Minimum puan filtresi (ratingAverage >= minRating)
+        if (request.minRating() != null) {
+            boolQueryBuilder.filter(QueryBuilders.range(r -> r
+                    .untyped(u -> u.field("ratingAverage")
+                            .gte(co.elastic.clients.json.JsonData.of(request.minRating())))
+            ));
+        }
 
-        Pageable pageable = PageRequest.of(request.page(), request.size());
-
-        NativeQuery nativeQuery = NativeQuery.builder()
-                .withQuery(boolQueryBuilder.build()._toQuery())
-                .withSort(sortOptions)
-                .withPageable(pageable)
-                .build();
-
-        SearchHits<ProductDocument> searchHits =
-                elasticsearchOperations.search(nativeQuery, ProductDocument.class);
-
-        List<ProductDocument> documents = searchHits.getSearchHits().stream()
-                .map(SearchHit::getContent)
-                .toList();
-
-        return new PageImpl<>(documents, pageable, searchHits.getTotalHits());
+        return boolQueryBuilder;
     }
 
     @Override
