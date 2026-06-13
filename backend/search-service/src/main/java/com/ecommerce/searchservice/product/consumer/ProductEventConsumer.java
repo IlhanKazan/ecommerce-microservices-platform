@@ -84,6 +84,7 @@ public class ProductEventConsumer {
         document.setDescription(payload.description());
         document.setBrand(payload.brand());
         document.setPrice(payload.price());
+        document.setDiscountedPrice(payload.discountedPrice());
         document.setCurrency(payload.currency());
         document.setMainImageUrl(payload.mainImageUrl());
         document.setAttributes(payload.attributes());

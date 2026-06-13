@@ -46,6 +46,9 @@ public class ProductDocument {
     @Field(type = FieldType.Double)
     private BigDecimal price;
 
+    @Field(type = FieldType.Double)
+    private BigDecimal discountedPrice;
+
     @Field(type = FieldType.Keyword)
     private String currency;
 
