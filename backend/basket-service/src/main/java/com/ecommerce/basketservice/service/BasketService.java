@@ -11,6 +11,7 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -48,6 +49,39 @@ public class BasketService {
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
                 log.info("Kilit bırakıldı: {}", lockKey);
+            }
+        }
+    }
+
+    /**
+     * Guest sepetini hesap sepetiyle birleştirir — TEK kilit altında, atomik.
+     * Her item için mevcut basket.addItem (aynı üründe miktar toplanır) uygulanır; tek save.
+     * Item'lar zaten product-service ile enrich edilmiş (taze fiyat) gelir.
+     */
+    public Basket mergeItems(UUID userId, List<BasketItem> items) {
+        String lockKey = "lock:basket:" + userId;
+        RLock lock = redissonClient.getLock(lockKey);
+        try {
+            if (lock.tryLock(10, 5, TimeUnit.SECONDS)) {
+                Basket basket = basketRepository.findById(String.valueOf(userId))
+                        .orElse(Basket.builder().userId(userId).build());
+
+                for (BasketItem item : items) {
+                    basket.addItem(item);
+                }
+
+                basketRepository.save(basket);
+                log.info("Guest sepeti birleştirildi. UserID: {}, item sayısı: {}", userId, items.size());
+                return basket;
+            } else {
+                throw new BusinessException("Sepetiniz şu an güncelleniyor, lütfen bekleyip tekrar deneyin.", "BASKET_LOCKED");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException("Sistem hatası: Kilit beklenirken kesilme oldu.", "LOCK_INTERRUPTED");
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
             }
         }
     }
