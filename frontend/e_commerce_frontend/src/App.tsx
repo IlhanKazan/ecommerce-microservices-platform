@@ -13,7 +13,6 @@ import ProtectedRoute from "./components/shared/ProtectedRoute";
 import { MerchantProtectedRoute } from "./components/shared/MerchantProtectedRoute";
 import ToastContainer from "./components/shared/ToastContainer.tsx";
 import { basketService } from './features/catalog/api/productService';
-import { generateIdempotencyKey } from './utils/idempotencyUtils';
 import { useGetCategories } from './query/useProductQueries';
 import { useCategoryStore } from './store/useCategoryStore';
 import { BASKET_QUERY_KEY } from './query/useBasketQueries';
@@ -55,9 +54,9 @@ function App() {
 
     const setUser = useAuthStore((state) => state.setUser);
     const { data: userData } = useMe(isAuthenticated);
-    // Selector'lar — App route ağacının tepesi; tüm-store aboneliği her sepet değişiminde
-    // tüm ağacı re-render ederdi. Alan bazlı abonelikle gereksiz render önlenir.
-    const localCartItems = useCartStore((s) => s.items);
+    // clearCart — guest sepeti merge sonrası temizliği için. Sepet item'larını
+    // burada selector'la dinlemiyoruz: değişimde App ağacını gereksiz re-render eder
+    // ve login/merge effect'ini tetiklerdi. Anlık ihtiyaçta getState() kullanılır.
     const clearCart = useCartStore((s) => s.clearCart);
     const queryClient = useQueryClient();
 
@@ -69,22 +68,29 @@ function App() {
         if (auth.isAuthenticated && auth.user?.access_token) {
             setAuth(auth.user.access_token, auth.user.profile);
 
-            // GUEST CART SENKRONİZASYONU
-            if (localCartItems.length > 0) {
-                Promise.allSettled(
-                    localCartItems.map(item =>
-                        basketService.addToCart(
-                            { productId: item.productId, quantity: item.quantity },
-                            generateIdempotencyKey()
-                        )
-                    )
-                ).finally(() => {
-                    clearCart();
-                    queryClient.invalidateQueries({ queryKey: BASKET_QUERY_KEY });
-                });
+            // GUEST CART → HESAP SEPETİ: tek atomik merge çağrısı (miktarlar toplanır).
+            // Başarıda local sepet temizlenir; HATA olursa local KORUNUR (veri kaybı yok).
+            // Not: guest sepetini deps'ten okumuyoruz (yoksa her "sepete ekle" bu
+            // effect'i tetikler); anlık snapshot'ı getState() ile alıyoruz.
+            const guestItems = useCartStore.getState().items;
+            if (guestItems.length > 0) {
+                basketService.mergeCart(
+                    guestItems.map(item => ({ productId: item.productId, quantity: item.quantity }))
+                )
+                    .then(() => {
+                        clearCart();
+                        queryClient.invalidateQueries({ queryKey: BASKET_QUERY_KEY });
+                    })
+                    .catch((err) => {
+                        console.error('Sepet birleştirme başarısız — local sepet korunuyor:', err);
+                    });
             }
         } else if (!auth.isLoading && !auth.isAuthenticated) {
-            clearAuth();
+            // Sadece GERÇEK logout'ta temizle. Hiç giriş yapmamış guest için
+            // clearAuth çağırma — clearAuth() guest sepetini de siler (clearCart).
+            if (useAuthStore.getState().isAuthenticated) {
+                clearAuth();
+            }
         }
 
         if (auth.error) {
@@ -92,7 +98,7 @@ function App() {
             clearAuth();
             auth.removeUser().then(() => { window.location.href = '/'; });
         }
-    }, [auth, localCartItems, clearCart, queryClient, setAuth, clearAuth]);
+    }, [auth, clearCart, queryClient, setAuth, clearAuth]);
 
     const { data: categoryData } = useGetCategories();
     const setCategories = useCategoryStore((state) => state.setCategories);

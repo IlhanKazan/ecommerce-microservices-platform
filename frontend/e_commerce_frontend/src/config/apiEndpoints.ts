@@ -80,6 +80,7 @@ export const API_ENDPOINTS = {
     BASKET: {
         GET:         '/baskets/me',
         ADD:         '/baskets/me/items',
+        MERGE:       '/baskets/me/merge',
         REMOVE_ITEM: (productId: number) => `/baskets/me/items/${productId}`,
         UPDATE_ITEM: (productId: number) => `/baskets/me/items/${productId}`,
         CLEAR:       '/baskets/me'

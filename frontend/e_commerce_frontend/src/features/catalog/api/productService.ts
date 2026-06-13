@@ -244,6 +244,11 @@ export const basketService = {
         );
     },
 
+    /** Guest sepetini hesap sepetine birleştir — tek atomik çağrı (miktarlar toplanır). */
+    mergeCart: async (items: AddItemRequest[]): Promise<void> => {
+        await api.post(API_ENDPOINTS.BASKET.MERGE, { items });
+    },
+
     removeItem: async (productId: number): Promise<void> => {
         await api.delete(API_ENDPOINTS.BASKET.REMOVE_ITEM(productId));
     },
