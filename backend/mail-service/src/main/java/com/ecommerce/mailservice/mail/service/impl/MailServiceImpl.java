@@ -147,6 +147,22 @@ public class MailServiceImpl implements MailService {
         send(toEmail, subject, "mail/subscription-renewal-failed", ctx, messageId, "SUBSCRIPTION_RENEWAL_FAILED_EVENT");
     }
 
+    @Override
+    public void sendSubscriptionPlanChanged(String toEmail, String oldPlanName, String newPlanName, String changeType,
+                                            LocalDate effectiveDate, BigDecimal chargedAmount, String messageId) {
+        boolean upgrade = "UPGRADE".equals(changeType);
+        Context ctx = new Context();
+        ctx.setVariable("oldPlanName", oldPlanName);
+        ctx.setVariable("newPlanName", newPlanName);
+        ctx.setVariable("upgrade", upgrade);
+        ctx.setVariable("effectiveDate", effectiveDate);
+        ctx.setVariable("chargedAmount", chargedAmount != null ? chargedAmount.toPlainString() : "0");
+        String subject = upgrade
+                ? "Planınız Yükseltildi — " + newPlanName
+                : "Plan Değişikliğiniz Planlandı — " + newPlanName;
+        send(toEmail, subject, "mail/subscription-plan-changed", ctx, messageId, "SUBSCRIPTION_PLAN_CHANGED_EVENT");
+    }
+
     private void send(String toEmail, String subject, String templateName, Context ctx,
                       String inboxMessageId, String eventType) {
         MailLog logEntry = MailLog.builder()
