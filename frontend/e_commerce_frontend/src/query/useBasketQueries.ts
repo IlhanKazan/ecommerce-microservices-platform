@@ -1,18 +1,19 @@
 import { useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { basketService } from '../features/catalog/api/productService';
-import { useAuth } from 'react-oidc-context';
+import { useAuthStore } from '../store/useAuthStore';
 import { generateIdempotencyKey } from '../utils/idempotencyUtils';
 import type { AddItemRequest, BasketResponse, BasketItem } from '../types';
 
 export const BASKET_QUERY_KEY = ['basket'] as const;
 
 export const useBasket = () => {
-    const auth = useAuth();
+    // Sepet display'i useAuthStore'a göre çalışıyor — backend fetch'i de aynı kaynağa gate'lensin (desync yok)
+    const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
     return useQuery({
         queryKey: BASKET_QUERY_KEY,
         queryFn: basketService.getCart,
-        enabled: auth.isAuthenticated,
+        enabled: isAuthenticated,
         staleTime: 30_000,
     });
 };
