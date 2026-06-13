@@ -52,11 +52,10 @@ Bu dosya servis bazında yapılacak iş listesini tutar. Endpoint, business logi
 - [ ] **IDOR kapatma** — body'deki `customerId` yerine `@CurrentUser` kullan. (TECHNICAL-DEBT 🔴'da) — **Stage 10 başlamadan kapanmalı**
 - [ ] **Kart bilgisi maskelenmesi** — log'a yazmadan önce mask (TECHNICAL-DEBT 🔴) — **Stage 10 başlamadan kapanmalı**
 - [ ] **iyzico'dan dönen hata mesajları UTS'ye Feign ile döndür** — şu an stack trace yutuluyor, UTS sadece "ödeme başarısız" diyor.
-- [ ] **Kart token değiştirme endpoint'i**
-- [ ] **Yeni kart ekleme endpoint'i**
+- [x] **Kayıtlı kart yönetimi (CRUD)** ✅ 2026-06-13 — iyzico Card Storage (cardUserKey + cardToken) ile vault: `GET/POST/DELETE/PATCH /api/v1/subscriptions/cards` (list/add/delete/set-default). `tenant_cards` tablosu (V8), `IyzicoCardAdapter`, `CardService`, OWNER guard (`TenantOwnershipGuard` + UTS authz Feign). İlk abonelik ödemesindeki kart varsayılan olarak seed edilir; renewal artık varsayılan karttan token+userKey ile çekiyor (eski tek-token latent eksik kapandı). Son kart + aktif ücretli abonelikte 409.
 - [ ] **Sub-merchant mantığı tamamlanması** — sub-merchant create, update, suspend tam akış.
 - [ ] **Abonelik bilgileri endpoint'leri** — `GET /subscriptions/me`, `POST /subscriptions/cancel`, upgrade/downgrade.
-- [ ] **🐞 Paket değiştirme endpoint'i YOK (2026-06-11 tespit)** — Frontend `POST /api/v1/subscriptions/change-plan` çağırıyor (`tenantService.changeSubscriptionPlan`) ama `SubscriptionController`'da bu mapping yok → `NoResourceFoundException` ("No static resource ...") 500 dönüyor. Mevcut sadece `GET /plans`, `GET /tenants/{tenantId}`. **Eklenecek:** `POST/PUT /subscriptions/change-plan` (`{tenantId, planId}`) — plan upgrade/downgrade iş kuralı (kalan gün/fiyat farkı/prorate, iyzico yeni tahsilat) netleştirilip yazılacak. Frontend `MerchantSubscription` zaten bağlı, sadece backend eksik.
+- [x] **🐞 Paket değiştirme endpoint'i** ✅ 2026-06-13 — `POST /api/v1/subscriptions/change-plan` (`{tenantId, planId}`) eklendi (`ChangePlanService`). **Upgrade:** kalan güne göre prorate fark anında varsayılan karttan tahsil, `nextBillingDate` sabit (Stripe-vari). **Downgrade:** `scheduled_plan_id` (V9) ile döngü sonuna ertelenir; renewal billing tarihinde uygular. Ücretsiz plana inişte tahsilatsız (0₺ iyzico bug'ı da kapandı). Aynı plan → bekleyen downgrade'i iptal eder. OWNER guard + 409 (aktif abonelik yok / varsayılan kart yok). `SUBSCRIPTION_PLAN_CHANGED_EVENT` + mail şablonu. Frontend `MerchantSubscription` onay dialogunda upgrade/downgrade bağlam metni + dönüşte tahsilat/yürürlük bilgisi.
 - [ ] **Outbox cleanup scheduler** (TECHNICAL-DEBT 🟠)
 - [ ] **PaymentServiceFallback aktifleştir** (TECHNICAL-DEBT 🟠 — yorum satırında + tip hatası)
 
@@ -80,7 +79,14 @@ Mevcut `processPayment` abonelik ödemesi için. Sipariş ödemesi ayrı bir end
 - [ ] **Stokta olmayan ama önceden alınmış ürün ekranı.** Detay görünür, yorumlar görünür, "stokta yok" badge'i, sepete ekle pasif.
 - [ ] **`salesStatus` değişikliği için event yayını.** Şu an sadece `PRODUCT_UPDATED_EVENT` yayılıyor — search-service salesStatus'e göre filtre yapamıyor. Yeni event tipi mi (`PRODUCT_SALES_STATUS_CHANGED`) yoksa mevcut UPDATED'a salesStatus eklemek mi (zaten payload'da var, search-service handler'ını düzelt) — kullanıcıya danış.
   - Notion'da: "salesstatus değişince search service haberi olmuyor. event atmamız lazım birçok yerde"
-- [ ] **Ürün varyantları** — `parentProductId` field'ı entity'de var ama controller/service tarafı tamamlanmamış (renkli/bedenli ürünler).
+- [ ] **🧩 Ürün varyant sistemi (beden/renk/numara + varyant-bazlı stok) — kendi sprint'i (büyük, çok-servisli)** 2026-06-13 planlandı:
+  Klasik e-ticaret varyant seçimi (ayakkabı numarası, kıyafet bedeni, renk). `parentProductId` entity'de var ama tamamlanmamış. Kapsam:
+  - **product-service:** varyant modeli — varyant = parent ürünün altında kendi SKU + attribute kombinasyonu (color/size). Varyant CRUD (parent + child'lar), public detayda varyant listesi + her varyantın fiyat/görsel.
+  - **stock-service:** **varyant-bazlı stok** — her varyant ayrı stok kalemi (şu an stok productId bazında; varyant her biri ayrı productId/child olacak veya stok'a variant dimension eklenecek).
+  - **search-service:** varyant attribute facet'leri (renk/beden çoklu-seçim filtresi) — `ProductDocument.attributes` zaten indexli, facet aggregation eklenir.
+  - **basket/order:** sepete/siparişe seçilen **varyant id** taşınmalı (hangi beden/renk).
+  - **frontend:** ürün detayda beden/renk seçici → seçilen varyantın stoğu/fiyatı/görseli; sepete varyantla ekleme; merchant ürün formunda varyant + her varyant için stok girişi.
+  - **Karar gerekli:** varyant = ayrı child-product (parentProductId) mi, yoksa product içinde gömülü variant listesi mi? Stok modeli buna bağlı.
 - [ ] **Discount/Coupon yönetim endpoint'i** — `discount_percentage`, `discounted_price` kolonları var, business logic eksik.
 - [ ] **Review moderasyon akışı** — `PENDING → APPROVED` endpoint yok.
 - [ ] **Toplu ürün import (CSV/Excel)** — bulk endpoint, Excel parser.

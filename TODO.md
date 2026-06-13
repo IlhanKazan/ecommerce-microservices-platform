@@ -200,6 +200,12 @@ Platformun tamamını yöneten ayrı bir admin arayüzü + backend yetkilendirme
 - [ ] **Frontend** — ayrı `/admin` route grubu, `PlatformAdminProtectedRoute`, admin layout. Mevcut `MerchantProtectedRoute` pattern'i örnek.
 - Bağlam: FW-2 admin SUSPENDED + FW-4 kategori CRUD bu panelin parçaları. Kapsam geniş → kendi sprint'i olmalı.
 
+### FW-7: Ürün varyant sistemi (beden/renk/numara + varyant-bazlı stok) 🟠 — planlandı 2026-06-13
+Klasik e-ticaret varyant seçimi (ayakkabı numarası, kıyafet bedeni, renk). Büyük, çok-servisli — **kendi sprint'i**. `parentProductId` entity'de var ama tamamlanmamış.
+- Etkilenen servisler: **product-service** (varyant modeli + CRUD), **stock-service** (varyant-bazlı stok), **search-service** (renk/beden facet), **basket/order** (seçilen varyant id), **frontend** (detayda beden/renk seçici + merchant varyant/stok girişi).
+- **Açık karar:** varyant = ayrı child-product (`parentProductId`) mi, yoksa product içinde gömülü variant listesi mi? Stok modeli buna bağlı.
+- **Tam kapsam ve servis-bazlı detay → `SERVICE-WORK.md` Product Service "Ürün varyant sistemi" maddesi.**
+
 ---
 
 ## 📚 Dokümantasyon & Portfolio
