@@ -112,7 +112,7 @@ Olay event-driven olduğu için Mockito **yetmez** — Testcontainers integratio
 
 ### Tamamlayıcı araçlar (kolay portföy puanı)
 
-- [ ] **Trivy** — container image + bağımlılık CVE taraması (`trivy image`).
+- [x] **Trivy** — bağımlılık CVE taraması. ✅ 2026-06-14 — Maven+npm `fs --offline-scan`, 0 CRITICAL / 19 HIGH (3 benzersiz: spring-boot-devtools dev-only, axios, react-router — hepsi patch/minor bump). `docs/quality/trivy-cve-scan.md`. (container `image` taraması ayrı: Dockerfile'lar build edilince.)
 - [ ] **OWASP Dependency-Check** — Maven bağımlılık CVE'leri.
 - [ ] **Semgrep** — SAST (SQL injection, hardcoded secret, kod seviyesi).
 - [x] **Gitleaks** — repoda sızmış secret taraması. ✅ 2026-06-14 — 141 commit tarandı, 2 bulgu (ikisi de false-positive, triage edildi), 0 gerçek secret. `.gitleaks.toml` allowlist + `docs/quality/gitleaks-secret-scan.md`.
