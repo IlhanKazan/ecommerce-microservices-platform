@@ -80,6 +80,13 @@ public class TenantStateService {
 
     @Transactional
     public void verifyTenant(Tenant tenant, String subMerchantKey){
+        // iyzico'dan boş key geldiyse mağazayı doğrulanmış sayma — aksi halde key'siz "verified"
+        // tenant ödeme alamaz ama UI doğrulanmış gösterir (sessiz bozulma).
+        if (subMerchantKey == null || subMerchantKey.isBlank()) {
+            throw new BusinessException(
+                    "Mağaza doğrulanamadı: ödeme altyapısı anahtarı alınamadı. Lütfen tekrar deneyin.",
+                    "SUBMERCHANT_KEY_MISSING");
+        }
         tenant.setIyzicoSubMerchantKey(subMerchantKey);
         tenant.setIsVerified(true);
         tenantRepository.save(tenant);
