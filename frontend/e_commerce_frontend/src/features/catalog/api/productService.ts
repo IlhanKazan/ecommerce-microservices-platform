@@ -17,6 +17,7 @@ import type {
     ProductUpdateRequest,
     AutocompleteSuggestion,
     TenantStorefront,
+    BrandFacet,
 } from '../../../types/product';
 import type { BasketResponse, AddItemRequest } from '../../../types';
 
@@ -71,6 +72,11 @@ export const productService = {
             API_ENDPOINTS.SEARCH.AUTOCOMPLETE,
             { params: { q, size } },
         );
+        return response.data;
+    },
+
+    getBrandFacets: async (body: ProductSearchPayload): Promise<BrandFacet[]> => {
+        const response = await api.post<BrandFacet[]>(API_ENDPOINTS.SEARCH.BRANDS, body);
         return response.data;
     },
 

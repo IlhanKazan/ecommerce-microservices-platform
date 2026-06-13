@@ -239,7 +239,7 @@ const ProductDetailPage: React.FC = () => {
                         {product.categoryName && (
                             <Link
                                 component={RouterLink}
-                                to={`/productlist?category=${product.categoryId}`}
+                                to={`/productlist?categoryId=${product.categoryId}`}
                                 underline="hover"
                                 color="inherit"
                             >
@@ -435,12 +435,20 @@ const ProductDetailPage: React.FC = () => {
                             )}
 
                             <Box sx={{ my: 3, p: 2, bgcolor: 'primary.lighter', borderRadius: 2, border: '1px dashed', borderColor: 'primary.light' }}>
-                                {product.discountedPrice ? (
+                                {product.discountedPrice && product.discountedPrice < product.price ? (
                                     <Stack spacing={0.5}>
-                                        <Typography variant="h6" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
-                                            {formatPrice(product.price)}
-                                        </Typography>
-                                        <Typography variant="h3" fontWeight="bold" color="primary.main">
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <Typography variant="h6" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
+                                                {formatPrice(product.price)}
+                                            </Typography>
+                                            <Chip
+                                                size="small"
+                                                color="error"
+                                                label={`%${Math.round((1 - product.discountedPrice / product.price) * 100)} İNDİRİM`}
+                                                sx={{ fontWeight: 700 }}
+                                            />
+                                        </Stack>
+                                        <Typography variant="h3" fontWeight="bold" color="error.main">
                                             {formatPrice(product.discountedPrice)}
                                         </Typography>
                                     </Stack>

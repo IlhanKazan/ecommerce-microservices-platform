@@ -47,6 +47,7 @@ export const API_ENDPOINTS = {
     SEARCH: {
         PRODUCTS: '/public/search/products',
         AUTOCOMPLETE: '/public/search/autocomplete',
+        BRANDS: '/public/search/brands',
     },
     PRODUCT: {
         BY_ID_PUBLIC: (id: number) => `/public/products/${id}`,

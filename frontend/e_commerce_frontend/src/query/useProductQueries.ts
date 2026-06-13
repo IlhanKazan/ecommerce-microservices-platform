@@ -32,6 +32,15 @@ export const useSearchProducts = (body: SearchPayload) => {
     });
 };
 
+export const useBrandFacets = (body: SearchPayload) => {
+    return useQuery({
+        queryKey: ['brandFacets', body],
+        queryFn: () => productService.getBrandFacets(body),
+        staleTime: 1000 * 60 * 2,
+        placeholderData: keepPreviousData,
+    });
+};
+
 export const useGetProductDetail = (productId: number) => {
     return useQuery({
         queryKey: QueryKeys.PRODUCT_DETAIL(productId),
