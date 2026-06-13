@@ -1,0 +1,21 @@
+# Gitleaks config — IlhanKazan E-Commerce Platform
+# Varsayilan kural setini genislet, triage edilmis false-positive'leri allowlist'e al.
+# Tarama: docker run --rm -v "$(pwd):/repo" zricethezav/gitleaks:latest detect \
+#   --source=/repo --config=/repo/.gitleaks.toml --redact --no-banner
+#
+# NOT: Gercek secret'lar repoda DEGIL — .env manuel yonetiliyor ve commit'lenmiyor.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Triage edilmis false-positive'ler (2026-06-14 gitleaks taramasi)"
+
+  # generic-api-key heuristic'i virgullu altyapi listesini secret sandi.
+  # CLAUDE.md:17 — "Infra: PostgreSQL, Kafka, Debezium, ... (planli)"
+  # vite.config.ts:10 — keycloakify themeName/config blogu, secret degil.
+  # Bu iki dosya secret tasimaz; dokuman + frontend build config'i.
+  paths = [
+    '''^CLAUDE\.md$''',
+    '''^frontend/e_commerce_frontend/vite\.config\.ts$''',
+  ]
