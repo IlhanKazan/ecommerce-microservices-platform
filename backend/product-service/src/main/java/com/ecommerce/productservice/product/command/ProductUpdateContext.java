@@ -15,6 +15,7 @@ public record ProductUpdateContext(
         String sku,
         String brand,
         BigDecimal price,
+        BigDecimal discountedPrice,
         String currency,
         Integer weightGrams,
         String dimensionsCm,

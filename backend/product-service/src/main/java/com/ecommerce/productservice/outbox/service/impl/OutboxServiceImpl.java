@@ -43,7 +43,8 @@ public class OutboxServiceImpl implements OutboxService {
                     product.getCurrency(),
                     product.getMainImageUrl(),
                     product.getAttributes(),
-                    product.getTags()
+                    product.getTags(),
+                    product.getDiscountedPrice()
             );
 
             Outbox outbox = Outbox.builder()
@@ -82,7 +83,8 @@ public class OutboxServiceImpl implements OutboxService {
                     product.getStatus().name(),
                     product.getSalesStatus().name(),
                     product.getRatingAverage(),
-                    product.getReviewCount()
+                    product.getReviewCount(),
+                    product.getDiscountedPrice()
             );
 
             Outbox outbox = Outbox.builder()

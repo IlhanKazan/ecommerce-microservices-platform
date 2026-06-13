@@ -15,6 +15,7 @@ public record ProductUpdateRequest(
         @NotBlank String sku,
         String brand,
         @NotNull @Positive BigDecimal price,
+        BigDecimal discountedPrice,
         String currency,
         Integer weightGrams,
         String dimensionsCm,
