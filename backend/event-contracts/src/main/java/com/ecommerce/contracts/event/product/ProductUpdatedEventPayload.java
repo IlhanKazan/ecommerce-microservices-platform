@@ -21,5 +21,7 @@ public record ProductUpdatedEventPayload(
         String salesStatus,
         BigDecimal ratingAverage,   // nullable — only set on rating recalculate
         Integer reviewCount,        // nullable — only set on rating recalculate
-        BigDecimal discountedPrice  // additive — nullable, indirim yoksa null
+        BigDecimal discountedPrice, // additive — nullable, indirim yoksa null
+        Long parentProductId,       // additive — null değilse ürün bir varyanttır (child), search indexlemez
+        Boolean isFeatured          // additive — öne çıkan ürün mü (storefront vitrin + ES filtresi)
 ) {}
