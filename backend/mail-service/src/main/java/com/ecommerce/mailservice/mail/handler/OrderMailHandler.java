@@ -4,6 +4,9 @@ import com.ecommerce.contracts.event.order.OrderCancelledEventPayload;
 import com.ecommerce.contracts.event.order.OrderConfirmedEventPayload;
 import com.ecommerce.contracts.event.order.OrderDeliveredEventPayload;
 import com.ecommerce.contracts.event.order.OrderRefundedEventPayload;
+import com.ecommerce.contracts.event.order.OrderReturnRejectedEventPayload;
+import com.ecommerce.contracts.event.order.OrderReturnRequestedEventPayload;
+import com.ecommerce.contracts.event.order.OrderReturnedEventPayload;
 import com.ecommerce.contracts.event.order.OrderShippedEventPayload;
 import com.ecommerce.mailservice.mail.service.MailService;
 import lombok.RequiredArgsConstructor;
@@ -46,5 +49,20 @@ public class OrderMailHandler {
     public void handleOrderDelivered(OrderDeliveredEventPayload payload, String messageId) {
         log.info("Sipariş teslim maili — orderId: {}, email: {}", payload.orderId(), payload.recipientEmail());
         mailService.sendOrderDelivered(payload.recipientEmail(), payload.orderId(), messageId);
+    }
+
+    public void handleOrderReturnRequested(OrderReturnRequestedEventPayload payload, String messageId) {
+        log.info("İade talebi maili — orderId: {}", payload.orderId());
+        mailService.sendOrderReturnRequested(payload.recipientEmail(), payload.orderId(), payload.reason(), messageId);
+    }
+
+    public void handleOrderReturnRejected(OrderReturnRejectedEventPayload payload, String messageId) {
+        log.info("İade red maili — orderId: {}", payload.orderId());
+        mailService.sendOrderReturnRejected(payload.recipientEmail(), payload.orderId(), payload.note(), messageId);
+    }
+
+    public void handleOrderReturned(OrderReturnedEventPayload payload, String messageId) {
+        log.info("İade tamamlandı maili — orderId: {}", payload.orderId());
+        mailService.sendOrderReturned(payload.recipientEmail(), payload.orderId(), payload.refundAmount(), messageId);
     }
 }

@@ -5,6 +5,9 @@ import com.ecommerce.contracts.event.order.OrderCancelledEventPayload;
 import com.ecommerce.contracts.event.order.OrderConfirmedEventPayload;
 import com.ecommerce.contracts.event.order.OrderDeliveredEventPayload;
 import com.ecommerce.contracts.event.order.OrderRefundedEventPayload;
+import com.ecommerce.contracts.event.order.OrderReturnRejectedEventPayload;
+import com.ecommerce.contracts.event.order.OrderReturnRequestedEventPayload;
+import com.ecommerce.contracts.event.order.OrderReturnedEventPayload;
 import com.ecommerce.contracts.event.order.OrderShippedEventPayload;
 import com.ecommerce.contracts.event.payment.SubscriptionActivatedEventPayload;
 import com.ecommerce.contracts.event.payment.SubscriptionPlanChangedEventPayload;
@@ -131,6 +134,27 @@ public class MailEventConsumer {
                             objectMapper.readValue(json, OrderDeliveredEventPayload.class);
                     if (payload.recipientEmail() != null) {
                         orderMailHandler.handleOrderDelivered(payload, messageId);
+                    }
+                }
+                case EventConstants.EVENT_ORDER_RETURN_REQUESTED -> {
+                    OrderReturnRequestedEventPayload payload =
+                            objectMapper.readValue(json, OrderReturnRequestedEventPayload.class);
+                    if (payload.recipientEmail() != null) {
+                        orderMailHandler.handleOrderReturnRequested(payload, messageId);
+                    }
+                }
+                case EventConstants.EVENT_ORDER_RETURN_REJECTED -> {
+                    OrderReturnRejectedEventPayload payload =
+                            objectMapper.readValue(json, OrderReturnRejectedEventPayload.class);
+                    if (payload.recipientEmail() != null) {
+                        orderMailHandler.handleOrderReturnRejected(payload, messageId);
+                    }
+                }
+                case EventConstants.EVENT_ORDER_RETURNED -> {
+                    OrderReturnedEventPayload payload =
+                            objectMapper.readValue(json, OrderReturnedEventPayload.class);
+                    if (payload.recipientEmail() != null) {
+                        orderMailHandler.handleOrderReturned(payload, messageId);
                     }
                 }
                 case null, default ->

@@ -39,6 +39,7 @@ public class TenantMailHandler {
         switch (payload.status()) {
             case "PASSIVE" -> mailService.sendTenantPaused(payload.contactEmail(), payload.name(), messageId);
             case "CLOSED" -> mailService.sendTenantClosed(payload.contactEmail(), payload.name(), messageId);
+            case "SUSPENDED" -> mailService.sendTenantSuspended(payload.contactEmail(), payload.name(), messageId);
             case "ACTIVE" -> mailService.sendTenantReactivated(payload.contactEmail(), payload.name(), messageId);
             default -> log.debug("Mail gerektirmeyen tenant status: {}", payload.status());
         }
