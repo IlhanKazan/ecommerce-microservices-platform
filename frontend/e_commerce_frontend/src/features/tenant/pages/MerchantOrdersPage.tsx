@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Box, Paper, Typography, Stack, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, TablePagination, Chip, IconButton, Select, MenuItem,
     FormControl, InputLabel, CircularProgress, Alert, Tooltip,
     Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,
+    InputAdornment,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import SearchIcon from '@mui/icons-material/Search';
+import { useDebounce } from '../../../hooks/useDebounce';
 import type { OrderDetail, OrderStatus } from '../../../types/order';
 import { ORDER_STATUS_CONFIG } from '../../../utils/orderUtils';
 import { useGetTenantOrders, useUpdateOrderStatus } from '../../../query/useOrderQueries';
@@ -25,16 +28,25 @@ const MerchantOrdersPage: React.FC = () => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(20);
     const [filterStatus, setFilterStatus] = useState<OrderStatus | 'ALL'>('ALL');
+    const [searchInput, setSearchInput] = useState('');
     const [selectedOrder, setSelectedOrder] = useState<OrderDetail | null>(null);
     const [shippingOrderId, setShippingOrderId] = useState<number | null>(null);
     const [trackingNumber, setTrackingNumber] = useState('');
 
-    const { data, isLoading, isError } = useGetTenantOrders(tenantId, page, rowsPerPage);
+    const debouncedSearch = useDebounce(searchInput, 300);
+    const serverStatus = filterStatus === 'ALL' ? '' : filterStatus;
+
+    // Arama/filtre değişince ilk sayfaya dön
+    useEffect(() => {
+        setPage(0);
+    }, [debouncedSearch, filterStatus]);
+
+    const { data, isLoading, isError } = useGetTenantOrders(
+        tenantId, page, rowsPerPage, serverStatus, debouncedSearch);
     const { mutate: updateStatus, isPending: isUpdating } = useUpdateOrderStatus();
 
-    const orders = (data?.content ?? []).filter((o) =>
-        filterStatus === 'ALL' ? true : o.status === filterStatus,
-    );
+    // Filtre + arama artık server-side; gelen sayfa doğrudan listelenir.
+    const orders = data?.content ?? [];
 
     const handleShipOrder = (order: OrderDetail) => {
         updateStatus(
@@ -88,6 +100,21 @@ const MerchantOrdersPage: React.FC = () => {
                 sx={{ mb: 3 }}
             >
                 <Typography variant="h6" fontWeight="bold">Siparişler</Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ flex: 1, justifyContent: 'flex-end' }}>
+                <TextField
+                    placeholder="Sipariş no veya alıcı e-postası ara..."
+                    size="small"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    sx={{ flex: 1, maxWidth: 360 }}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon fontSize="small" color="action" />
+                            </InputAdornment>
+                        ),
+                    }}
+                />
                 <FormControl size="small" sx={{ minWidth: 180 }}>
                     <InputLabel>Durum Filtresi</InputLabel>
                     <Select
@@ -106,6 +133,7 @@ const MerchantOrdersPage: React.FC = () => {
                         <MenuItem value="REFUNDED">İade Edildi</MenuItem>
                     </Select>
                 </FormControl>
+                </Stack>
             </Stack>
 
             {/* Tablo */}

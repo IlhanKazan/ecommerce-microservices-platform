@@ -3,6 +3,7 @@ package com.ecommerce.stockservice.consumer;
 import com.ecommerce.common.event.constants.EventConstants;
 import com.ecommerce.contracts.event.order.OrderCancelledEventPayload;
 import com.ecommerce.contracts.event.order.OrderConfirmedEventPayload;
+import com.ecommerce.contracts.event.order.OrderReturnedEventPayload;
 import com.ecommerce.stockservice.inbox.service.InboxService;
 import com.ecommerce.stockservice.stock.service.InternalStockService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -59,6 +60,17 @@ public class OrderEventConsumer {
                         log.info("İptal stok rollback tamamlandı. OrderID: {}", payload.orderId());
                     } else {
                         log.warn("ORDER_CANCELLED_EVENT items boş geldi. OrderID: {}", payload.orderId());
+                    }
+                }
+                case EventConstants.EVENT_ORDER_RETURNED -> {
+                    OrderReturnedEventPayload payload =
+                            objectMapper.readValue(json, OrderReturnedEventPayload.class);
+                    if (payload.items() != null && !payload.items().isEmpty()) {
+                        internalStockService.restockForReturn(
+                                payload.orderId().toString(), payload.tenantId(), payload.items());
+                        log.info("İade stok geri ekleme tamamlandı. OrderID: {}", payload.orderId());
+                    } else {
+                        log.warn("ORDER_RETURNED_EVENT items boş geldi. OrderID: {}", payload.orderId());
                     }
                 }
                 case null, default ->

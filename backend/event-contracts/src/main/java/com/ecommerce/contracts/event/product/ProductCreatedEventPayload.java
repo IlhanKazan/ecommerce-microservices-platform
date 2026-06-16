@@ -17,5 +17,6 @@ public record ProductCreatedEventPayload(
         String mainImageUrl,
         Map<String, String> attributes,
         List<String> tags,
-        BigDecimal discountedPrice   // additive — nullable, indirim yoksa null
+        BigDecimal discountedPrice,  // additive — nullable, indirim yoksa null
+        Long parentProductId         // additive — null değilse ürün bir varyanttır (child), search indexlemez
 ) {}

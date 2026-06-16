@@ -56,9 +56,6 @@ public class Address extends BaseEntity {
 
     private String label;
 
-    private Double latitude;
-    private Double longitude;
-
     @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;

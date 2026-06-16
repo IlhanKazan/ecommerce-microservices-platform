@@ -7,8 +7,11 @@ import com.ecommerce.productservice.client.dto.TenantStorefrontResponse;
 import com.ecommerce.productservice.product.constant.ProductStatus;
 import com.ecommerce.productservice.product.entity.Product;
 import com.ecommerce.productservice.product.query.PublicProductInfo;
+import com.ecommerce.productservice.product.query.VariantInfo;
 import com.ecommerce.productservice.product.repository.ProductRepository;
 import com.ecommerce.productservice.product.service.QueryProductService;
+
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -23,6 +26,7 @@ public class QueryProductServiceImpl implements QueryProductService {
 
     private final ProductRepository productRepository;
     private final UserTenantClientAdapter userTenantClientAdapter;
+    private final com.ecommerce.productservice.common.buffer.ViewCountBuffer viewCountBuffer;
 
     @Override
     @Cacheable(cacheNames = "public-product", key = "#id")
@@ -37,6 +41,21 @@ public class QueryProductServiceImpl implements QueryProductService {
         }
 
         TenantStorefrontResponse storefront = userTenantClientAdapter.getStorefront(product.getTenantId());
+
+        // Varyant (parent) ise ACTIVE child'ları yükle; standalone'da boş liste döner.
+        List<VariantInfo> variants = productRepository
+                .findByParentProductIdAndStatus(product.getId(), ProductStatus.ACTIVE)
+                .stream()
+                .map(v -> new VariantInfo(
+                        v.getId(),
+                        v.getSku(),
+                        v.getName(),
+                        v.getAttributes(),
+                        v.getPrice(),
+                        v.getDiscountedPrice(),
+                        v.getCurrency(),
+                        v.getMainImageUrl()))
+                .toList();
 
         return new PublicProductInfo(
                 product.getId(),
@@ -63,7 +82,15 @@ public class QueryProductServiceImpl implements QueryProductService {
                 product.getSalesStatus().toString(),
                 storefront != null ? storefront.name() : null,
                 storefront != null ? storefront.logoUrl() : null,
-                product.getAiReviewReport()
+                product.getAiReviewReport(),
+                variants
         );
+    }
+
+    @Override
+    public void recordView(Long id) {
+        // Best-effort sayaç — Redis tamponuna yazılır (DB'ye dokunmaz); flusher periyodik olarak DB'ye batch'ler.
+        // Cache'li detay metodundan ayrı tutulur ki cache hit'te de her görüntülenme sayılsın.
+        viewCountBuffer.record(id);
     }
 }

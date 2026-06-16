@@ -8,6 +8,7 @@ public record StockSummaryInfo(
         Long warehouseId,
         String warehouseName,
         Integer availableQuantity,
-        Integer reservedQuantity
+        Integer reservedQuantity,
+        Integer lowStockThreshold
 ) implements Serializable {
 }

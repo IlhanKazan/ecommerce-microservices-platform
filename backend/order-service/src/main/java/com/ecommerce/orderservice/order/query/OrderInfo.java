@@ -17,5 +17,6 @@ public record OrderInfo(
         String paymentTransactionId,
         String cancellationReason,
         LocalDateTime createdAt,
+        LocalDateTime deliveredAt,
         List<OrderItemInfo> items
 ) implements Serializable {}

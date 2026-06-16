@@ -3,6 +3,7 @@ package com.ecommerce.productservice.product.controller;
 import com.ecommerce.productservice.common.constants.ApiPaths;
 import com.ecommerce.productservice.product.controller.dto.request.AiReportUpdateRequest;
 import com.ecommerce.productservice.product.query.ProductValidationInfo;
+import com.ecommerce.productservice.product.query.StockGroupInfo;
 import com.ecommerce.productservice.product.service.InternalProductService;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,20 @@ public class InternalProductController {
             @RequestBody AiReportUpdateRequest request) {
         internalProductService.updateAiReport(productId, request.aiReviewReport());
         return ResponseEntity.ok().build();
+    }
+
+    // Order-service satış metriği: ürünün kendisi + tüm varyant id'leri
+    // GET /api/v1/internal/products/{productId}/variant-ids
+    @GetMapping("/{productId}/variant-ids")
+    public ResponseEntity<java.util.List<Long>> getSalesAggregationIds(@PathVariable Long productId) {
+        return ResponseEntity.ok(internalProductService.getSalesAggregationIds(productId));
+    }
+
+    // Stock-service ES stok agregasyonu: stoğu değişen ürünün search-index hedefi + üye id'leri
+    // GET /api/v1/internal/products/{productId}/stock-group
+    @GetMapping("/{productId}/stock-group")
+    public ResponseEntity<StockGroupInfo> resolveStockGroup(@PathVariable Long productId) {
+        return ResponseEntity.ok(internalProductService.resolveStockGroup(productId));
     }
 
 }

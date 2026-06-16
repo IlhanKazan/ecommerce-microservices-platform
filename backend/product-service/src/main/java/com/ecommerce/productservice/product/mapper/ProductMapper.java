@@ -7,12 +7,14 @@ import com.ecommerce.productservice.product.entity.*;
 import com.ecommerce.productservice.product.controller.dto.request.ProductCreateRequest;
 import com.ecommerce.productservice.product.controller.dto.response.ProductResponse;
 import com.ecommerce.productservice.product.controller.dto.response.ProductDetailResponse;
+import com.ecommerce.productservice.product.controller.dto.response.VariantResponse;
 import com.ecommerce.productservice.product.query.ProductDetailInfo;
 import com.ecommerce.productservice.product.query.ProductInfo;
 import com.ecommerce.productservice.product.query.PublicProductInfo;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.util.List;
 import java.util.UUID;
 
 @Mapper(componentModel = "spring", builder = @org.mapstruct.Builder(disableBuilder = true))
@@ -34,15 +36,30 @@ public interface ProductMapper {
     @Mapping(source = "parentProduct.id", target = "parentProductId")
     @Mapping(target = "tenantName", ignore = true)
     @Mapping(target = "tenantLogoUrl", ignore = true)
+    @Mapping(target = "variants", ignore = true)
+    @Mapping(target = "hasVariants", ignore = true)
+    @Mapping(target = "variantProductIds", ignore = true)
     ProductResponse toResponse(Product product);
 
     @Mapping(target = "tenantName", ignore = true)
     @Mapping(target = "tenantLogoUrl", ignore = true)
+    @Mapping(target = "variants", ignore = true)
     ProductResponse toResponseFromInfo(ProductInfo info);
 
     ProductDetailResponse toDetailResponse(ProductDetailInfo info);
 
+    // variants: PublicProductInfo.variants (List<VariantInfo>) → List<VariantResponse> otomatik eşlenir
+    // hasVariants/variantProductIds public detayda kullanılmaz (frontend doğrudan variants dizisini okur)
+    @Mapping(target = "hasVariants", ignore = true)
+    @Mapping(target = "variantProductIds", ignore = true)
+    @Mapping(target = "viewCount", ignore = true)
+    @Mapping(target = "saleCount", ignore = true)
+    @Mapping(target = "isFeatured", ignore = true)
     ProductResponse toResponseFromPublicInfo(PublicProductInfo info);
+
+    // Merchant Varyantlar ekranı: child Product → VariantResponse (alan adları birebir)
+    VariantResponse toVariantResponse(Product product);
+    List<VariantResponse> toVariantResponses(List<Product> products);
 
     default ProductUpdateContext toUpdateContext(ProductUpdateRequest request, Long tenantId, UUID keycloakId) {
         return new ProductUpdateContext(

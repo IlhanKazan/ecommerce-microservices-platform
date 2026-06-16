@@ -51,7 +51,7 @@ public class BasketController {
                 productDto.id(),
                 productDto.name(),
                 request.quantity(),
-                productDto.price(),
+                productDto.effectivePrice(),
                 productDto.mainImageUrl()
         );
 
@@ -84,7 +84,7 @@ public class BasketController {
                         productDto.id(),
                         productDto.name(),
                         item.quantity(),
-                        productDto.price(),
+                        productDto.effectivePrice(),
                         productDto.mainImageUrl()
                 ));
             } catch (Exception e) {

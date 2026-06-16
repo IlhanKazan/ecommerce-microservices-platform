@@ -15,6 +15,7 @@ public final class EventConstants {
     public static final String EVENT_PRODUCT_CREATED = "PRODUCT_CREATED_EVENT";
     public static final String EVENT_PRODUCT_UPDATED = "PRODUCT_UPDATED_EVENT";
     public static final String EVENT_PRODUCT_DELETED = "PRODUCT_DELETED_EVENT";
+    public static final String EVENT_PRODUCT_STATS_CHANGED = "PRODUCT_STATS_CHANGED_EVENT";
 
     public static final String EVENT_STOCK_RESERVED = "STOCK_RESERVED_EVENT";
     public static final String EVENT_STOCK_FAILED = "STOCK_FAILED_EVENT";
@@ -35,6 +36,9 @@ public final class EventConstants {
     public static final String EVENT_ORDER_SHIPPED          = "ORDER_SHIPPED_EVENT";
     public static final String EVENT_ORDER_REFUNDED         = "ORDER_REFUNDED_EVENT";
     public static final String EVENT_ORDER_DELIVERED        = "ORDER_DELIVERED_EVENT";
+    public static final String EVENT_ORDER_RETURN_REQUESTED = "ORDER_RETURN_REQUESTED_EVENT";
+    public static final String EVENT_ORDER_RETURN_REJECTED  = "ORDER_RETURN_REJECTED_EVENT";
+    public static final String EVENT_ORDER_RETURNED         = "ORDER_RETURNED_EVENT";
 
     public static final String EVENT_STOCK_COMMIT_FAILED    = "STOCK_COMMIT_FAILED_EVENT";
 

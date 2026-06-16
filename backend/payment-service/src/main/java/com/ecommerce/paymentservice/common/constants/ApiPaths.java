@@ -12,6 +12,8 @@ public class ApiPaths {
     public static class Payment{
         public static final String PAYMENT = BASE_PATH_V1 + "/payments";
         public static final String PAYMENT_HISTORY = PAYMENT + "/history";
+        // Platform admin — /api/v1/payments/** gateway route'u altında, method-level hasRole ile korunur
+        public static final String ADMIN = PAYMENT + "/admin";
     }
 
     @NoArgsConstructor(access = AccessLevel.PRIVATE)

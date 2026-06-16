@@ -123,6 +123,24 @@ public class TenantLifecycleService {
         log.info("Mağaza yeniden açıldı. TenantId: {}", tenantId);
     }
 
+    /** Platform admin mağazayı askıya alır. Ürünleri satıştan kalkar; üye erişimi korunur (close değil). */
+    @Transactional
+    public void suspendTenant(Long tenantId) {
+        Tenant tenant = tenantProfileService.getTenantById(tenantId);
+        tenantStateService.suspendTenant(tenant);
+        tenantProfileService.evictStorefrontCache(tenantId);
+        log.info("Mağaza askıya alındı (admin). TenantId: {}", tenantId);
+    }
+
+    /** Platform admin askıya alınmış mağazayı yeniden aktive eder. Ürünleri tekrar satışa döner. */
+    @Transactional
+    public void reactivateTenant(Long tenantId) {
+        Tenant tenant = tenantProfileService.getTenantById(tenantId);
+        tenantStateService.reactivateTenant(tenant);
+        tenantProfileService.evictStorefrontCache(tenantId);
+        log.info("Mağaza yeniden aktive edildi (admin). TenantId: {}", tenantId);
+    }
+
     /** Mağazayı kalıcı kapatır. Tüm üyelerin authz cache'i temizlenir (rol artık NONE). */
     @Transactional
     public void closeTenant(Long tenantId) {

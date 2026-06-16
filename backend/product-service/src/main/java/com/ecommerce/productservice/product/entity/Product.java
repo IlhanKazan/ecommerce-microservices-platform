@@ -52,10 +52,6 @@ public class Product extends BaseEntity {
     @Builder.Default
     private String currency = "TRY";
 
-    @Column(precision = 5, scale = 2)
-    @Builder.Default
-    private BigDecimal discountPercentage = BigDecimal.ZERO;
-
     @Column(precision = 12, scale = 2)
     private BigDecimal discountedPrice;
 
@@ -89,6 +85,11 @@ public class Product extends BaseEntity {
 
     @Builder.Default
     private Integer saleCount = 0;
+
+    // Popülerlik senkronu: sayaç değişince true; scheduler ES'e taşıyıp false'a çeker.
+    @Column(name = "stats_dirty", nullable = false)
+    @Builder.Default
+    private Boolean statsDirty = false;
 
     @Column(precision = 3, scale = 2)
     @Builder.Default

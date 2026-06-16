@@ -86,7 +86,12 @@ public class OrderSagaServiceImpl implements OrderSagaService {
                     "ORDER_AMOUNT_LIMIT_EXCEEDED");
         }
 
-        // ─── 3. Stok rezervasyonu ────────────────────────────────────────
+        // ─── 3. SubMerchant key — stok rezervinden ÖNCE doğrula ──────────
+        // Yan etkisiz okuma; ucuz fail (mağaza ödeme altyapısı hazır değil) önce yapılır.
+        // Aksi halde key null'da stok rezerve edilir ama rollback yapılmaz → kalıcı rezerve sızıntısı.
+        String subMerchantKey = fetchSubMerchantKeyOrThrow(command.tenantId());
+
+        // ─── 4. Stok rezervasyonu ────────────────────────────────────────
         String tempOrderId = "CHECKOUT-" + UUID.randomUUID();
         StockReserveRequest stockReq = new StockReserveRequest(
                 tempOrderId,
@@ -97,9 +102,7 @@ public class OrderSagaServiceImpl implements OrderSagaService {
         );
         reserveStockOrThrow(stockReq);
 
-        // ─── 4. Ödeme ────────────────────────────────────────────────────
-        String subMerchantKey = fetchSubMerchantKeyOrThrow(command.tenantId());
-
+        // ─── 5. Ödeme ────────────────────────────────────────────────────
         OrderPaymentRequest paymentReq = new OrderPaymentRequest(
                 null,
                 command.tenantId(),
@@ -113,11 +116,11 @@ public class OrderSagaServiceImpl implements OrderSagaService {
         );
         PaymentResult paymentResult = processPaymentOrRollback(paymentReq, stockReq);
 
-        // ─── 5. Order + items + outbox — tek @Transactional ─────────────
+        // ─── 6. Order + items + outbox — tek @Transactional ─────────────
         Order order = orderPersistenceService.saveOrderWithItems(
                 command, basket, snapshots, totalAmount, currency, paymentResult);
 
-        // ─── 6. Basket temizle — fire-and-forget ─────────────────────────
+        // ─── 7. Basket temizle — fire-and-forget ─────────────────────────
         clearBasketQuietly();
 
         return order;

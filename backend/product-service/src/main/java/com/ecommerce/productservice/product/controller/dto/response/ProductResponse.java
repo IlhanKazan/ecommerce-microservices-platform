@@ -25,5 +25,13 @@ public record ProductResponse(
         String status,
         String salesStatus,
         String tenantName,
-        String tenantLogoUrl
+        String tenantLogoUrl,
+        List<VariantResponse> variants,
+        // Merchant listesi: varyantı olan ana üründe stok = variantProductIds stoklarının toplamı.
+        boolean hasVariants,
+        List<Long> variantProductIds,
+        // Popülerlik sayaçları (merchant analitiği).
+        Integer viewCount,
+        Integer saleCount,
+        Boolean isFeatured
 ) {}

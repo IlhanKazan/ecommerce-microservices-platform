@@ -17,6 +17,8 @@ public record ProductSearchRequest(
         @Schema(description = "Maximum price filter in TRY", example = "500.00")
         BigDecimal maxPrice,
         Boolean inStock,
+        @Schema(description = "Only featured products", example = "true")
+        Boolean featured,
         @Schema(description = "Minimum average rating filter (0-5)", example = "4")
         BigDecimal minRating,
         String sortBy,

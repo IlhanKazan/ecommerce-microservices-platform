@@ -3,6 +3,7 @@ package com.ecommerce.searchservice.product.consumer;
 import com.ecommerce.common.event.constants.EventConstants;
 import com.ecommerce.contracts.event.product.ProductCreatedEventPayload;
 import com.ecommerce.contracts.event.product.ProductDeletedEventPayload;
+import com.ecommerce.contracts.event.product.ProductStatsChangedEventPayload;
 import com.ecommerce.contracts.event.product.ProductUpdatedEventPayload;
 import com.ecommerce.contracts.event.stock.StockStatusChangedEventPayload;
 import com.ecommerce.searchservice.client.adapter.UserTenantClientAdapter;
@@ -48,6 +49,7 @@ public class ProductEventConsumer {
                 case EventConstants.EVENT_PRODUCT_CREATED -> handleProductCreated(unescapedJson);
                 case EventConstants.EVENT_PRODUCT_UPDATED -> handleProductUpdated(unescapedJson);
                 case EventConstants.EVENT_PRODUCT_DELETED -> handleProductDeleted(unescapedJson);
+                case EventConstants.EVENT_PRODUCT_STATS_CHANGED -> handleProductStatsChanged(unescapedJson);
                 case null, default -> log.warn("Bilinmeyen bir PRODUCT event tipi geldi: {}", headerEventType);
             }
 
@@ -58,8 +60,17 @@ public class ProductEventConsumer {
 
     private void handleProductCreated(String json) throws JsonProcessingException {
         ProductCreatedEventPayload payload = objectMapper.readValue(json, ProductCreatedEventPayload.class);
+
+        // Varyant (child) ürünler vitrinde/aramada kart olarak görünmez — parent üzerinden seçilir.
+        if (payload.parentProductId() != null) {
+            log.info("Varyant ürün indexlenmedi (child). ProductId: {}, ParentId: {}",
+                    payload.productId(), payload.parentProductId());
+            return;
+        }
+
         ProductDocument document = productSearchMapper.toDocument(payload);
         document.setInStock(false);
+        document.setIsFeatured(false); // yeni ürün varsayılan: öne çıkan değil
         document.setCreatedAt(LocalDateTime.now());
         enrichWithTenantInfo(document, payload.tenantId());
         searchRepository.save(document);
@@ -68,6 +79,15 @@ public class ProductEventConsumer {
 
     private void handleProductUpdated(String json) throws JsonProcessingException {
         ProductUpdatedEventPayload payload = objectMapper.readValue(json, ProductUpdatedEventPayload.class);
+
+        // Ürün bir varyanta (child) dönüştüyse aramadan düşür — varsa eski dokümanı sil.
+        if (payload.parentProductId() != null) {
+            if (searchRepository.existsById(payload.productId().toString())) {
+                searchRepository.deleteById(payload.productId().toString());
+                log.info("Varyanta dönüşen ürün ES'ten silindi. ProductId: {}", payload.productId());
+            }
+            return;
+        }
 
         boolean isNew = !searchRepository.existsById(payload.productId().toString());
         ProductDocument document = searchRepository.findById(payload.productId().toString())
@@ -93,6 +113,11 @@ public class ProductEventConsumer {
         // inStock'a dokunma — gerçek fiziksel stok durumunu yalnızca stock-service event'leri yönetir.
         // salesStatus'ü ayrı tut; search query her iki alanı birlikte filtreler.
         document.setSalesStatus(payload.salesStatus());
+
+        // Öne çıkan durumu (additive alan; eski event'lerde null gelebilir → dokunma).
+        if (payload.isFeatured() != null) {
+            document.setIsFeatured(payload.isFeatured());
+        }
 
         if (payload.ratingAverage() != null) {
             document.setRatingAverage(payload.ratingAverage().doubleValue());
@@ -123,6 +148,35 @@ public class ProductEventConsumer {
         ProductDeletedEventPayload payload = objectMapper.readValue(json, ProductDeletedEventPayload.class);
         searchRepository.deleteById(payload.productId().toString());
         log.info("ES Ürün Tamamen Silindi. ID: {}", payload.productId());
+    }
+
+    // Popülerlik sayaçları — partial ES update (stok inStock güncellemesiyle aynı yaklaşım).
+    private void handleProductStatsChanged(String json) throws JsonProcessingException {
+        ProductStatsChangedEventPayload payload =
+                objectMapper.readValue(json, ProductStatsChangedEventPayload.class);
+
+        // İndexlenmemiş (varyant/standalone değil) ürün için no-op.
+        if (!searchRepository.existsById(payload.productId().toString())) {
+            return;
+        }
+
+        Document document = Document.create();
+        if (payload.viewCount() != null) {
+            document.put("viewCount", payload.viewCount());
+        }
+        if (payload.saleCount() != null) {
+            document.put("saleCount", payload.saleCount());
+        }
+        if (document.isEmpty()) {
+            return;
+        }
+
+        UpdateQuery updateQuery = UpdateQuery.builder(payload.productId().toString())
+                .withDocument(document)
+                .build();
+        elasticsearchOperations.update(updateQuery, IndexCoordinates.of("products"));
+        log.info("ES popülerlik güncellendi. ID: {}, view: {}, sale: {}",
+                payload.productId(), payload.viewCount(), payload.saleCount());
     }
 
     @KafkaListener(topics = EventConstants.AGGREGATE_STOCK, groupId = "search-service-group")

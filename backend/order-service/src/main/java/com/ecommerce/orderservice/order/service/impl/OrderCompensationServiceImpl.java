@@ -38,9 +38,10 @@ public class OrderCompensationServiceImpl implements OrderCompensationService {
             return;
         }
 
-        // İade dene — başarısız olursa loglayıp devam et; sipariş durumu yine REFUNDED olarak işaretlenir
+        // İade dene — başarısız olursa loglayıp devam et; sipariş durumu yine REFUNDED olarak işaretlenir.
+        // Sipariş aynı gün oluştuğundan iyzico Cancel (iptal) uygundur.
         try {
-            paymentClient.refundOrderPayment(new RefundRequest(orderId, transactionId));
+            paymentClient.refundOrderPayment(new RefundRequest(orderId, order.getPaymentTransactionId(), order.getTotalAmount(), "CANCEL"));
             log.info("[COMPENSATION] Ödeme iadesi başarılı. OrderID: {}", orderId);
         } catch (FeignException e) {
             log.error("[COMPENSATION] Ödeme iadesi BAŞARISIZ — Manuel müdahale gerekli! OrderID: {}, Hata: {}",

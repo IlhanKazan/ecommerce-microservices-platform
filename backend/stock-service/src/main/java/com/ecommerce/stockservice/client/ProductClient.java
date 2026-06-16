@@ -1,6 +1,7 @@
 package com.ecommerce.stockservice.client;
 
 import com.ecommerce.stockservice.client.dto.ProductResponse;
+import com.ecommerce.stockservice.client.dto.StockGroupResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,5 +14,9 @@ public interface ProductClient {
             @PathVariable("tenantId") Long tenantId,
             @PathVariable("productId") Long productId
     );
+
+    // ES stok agregasyonu: stoğu değişen ürünün search-index hedefi + üye id'leri
+    @GetMapping("/api/v1/internal/products/{productId}/stock-group")
+    StockGroupResponse resolveStockGroup(@PathVariable("productId") Long productId);
 
 }

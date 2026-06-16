@@ -10,9 +10,13 @@ import com.ecommerce.productservice.product.constant.SalesStatus;
 import com.ecommerce.productservice.product.controller.dto.request.ProductUpdateRequest;
 import com.ecommerce.productservice.product.entity.Product;
 import com.ecommerce.productservice.product.command.ProductCreateContext;
+import com.ecommerce.productservice.product.command.VariantCommand;
 import com.ecommerce.productservice.product.controller.dto.request.ProductCreateRequest;
+import com.ecommerce.productservice.product.controller.dto.request.VariantBatchRequest;
+import com.ecommerce.productservice.product.controller.dto.request.VariantRequest;
 import com.ecommerce.productservice.product.controller.dto.response.ProductDetailResponse;
 import com.ecommerce.productservice.product.controller.dto.response.ProductResponse;
+import com.ecommerce.productservice.product.controller.dto.response.VariantResponse;
 import com.ecommerce.productservice.product.query.ProductDetailInfo;
 import com.ecommerce.productservice.product.query.ProductInfo;
 import com.ecommerce.productservice.product.command.ProductUpdateContext;
@@ -29,6 +33,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 
 @Tag(name = "Tenant Products", description = "Merchant product catalog — create, update, delete products and upload images")
@@ -66,11 +71,14 @@ public class TenantProductController {
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
     public ResponseEntity<PageResponse<ProductResponse>> getTenantProducts(
             @PathVariable Long tenantId,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String salesStatus,
+            @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         PageResponse<ProductInfo> result =
-                tenantProductService.getTenantProducts(tenantId, page, size);
+                tenantProductService.getTenantProducts(tenantId, q, salesStatus, sort, page, size);
 
         PageResponse<ProductResponse> response = new PageResponse<>(
                 result.content().stream()
@@ -144,6 +152,19 @@ public class TenantProductController {
         return ResponseEntity.ok().build();
     }
 
+    @Operation(summary = "Toggle featured", description = "Ürünü öne çıkar/kaldır. Öne çıkan ürünler storefront vitrininde gösterilir. PRODUCT_UPDATED event'i ile ES'e yansır.")
+    @ApiResponse(responseCode = "200", description = "Öne çıkan durumu güncellendi")
+    @PatchMapping("/{productId}/featured")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<Void> setFeatured(
+            @PathVariable Long tenantId,
+            @PathVariable Long productId,
+            @RequestParam boolean featured) {
+
+        tenantProductService.setFeatured(tenantId, productId, featured);
+        return ResponseEntity.ok().build();
+    }
+
     @Operation(summary = "Delete product", description = "Soft-deletes the product (status → DELETED). Triggers PRODUCT_DELETED event to remove from search index.")
     @ApiResponse(responseCode = "200", description = "Product deleted")
     @DeleteMapping("/{productId}")
@@ -154,6 +175,87 @@ public class TenantProductController {
 
         tenantProductService.deleteProduct(tenantId, productId);
         return ResponseEntity.noContent().build();
+    }
+
+    // ─── Varyant (child product) yönetimi ───────────────────────────────
+
+    @Operation(summary = "List product variants", description = "Bir ürünün varyantlarını (child) listeler. Varyantlar ana ürün listesinde görünmez.")
+    @ApiResponse(responseCode = "200", description = "Varyant listesi")
+    @GetMapping("/{productId}/variants")
+    @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
+    public ResponseEntity<List<VariantResponse>> getVariants(
+            @PathVariable Long tenantId,
+            @PathVariable Long productId) {
+        return ResponseEntity.ok(productMapper.toVariantResponses(
+                tenantProductService.getVariants(tenantId, productId)));
+    }
+
+    @Operation(summary = "Create variant", description = "Ana ürünün altına varyant (child) ekler. Kombinasyon (attributes) + SKU + fiyat zorunlu. Stok ayrıca stock-service'ten girilir.")
+    @ApiResponse(responseCode = "201", description = "Varyant oluşturuldu")
+    @ApiResponse(responseCode = "409", description = "Aynı kombinasyonda varyant zaten var")
+    @Idempotent(cachePrefix = "idempotency:variant-create:", ttlSeconds = 300)
+    @PostMapping("/{productId}/variants")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<VariantResponse> createVariant(
+            @PathVariable Long tenantId,
+            @PathVariable Long productId,
+            @Valid @RequestBody VariantRequest request,
+            @CurrentUser AuthUser user) {
+
+        Product saved = tenantProductService.createVariant(
+                tenantId, productId, toVariantCommand(request), user.keycloakId());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(productMapper.toVariantResponse(saved));
+    }
+
+    @Operation(summary = "Create variants in batch", description = "Matris üretici: tek istekte N varyant. Eksen kombinasyonlarından üretilmiş varyantları toplu ekler. Atomik — biri (ör. kombinasyon çakışması) patlarsa hiçbiri eklenmez.")
+    @ApiResponse(responseCode = "201", description = "Varyantlar oluşturuldu")
+    @ApiResponse(responseCode = "409", description = "Kombinasyonlardan biri zaten var")
+    @Idempotent(cachePrefix = "idempotency:variant-batch:", ttlSeconds = 300)
+    @PostMapping("/{productId}/variants/batch")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<List<VariantResponse>> createVariantsBatch(
+            @PathVariable Long tenantId,
+            @PathVariable Long productId,
+            @Valid @RequestBody VariantBatchRequest request,
+            @CurrentUser AuthUser user) {
+
+        List<VariantCommand> commands = request.variants().stream()
+                .map(this::toVariantCommand)
+                .toList();
+        List<Product> saved = tenantProductService.createVariantsBatch(
+                tenantId, productId, commands, user.keycloakId());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(productMapper.toVariantResponses(saved));
+    }
+
+    @Operation(summary = "Update variant", description = "Varyantın fiyat/kombinasyon/görselini günceller.")
+    @ApiResponse(responseCode = "200", description = "Varyant güncellendi")
+    @PutMapping("/variants/{variantId}")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<VariantResponse> updateVariant(
+            @PathVariable Long tenantId,
+            @PathVariable Long variantId,
+            @Valid @RequestBody VariantRequest request) {
+
+        Product updated = tenantProductService.updateVariant(tenantId, variantId, toVariantCommand(request));
+        return ResponseEntity.ok(productMapper.toVariantResponse(updated));
+    }
+
+    @Operation(summary = "Delete variant", description = "Varyantı soft-delete eder (status → DELETED).")
+    @ApiResponse(responseCode = "204", description = "Varyant silindi")
+    @DeleteMapping("/variants/{variantId}")
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<Void> deleteVariant(
+            @PathVariable Long tenantId,
+            @PathVariable Long variantId) {
+        tenantProductService.deleteProduct(tenantId, variantId);
+        return ResponseEntity.noContent().build();
+    }
+
+    private VariantCommand toVariantCommand(VariantRequest r) {
+        return new VariantCommand(
+                r.name(), r.sku(), r.price(), r.discountedPrice(), r.mainImageUrl(), r.attributes());
     }
 
     @Operation(summary = "Upload product image", description = "Uploads an image to MinIO products/ bucket. Returns the public URL to use in product create/update requests. Max 5MB, JPEG/PNG/WebP.")

@@ -72,6 +72,14 @@ public class MailServiceImpl implements MailService {
     }
 
     @Override
+    public void sendTenantSuspended(String toEmail, String tenantName, String inboxMessageId) {
+        Context ctx = new Context();
+        ctx.setVariable("tenantName", tenantName);
+        String subject = "Mağazanız Askıya Alındı — " + tenantName;
+        send(toEmail, subject, "mail/tenant-suspended", ctx, inboxMessageId, "TENANT_STATUS_CHANGED_EVENT");
+    }
+
+    @Override
     public void sendPaymentSuccess(String toEmail, String amount, String currency, String paymentType, String inboxMessageId) {
         Context ctx = new Context();
         ctx.setVariable("amount", amount);
@@ -118,6 +126,30 @@ public class MailServiceImpl implements MailService {
         Context ctx = new Context();
         ctx.setVariable("orderId", orderId);
         send(toEmail, "Siparişiniz Teslim Edildi — #" + orderId, "mail/order-delivered", ctx, messageId, "ORDER_DELIVERED_EVENT");
+    }
+
+    @Override
+    public void sendOrderReturnRequested(String toEmail, Long orderId, String reason, String messageId) {
+        Context ctx = new Context();
+        ctx.setVariable("orderId", orderId);
+        ctx.setVariable("reason", reason != null ? reason : "Belirtilmedi");
+        send(toEmail, "İade Talebiniz Alındı — #" + orderId, "mail/return-requested", ctx, messageId, "ORDER_RETURN_REQUESTED_EVENT");
+    }
+
+    @Override
+    public void sendOrderReturnRejected(String toEmail, Long orderId, String note, String messageId) {
+        Context ctx = new Context();
+        ctx.setVariable("orderId", orderId);
+        ctx.setVariable("note", note != null ? note : "Belirtilmedi");
+        send(toEmail, "İade Talebiniz Reddedildi — #" + orderId, "mail/return-rejected", ctx, messageId, "ORDER_RETURN_REJECTED_EVENT");
+    }
+
+    @Override
+    public void sendOrderReturned(String toEmail, Long orderId, BigDecimal refundAmount, String messageId) {
+        Context ctx = new Context();
+        ctx.setVariable("orderId", orderId);
+        ctx.setVariable("refundAmount", refundAmount != null ? refundAmount.toPlainString() : "0");
+        send(toEmail, "İadeniz Tamamlandı — #" + orderId, "mail/returned", ctx, messageId, "ORDER_RETURNED_EVENT");
     }
 
     @Override

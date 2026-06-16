@@ -10,4 +10,6 @@ public interface InternalStockService {
     void rollbackAllForOrder(String orderId, Long tenantId, List<StockItemRequest> items);
     void commitAllForOrder(String orderId, Long tenantId, List<OrderItemSnapshotPayload> items);
     void cancelAllForOrder(String orderId, Long tenantId, List<OrderItemSnapshotPayload> items);
+    // İade onaylandı: satılmış (committed) stoğu aktif depoya geri ekle (available += qty)
+    void restockForReturn(String orderId, Long tenantId, List<OrderItemSnapshotPayload> items);
 }

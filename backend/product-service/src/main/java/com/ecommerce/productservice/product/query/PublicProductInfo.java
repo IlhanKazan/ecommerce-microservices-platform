@@ -29,6 +29,7 @@ public record PublicProductInfo(
         String salesStatus,
         String tenantName,
         String tenantLogoUrl,
-        String aiReviewReport
+        String aiReviewReport,
+        List<VariantInfo> variants   // parent ise ACTIVE varyantları; standalone'da boş liste
 ) implements Serializable {
 }

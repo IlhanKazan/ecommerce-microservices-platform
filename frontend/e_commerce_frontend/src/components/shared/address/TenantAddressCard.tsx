@@ -1,36 +1,51 @@
 import React from 'react';
-import { Card, CardContent, Typography, Stack, Grid, Box, Avatar, IconButton, Tooltip } from '@mui/material';
+import { Card, CardContent, Typography, Stack, Box, Avatar, IconButton, Tooltip, Chip } from '@mui/material';
 import {
     LocationOn as LocationIcon,
     Business as BusinessIcon,
     LocalShipping as ShippingIcon,
-    DeleteOutline as DeleteIcon
+    PersonOutline as PersonIcon,
+    DeleteOutline as DeleteIcon,
 } from '@mui/icons-material';
-import { AddressType } from '../../../types/enums';
 
 interface TenantAddressCardProps {
     address: {
         label?: string | null;
-        recipientName: string;
+        recipientName?: string | null;
         phoneNumber?: string | null;
-        line1?: string;
+        line1?: string | null;
         line2?: string | null;
-        city: string;
-        country: string;
+        city?: string | null;
+        country?: string | null;
         zipCode?: string | null;
-        type?: string;
-        addressType?: string;
+        type?: string | null;
+        addressType?: string | null;
     };
     onDelete?: () => void;
 }
 
-const TenantAddressCard: React.FC<TenantAddressCardProps> = ({ address, onDelete }) => {
+const TYPE_TITLE: Record<string, string> = {
+    BILLING: 'Fatura Adresi',
+    FATURA: 'Fatura Adresi',
+    SHIPPING: 'Teslimat Adresi',
+    WAREHOUSE: 'Depo Adresi',
+    REGISTERED: 'Kayıtlı Adres',
+};
 
-    const displayTitle = address.label || 'Adres Başlığı Yok';
-    const displayType = (address.type || address.addressType || 'GENEL') as string;
-    const displayAddress1 = `${address.line1 || ''}`;
-    const displayAddress2 = `${address.line2 || ''}`;
-    const isBilling = displayType === AddressType.BILLING || displayType === 'FATURA';
+const clean = (s?: string | null) => (s ?? '').trim();
+
+const TenantAddressCard: React.FC<TenantAddressCardProps> = ({ address, onDelete }) => {
+    const rawType = clean(address.type || address.addressType).toUpperCase();
+    const isBilling = rawType === 'BILLING' || rawType === 'FATURA';
+    const typeLabel = TYPE_TITLE[rawType] || 'Mağaza Adresi';
+
+    // Başlık: kullanıcı bir etiket girdiyse onu, yoksa adres tipinden anlamlı bir başlık kullan.
+    const title = clean(address.label) || typeLabel;
+    const recipient = clean(address.recipientName);
+    const addressLines = [clean(address.line1), clean(address.line2)].filter(Boolean);
+    const locationLine = [clean(address.zipCode), clean(address.city), clean(address.country)]
+        .filter(Boolean)
+        .join(' · ');
 
     return (
         <Card
@@ -41,13 +56,13 @@ const TenantAddressCard: React.FC<TenantAddressCardProps> = ({ address, onDelete
                 border: '1px solid #e2e8f0',
                 position: 'relative',
                 overflow: 'hidden',
-                '&:hover .delete-btn': { opacity: 1 }
+                '&:hover .delete-btn': { opacity: 1 },
             }}
         >
             <Box
                 sx={{
                     position: 'absolute', left: 0, top: 0, bottom: 0, width: 6,
-                    bgcolor: isBilling ? 'secondary.main' : 'primary.main'
+                    bgcolor: isBilling ? 'secondary.main' : 'primary.main',
                 }}
             />
 
@@ -61,7 +76,7 @@ const TenantAddressCard: React.FC<TenantAddressCardProps> = ({ address, onDelete
                             position: 'absolute', top: 8, right: 8,
                             opacity: 0.6, transition: '0.2s',
                             bgcolor: 'background.paper',
-                            '&:hover': { opacity: 1, bgcolor: '#fee2e2' }
+                            '&:hover': { opacity: 1, bgcolor: '#fee2e2' },
                         }}
                     >
                         <DeleteIcon />
@@ -69,50 +84,61 @@ const TenantAddressCard: React.FC<TenantAddressCardProps> = ({ address, onDelete
                 </Tooltip>
             )}
 
-            <CardContent sx={{ pl: 3, pr: 5 }}>
-                <Grid container spacing={2}>
-                    <Grid size={12}>
-                        <Stack direction="row" gap={2} alignItems="center">
-                            <Avatar
-                                sx={{
-                                    bgcolor: isBilling ? 'secondary.50' : 'primary.50',
-                                    color: isBilling ? 'secondary.main' : 'primary.main',
-                                    width: 48, height: 48
-                                }}
-                            >
-                                {isBilling ? <BusinessIcon /> : <ShippingIcon />}
-                            </Avatar>
-                            <Box>
-                                <Typography variant="h6" fontWeight="bold" lineHeight={1.2}>
-                                    {displayTitle}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" fontWeight="500">
-                                    {address.recipientName}
-                                </Typography>
-                            </Box>
-                        </Stack>
-                    </Grid>
-
-                    <Grid size={12}><Box sx={{ borderBottom: '1px dashed #e2e8f0' }} /></Grid>
-
-                    <Grid size={12}>
-                        <Stack direction="row" gap={1} mb={1}>
-                            <LocationIcon color="action" fontSize="small" sx={{ mt: 0.3 }} />
-                            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-                                {displayAddress1}
+            <CardContent sx={{ pl: 3, pr: 6 }}>
+                {/* Başlık satırı */}
+                <Stack direction="row" gap={2} alignItems="center" sx={{ mb: 2 }}>
+                    <Avatar
+                        sx={{
+                            bgcolor: isBilling ? 'secondary.50' : 'primary.50',
+                            color: isBilling ? 'secondary.main' : 'primary.main',
+                            width: 48, height: 48,
+                        }}
+                    >
+                        {isBilling ? <BusinessIcon /> : <ShippingIcon />}
+                    </Avatar>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+                            <Typography variant="h6" fontWeight="bold" lineHeight={1.2}>
+                                {title}
                             </Typography>
+                            <Chip size="small" label={typeLabel} variant="outlined"
+                                  color={isBilling ? 'secondary' : 'primary'} sx={{ height: 22 }} />
                         </Stack>
-                        <Stack direction="row" gap={1} mb={1}>
-                            <LocationIcon color="action" fontSize="small" sx={{ mt: 0.3 }} />
-                            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-                                {displayAddress2}
-                            </Typography>
-                        </Stack>
-                        <Typography variant="body2" fontWeight="600" color="text.primary" sx={{ ml: 3.5 }}>
-                            {address.zipCode ? `${address.zipCode} - ` : ''} {address.city} / {address.country}
-                        </Typography>
-                    </Grid>
-                </Grid>
+                        {recipient && (
+                            <Stack direction="row" gap={0.5} alignItems="center" sx={{ mt: 0.25 }}>
+                                <PersonIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                                    {recipient}
+                                </Typography>
+                            </Stack>
+                        )}
+                    </Box>
+                </Stack>
+
+                <Box sx={{ borderBottom: '1px dashed #e2e8f0', mb: 2 }} />
+
+                {/* Adres detayları */}
+                {addressLines.length === 0 && !locationLine ? (
+                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                        Adres detayı girilmemiş.
+                    </Typography>
+                ) : (
+                    <Stack direction="row" gap={1}>
+                        <LocationIcon color="action" fontSize="small" sx={{ mt: 0.3 }} />
+                        <Box>
+                            {addressLines.map((line, i) => (
+                                <Typography key={i} variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+                                    {line}
+                                </Typography>
+                            ))}
+                            {locationLine && (
+                                <Typography variant="body2" fontWeight={600} color="text.primary" sx={{ mt: 0.5 }}>
+                                    {locationLine}
+                                </Typography>
+                            )}
+                        </Box>
+                    </Stack>
+                )}
             </CardContent>
         </Card>
     );

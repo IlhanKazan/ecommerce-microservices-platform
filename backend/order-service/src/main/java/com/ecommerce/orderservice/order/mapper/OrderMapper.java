@@ -2,9 +2,11 @@ package com.ecommerce.orderservice.order.mapper;
 
 import com.ecommerce.orderservice.order.controller.dto.response.OrderDetailResponse;
 import com.ecommerce.orderservice.order.controller.dto.response.OrderResponse;
+import com.ecommerce.orderservice.order.controller.dto.response.ReturnResponse;
 import com.ecommerce.orderservice.order.entity.Order;
 import com.ecommerce.orderservice.order.query.OrderInfo;
 import com.ecommerce.orderservice.order.query.OrderItemInfo;
+import com.ecommerce.orderservice.order.query.ReturnInfo;
 import org.mapstruct.Builder;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -32,6 +34,7 @@ public interface OrderMapper {
                 info.currency(),
                 info.shippingAddressJson(),
                 info.createdAt(),
+                info.deliveredAt(),
                 items
         );
     }
@@ -42,4 +45,7 @@ public interface OrderMapper {
                 item.productImageUrl(), item.unitPrice(), item.quantity()
         );
     }
+
+    // İade listesi — alan adları birebir (auto-map)
+    ReturnResponse toReturnResponse(ReturnInfo info);
 }

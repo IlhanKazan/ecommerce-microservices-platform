@@ -9,6 +9,7 @@ public interface MailService {
     void sendTenantPaused(String toEmail, String tenantName, String inboxMessageId);
     void sendTenantClosed(String toEmail, String tenantName, String inboxMessageId);
     void sendTenantReactivated(String toEmail, String tenantName, String inboxMessageId);
+    void sendTenantSuspended(String toEmail, String tenantName, String inboxMessageId);
     void sendPaymentSuccess(String toEmail, String amount, String currency, String paymentType, String inboxMessageId);
 
     void sendOrderConfirmed(String toEmail, Long orderId, BigDecimal totalAmount, String currency, String messageId);
@@ -16,6 +17,9 @@ public interface MailService {
     void sendOrderShipped(String toEmail, Long orderId, String trackingNumber, String messageId);
     void sendOrderRefunded(String toEmail, Long orderId, String reason, String messageId);
     void sendOrderDelivered(String toEmail, Long orderId, String messageId);
+    void sendOrderReturnRequested(String toEmail, Long orderId, String reason, String messageId);
+    void sendOrderReturnRejected(String toEmail, Long orderId, String note, String messageId);
+    void sendOrderReturned(String toEmail, Long orderId, BigDecimal refundAmount, String messageId);
 
     void sendSubscriptionActivated(String toEmail, String planName, LocalDate nextBillingDate, String messageId);
     void sendSubscriptionRenewalSuccess(String toEmail, String planName, LocalDate nextBillingDate, String messageId);

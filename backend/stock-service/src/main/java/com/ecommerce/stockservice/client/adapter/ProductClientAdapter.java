@@ -4,10 +4,13 @@ import com.ecommerce.common.exception.BusinessException;
 import com.ecommerce.common.exception.ExternalServiceException;
 import com.ecommerce.stockservice.client.ProductClient;
 import com.ecommerce.stockservice.client.dto.ProductResponse;
+import com.ecommerce.stockservice.client.dto.StockGroupResponse;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -25,6 +28,26 @@ public class ProductClientAdapter {
         } catch (Exception e) {
             log.error("Product Service'e ulaşılamadı. ProductID: {}", productId, e);
             throw new ExternalServiceException("Ürün doğrulaması yapılamadı, lütfen sonra tekrar deneyin.", "PRODUCT_SERVICE_DOWN");
+        }
+    }
+
+    /**
+     * ES stok agregasyon grubunu çözer. Best-effort: product-service'e ulaşılamazsa
+     * ürünün kendisini hedef alan grupla geri döner (ES senkronu o tur atlanır ama
+     * çekirdek stok işlemi kesintiye uğramaz).
+     */
+    public StockGroupResponse resolveStockGroup(Long productId) {
+        try {
+            StockGroupResponse group = productClient.resolveStockGroup(productId);
+            if (group == null || group.searchTargetId() == null
+                    || group.memberIds() == null || group.memberIds().isEmpty()) {
+                return new StockGroupResponse(productId, List.of(productId));
+            }
+            return group;
+        } catch (Exception e) {
+            log.warn("Stok grubu çözülemedi, ürünün kendisi hedef alınıyor. ProductID: {}, Hata: {}",
+                    productId, e.getMessage());
+            return new StockGroupResponse(productId, List.of(productId));
         }
     }
 }

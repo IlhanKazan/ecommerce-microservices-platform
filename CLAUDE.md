@@ -21,6 +21,7 @@ Bitirme projesi + staj projesi olarak geliştiriliyor; **TÜBİTAK 2209-A** baş
 - **Mimari, event akışı, servis topolojisi:** `ARCHITECTURE.md`
 - **Kod kuralları, paket yapısı, DTO kuralları, tuzaklar:** `CONVENTIONS.md`
 - **Yapılacaklar, aktif migration aşamaları, bilinen borç:** `TODO.md`
+- **Test / load / pentest yol haritası (kalite fazı, portföy çıktıları):** `QUALITY-ROADMAP.md`
 
 Yeni bir işe başlamadan önce **en azından `TODO.md`'nin "Aktif" bölümü + `ARCHITECTURE.md` §3 (event pipeline) + ilgili servisin `CONVENTIONS.md` bölümü** okunmalı.
 

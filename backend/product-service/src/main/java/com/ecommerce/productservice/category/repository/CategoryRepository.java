@@ -16,6 +16,14 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
     Optional<Category> findBySlugAndIsActiveTrue(String slug);
 
+    // --- Platform admin ---
+    boolean existsBySlug(String slug);
+
+    boolean existsByParentCategoryId(Long parentId);
+
+    // Admin tam ağaç: inaktif dahil tüm kök kategoriler (alt kategoriler ilişkiden gelir)
+    List<Category> findByParentCategoryIsNullOrderByDisplayOrderAsc();
+
     @Query("""
         SELECT c FROM Category c
         LEFT JOIN FETCH c.subCategories sc

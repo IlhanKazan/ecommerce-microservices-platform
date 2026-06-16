@@ -25,6 +25,7 @@ import {
     useDeleteWarehouse,
     useAddManualStock,
     useRemoveManualStock,
+    useUpdateLowStockThreshold,
     useGetTenantProducts,
     useGetTenantStocks,
 } from '../../../query/useProductQueries';
@@ -479,6 +480,65 @@ const DeleteWarehouseDialog: React.FC<DeleteWarehouseDialogProps> = ({
     );
 };
 
+// ─── Edit Low-Stock Threshold Dialog ───────────────────────────────────────────
+
+interface EditThresholdDialogProps {
+    open: boolean;
+    onClose: () => void;
+    tenantId: number;
+    warehouseId: number;
+    productId: number;
+    productSku: string;
+    currentThreshold: number;
+}
+
+const EditThresholdDialog: React.FC<EditThresholdDialogProps> = ({
+    open, onClose, tenantId, warehouseId, productId, productSku, currentThreshold,
+}) => {
+    const { notify } = useNotification();
+    const [threshold, setThreshold] = useState<number | ''>(currentThreshold);
+    const { mutate: updateThreshold, isPending } = useUpdateLowStockThreshold(tenantId);
+
+    const isValid = threshold !== '' && Number(threshold) >= 0;
+
+    const handleSubmit = () => {
+        if (!isValid) return;
+        updateThreshold(
+            { warehouseId, productId, threshold: Number(threshold) },
+            {
+                onSuccess: () => { notify('Düşük stok eşiği güncellendi.', 'success'); onClose(); },
+                onError: () => notify('Eşik güncellenirken hata oluştu.', 'error'),
+            },
+        );
+    };
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+            <DialogTitle fontWeight="bold">Düşük Stok Eşiği</DialogTitle>
+            <DialogContent dividers>
+                <Stack spacing={2} sx={{ pt: 0.5 }}>
+                    <Chip label={productSku} size="small" variant="outlined" sx={{ fontFamily: 'monospace', alignSelf: 'flex-start' }} />
+                    <TextField
+                        type="number" fullWidth required autoFocus
+                        label="Düşük stok eşiği (adet)"
+                        value={threshold}
+                        onChange={(e) => setThreshold(e.target.value === '' ? '' : Number(e.target.value))}
+                        slotProps={{ htmlInput: { min: 0 } }}
+                        helperText="Mevcut stok bu değerin altına inince 'düşük stok' olarak işaretlenir."
+                    />
+                </Stack>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button onClick={onClose} color="inherit" disabled={isPending}>İptal</Button>
+                <Button onClick={handleSubmit} variant="contained" disabled={!isValid || isPending}
+                    startIcon={isPending ? <CircularProgress size={18} color="inherit" /> : <EditIcon />}>
+                    {isPending ? 'Kaydediliyor...' : 'Kaydet'}
+                </Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const MerchantWarehousePage: React.FC = () => {
@@ -496,6 +556,13 @@ const MerchantWarehousePage: React.FC = () => {
         warehouseName: string;
     } | null>(null);
     const [expandedWarehouseId,  setExpandedWarehouseId]  = useState<number | null>(null);
+    const [stockSearch,          setStockSearch]           = useState('');
+    const [thresholdTarget,      setThresholdTarget]       = useState<{
+        warehouseId: number;
+        productId: number;
+        sku: string;
+        current: number;
+    } | null>(null);
     const [warehouseForm,        setWarehouseForm]         = useState({ code: '', name: '', locationDetails: '' });
     const [editTarget,           setEditTarget]            = useState<Warehouse | null>(null);
     const [deleteTarget,         setDeleteTarget]          = useState<Warehouse | null>(null);
@@ -514,6 +581,11 @@ const MerchantWarehousePage: React.FC = () => {
         list.push(s);
         stockByWarehouse.set(s.warehouseId, list);
     });
+
+    // SKU araması (client-side) — eşleşen kayıtlar filtrelenir, eşleşmeli depolar otomatik açılır.
+    const stockQuery = stockSearch.trim().toLowerCase();
+    const filterStocks = (list: StockSummaryItem[]) =>
+        stockQuery ? list.filter((s) => s.sku.toLowerCase().includes(stockQuery)) : list;
 
     if (!activeTenant) {
         return <Alert severity="warning">Aktif mağaza bulunamadı.</Alert>;
@@ -633,9 +705,29 @@ const MerchantWarehousePage: React.FC = () => {
 
             {/* Depo listesi */}
             <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
-                <Box sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    justifyContent="space-between"
+                    alignItems={{ sm: 'center' }}
+                    spacing={2}
+                    sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider' }}
+                >
                     <Typography variant="h6">Mevcut Depolar</Typography>
-                </Box>
+                    <TextField
+                        placeholder="SKU ara..."
+                        size="small"
+                        value={stockSearch}
+                        onChange={(e) => setStockSearch(e.target.value)}
+                        sx={{ width: { xs: '100%', sm: 280 } }}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon fontSize="small" color="action" />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                </Stack>
                 <TableContainer>
                     <Table>
                         <TableHead sx={{ bgcolor: 'grey.50' }}>
@@ -664,8 +756,11 @@ const MerchantWarehousePage: React.FC = () => {
                                 </TableRow>
                             ) : (
                                 warehouses.map((w) => {
-                                    const warehouseStocks = stockByWarehouse.get(w.id) ?? [];
-                                    const isExpanded = expandedWarehouseId === w.id;
+                                    const warehouseStocks = filterStocks(stockByWarehouse.get(w.id) ?? []);
+                                    // Aktif SKU aramasında eşleşmeli depoyu otomatik aç.
+                                    const isExpanded = stockQuery
+                                        ? warehouseStocks.length > 0
+                                        : expandedWarehouseId === w.id;
 
                                     return (
                                         <React.Fragment key={w.id}>
@@ -762,6 +857,7 @@ const MerchantWarehousePage: React.FC = () => {
                                                                             <TableCell sx={{ pl: 4 }}><b>SKU</b></TableCell>
                                                                             <TableCell align="center"><b>Mevcut</b></TableCell>
                                                                             <TableCell align="center"><b>Rezerve</b></TableCell>
+                                                                            <TableCell align="center"><b>Düşük Eşik</b></TableCell>
                                                                             <TableCell align="center"><b>İşlemler</b></TableCell>
                                                                         </TableRow>
                                                                     </TableHead>
@@ -783,7 +879,7 @@ const MerchantWarehousePage: React.FC = () => {
                                                                                         color={
                                                                                             s.availableQuantity === 0
                                                                                                 ? 'error'
-                                                                                                : s.availableQuantity <= 5
+                                                                                                : s.availableQuantity <= (s.lowStockThreshold ?? 5)
                                                                                                     ? 'warning'
                                                                                                     : 'success'
                                                                                         }
@@ -797,6 +893,26 @@ const MerchantWarehousePage: React.FC = () => {
                                                                                         color={s.reservedQuantity > 0 ? 'warning' : 'default'}
                                                                                         variant="outlined"
                                                                                     />
+                                                                                </TableCell>
+                                                                                <TableCell align="center">
+                                                                                    <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                                                                                        <Typography variant="caption" color="text.secondary">
+                                                                                            {s.lowStockThreshold ?? 5}
+                                                                                        </Typography>
+                                                                                        <Tooltip title="Düşük stok eşiğini düzenle">
+                                                                                            <IconButton
+                                                                                                size="small"
+                                                                                                onClick={() => setThresholdTarget({
+                                                                                                    warehouseId: s.warehouseId,
+                                                                                                    productId: s.productId,
+                                                                                                    sku: s.sku,
+                                                                                                    current: s.lowStockThreshold ?? 5,
+                                                                                                })}
+                                                                                            >
+                                                                                                <EditIcon fontSize="small" />
+                                                                                            </IconButton>
+                                                                                        </Tooltip>
+                                                                                    </Stack>
                                                                                 </TableCell>
                                                                                 <TableCell align="center">
                                                                                     <Stack direction="row" spacing={0.5} justifyContent="center">
@@ -890,6 +1006,19 @@ const MerchantWarehousePage: React.FC = () => {
                     tenantId={tenantId}
                     warehouse={deleteTarget}
                     stockItemCount={(stockByWarehouse.get(deleteTarget.id) ?? []).length}
+                />
+            )}
+
+            {/* Düşük stok eşiği dialog */}
+            {thresholdTarget && (
+                <EditThresholdDialog
+                    open={!!thresholdTarget}
+                    onClose={() => setThresholdTarget(null)}
+                    tenantId={tenantId}
+                    warehouseId={thresholdTarget.warehouseId}
+                    productId={thresholdTarget.productId}
+                    productSku={thresholdTarget.sku}
+                    currentThreshold={thresholdTarget.current}
                 />
             )}
         </Box>

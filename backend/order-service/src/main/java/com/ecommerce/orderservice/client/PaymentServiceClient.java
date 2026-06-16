@@ -3,6 +3,7 @@ package com.ecommerce.orderservice.client;
 import com.ecommerce.orderservice.client.dto.OrderPaymentRequest;
 import com.ecommerce.orderservice.client.dto.PaymentResult;
 import com.ecommerce.orderservice.client.dto.RefundRequest;
+import com.ecommerce.orderservice.client.dto.RefundResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,5 +15,5 @@ public interface PaymentServiceClient {
     PaymentResult processOrderPayment(@RequestBody OrderPaymentRequest request);
 
     @PostMapping("/api/v1/payments/internal/refund")
-    void refundOrderPayment(@RequestBody RefundRequest request);
+    RefundResponse refundOrderPayment(@RequestBody RefundRequest request);
 }

@@ -82,6 +82,12 @@ public class ProductDocument {
     @Field(type = FieldType.Integer)
     private Integer saleCount;
 
+    @Field(type = FieldType.Integer)
+    private Integer viewCount;
+
+    @Field(type = FieldType.Boolean)
+    private Boolean isFeatured;
+
     @Field(type = FieldType.Keyword)
     private String tenantName;
 

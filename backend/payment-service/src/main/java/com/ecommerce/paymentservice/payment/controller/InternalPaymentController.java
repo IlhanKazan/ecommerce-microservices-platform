@@ -8,7 +8,9 @@ import com.ecommerce.paymentservice.payment.constant.PaymentType;
 import com.ecommerce.paymentservice.payment.controller.dto.request.InternalOrderPaymentRequest;
 import com.ecommerce.paymentservice.payment.controller.dto.request.InternalRefundRequest;
 import com.ecommerce.paymentservice.payment.controller.dto.response.InternalPaymentResponse;
+import com.ecommerce.paymentservice.payment.controller.dto.response.InternalRefundResponse;
 import com.ecommerce.paymentservice.payment.domain.PaymentContext;
+import com.ecommerce.paymentservice.payment.domain.RefundResult;
 import com.ecommerce.paymentservice.payment.entity.Payment;
 import com.ecommerce.paymentservice.payment.service.PaymentService;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -60,16 +62,18 @@ public class InternalPaymentController {
                 payment.getId(),
                 payment.getPaymentStatus() == PaymentStatus.SUCCESS,
                 payment.getIyzicoTransactionId(),
-                payment.getFailureReason()
+                payment.getFailureReason(),
+                payment.getCommissionAmount()
         ));
     }
 
     @PostMapping("/refund")
-    public ResponseEntity<Void> refundOrderPayment(@RequestBody InternalRefundRequest request) {
-        log.info("[INTERNAL] İade isteği. OrderID: {}, TransactionID: {}",
-                request.orderId(), request.transactionId());
-        // TODO [01.06.2026]: Gerçek iyzico refund API çağrısı sonraki iterasyonda eklenecek
-        paymentService.refundByOrderId(request.orderId(), request.transactionId());
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<InternalRefundResponse> refundOrderPayment(@RequestBody InternalRefundRequest request) {
+        log.info("[INTERNAL] İade isteği. OrderID: {}, kind: {}, amount: {}",
+                request.orderId(), request.kind(), request.amount());
+        RefundResult result = paymentService.processRefund(
+                request.orderId(), request.transactionId(), request.amount(), request.kind());
+        return ResponseEntity.ok(new InternalRefundResponse(
+                result.success(), result.message(), result.refundedAmount()));
     }
 }

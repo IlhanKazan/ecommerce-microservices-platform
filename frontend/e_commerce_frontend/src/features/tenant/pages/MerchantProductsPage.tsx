@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Box, Typography, Button, Paper, Stack, Chip, Alert,
     Table, TableBody, TableCell, TableContainer, TableHead,
     TableRow, TablePagination, IconButton, Tooltip,
     CircularProgress, Dialog, DialogTitle, DialogContent,
     DialogContentText, DialogActions, Avatar,
+    TextField, InputAdornment, FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -13,7 +14,13 @@ import {
     ToggleOn as ToggleOnIcon,
     ToggleOff as ToggleOffIcon,
     Inventory2 as InventoryIcon,
+    Style as StyleIcon,
+    BarChart as MetricsIcon,
+    Search as SearchIcon,
+    Star as StarIcon,
+    StarBorder as StarBorderIcon,
 } from '@mui/icons-material';
+import { useDebounce } from '../../../hooks/useDebounce';
 import { useMerchantStore } from '../../../store/useMerchantStore';
 import { useNotification } from '../../../components/shared/NotificationContext';
 import {
@@ -22,11 +29,15 @@ import {
     useUpdateTenantProduct,
     useDeleteTenantProduct,
     useUpdateSalesStatus,
+    useSetFeatured,
     useGetTenantStocks,
 } from '../../../query/useProductQueries';
 import type { TenantProductResponse, ProductCreateRequest } from '../../../types/product';
 import MerchantProductForm from '../components/MerchantProductForm';
 import { AddStockModal } from '../components/AddStockModal';
+import { MerchantVariantsModal } from '../components/MerchantVariantsModal';
+import ProductMetricsModal from '../../../components/shared/ProductMetricsModal';
+import { useTenantProductMetrics } from '../../../query/useOrderQueries';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -57,23 +68,39 @@ const MerchantProductsPage: React.FC = () => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(20);
 
+    // Arama + filtre + sıralama state (server-side)
+    const [searchInput, setSearchInput] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [sortBy, setSortBy] = useState('');
+    const debouncedSearch = useDebounce(searchInput, 300);
+
+    // Arama/filtre/sıralama değişince ilk sayfaya dön
+    useEffect(() => {
+        setPage(0);
+    }, [debouncedSearch, statusFilter, sortBy]);
+
     // Form & delete & stock dialog state
     const [formOpen, setFormOpen] = useState(false);
     const [editTarget, setEditTarget] = useState<TenantProductResponse | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<TenantProductResponse | null>(null);
     const [stockTargetId, setStockTargetId] = useState<number | null>(null);
+    const [variantTarget, setVariantTarget] = useState<TenantProductResponse | null>(null);
+    const [metricsTarget, setMetricsTarget] = useState<TenantProductResponse | null>(null);
 
     // Tüm hook'lar koşulsuz çağrılmalı — Rules of Hooks
     // activeTenant yoksa tenantId=0 ile çağrılır; enabled: false koruması
     // useGetTenantProducts içinde !!tenantId kontrolü ile query devre dışı kalır
     const tenantId = activeTenant?.id ?? 0;
 
-    const { data, isLoading, isError } = useGetTenantProducts(tenantId, page, rowsPerPage);
+    const { data, isLoading, isError } = useGetTenantProducts(
+        tenantId, page, rowsPerPage, debouncedSearch, statusFilter, sortBy);
     const { mutate: createProduct, isPending: isCreating } = useCreateTenantProduct(tenantId);
     const { mutate: updateProduct, isPending: isUpdating } = useUpdateTenantProduct(tenantId);
     const { mutate: deleteProduct, isPending: isDeleting } = useDeleteTenantProduct(tenantId);
     const { mutate: updateStatus, isPending: isUpdatingStatus } = useUpdateSalesStatus(tenantId);
+    const { mutate: setFeatured, isPending: isSettingFeatured } = useSetFeatured(tenantId);
     const { data: stockSummary } = useGetTenantStocks(tenantId);
+    const productMetrics = useTenantProductMetrics(tenantId, metricsTarget?.id ?? null, !!metricsTarget);
 
     // productId → toplam available quantity (tüm depolar)
     const stockByProduct = new Map<number, number>();
@@ -185,6 +212,51 @@ const MerchantProductsPage: React.FC = () => {
                 </Button>
             </Stack>
 
+            {/* Arama + filtre */}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3}>
+                <TextField
+                    placeholder="Ürün adı veya SKU ara..."
+                    size="small"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    sx={{ flex: 1, maxWidth: 420 }}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon fontSize="small" color="action" />
+                            </InputAdornment>
+                        ),
+                    }}
+                />
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel>Satış Durumu</InputLabel>
+                    <Select
+                        label="Satış Durumu"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                        <MenuItem value="">Tümü</MenuItem>
+                        <MenuItem value="ON_SALE">Satışta</MenuItem>
+                        <MenuItem value="OUT_OF_STOCK">Stok Yok</MenuItem>
+                        <MenuItem value="COMING_SOON">Yakında</MenuItem>
+                    </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel>Sırala</InputLabel>
+                    <Select
+                        label="Sırala"
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                    >
+                        <MenuItem value="">En Yeni</MenuItem>
+                        <MenuItem value="sales">Çok Satan</MenuItem>
+                        <MenuItem value="views">Çok Görüntülenen</MenuItem>
+                        <MenuItem value="price_desc">Fiyat: Azalan</MenuItem>
+                        <MenuItem value="price_asc">Fiyat: Artan</MenuItem>
+                    </Select>
+                </FormControl>
+            </Stack>
+
             {isError && (
                 <Alert severity="error" sx={{ mb: 3 }}>
                     Ürünler yüklenirken bir hata oluştu.
@@ -252,10 +324,13 @@ const MerchantProductsPage: React.FC = () => {
                                                     {product.name}
                                                 </Typography>
                                                 {product.brand && (
-                                                    <Typography variant="caption" color="text.secondary">
+                                                    <Typography variant="caption" color="text.secondary" display="block">
                                                         {product.brand}
                                                     </Typography>
                                                 )}
+                                                <Typography variant="caption" color="text.disabled" display="block">
+                                                    👁 {product.viewCount ?? 0} · 🛒 {product.saleCount ?? 0}
+                                                </Typography>
                                             </TableCell>
 
                                             <TableCell>
@@ -301,6 +376,24 @@ const MerchantProductsPage: React.FC = () => {
 
                                             <TableCell align="center">
                                                 {(() => {
+                                                    // Varyantlı ana üründe stok = varyantların toplamı (ana ürünün kendi stoğu gizlenir).
+                                                    if (product.hasVariants) {
+                                                        const qty = (product.variantProductIds ?? []).reduce(
+                                                            (sum, vid) => sum + (stockByProduct.get(vid) ?? 0), 0);
+                                                        return (
+                                                            <Stack alignItems="center" spacing={0.25}>
+                                                                <Chip
+                                                                    label={qty}
+                                                                    size="small"
+                                                                    color={qty === 0 ? 'error' : qty <= 5 ? 'warning' : 'success'}
+                                                                    variant="outlined"
+                                                                />
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    {(product.variantProductIds ?? []).length} varyant
+                                                                </Typography>
+                                                            </Stack>
+                                                        );
+                                                    }
                                                     const qty = stockByProduct.get(product.id);
                                                     if (qty === undefined) {
                                                         return (
@@ -356,6 +449,49 @@ const MerchantProductsPage: React.FC = () => {
                                                                 }
                                                             </IconButton>
                                                         </span>
+                                                    </Tooltip>
+
+                                                    <Tooltip title={product.isFeatured ? 'Öne çıkarmayı kaldır' : 'Öne çıkar'}>
+                                                        <span>
+                                                            <IconButton
+                                                                size="small"
+                                                                color={product.isFeatured ? 'warning' : 'default'}
+                                                                disabled={isSettingFeatured}
+                                                                onClick={() => setFeatured(
+                                                                    { productId: product.id, featured: !product.isFeatured },
+                                                                    {
+                                                                        onSuccess: () => notify(
+                                                                            product.isFeatured ? 'Öne çıkarma kaldırıldı.' : 'Ürün öne çıkarıldı.',
+                                                                            'success'),
+                                                                        onError: () => notify('İşlem başarısız oldu.', 'error'),
+                                                                    },
+                                                                )}
+                                                            >
+                                                                {product.isFeatured
+                                                                    ? <StarIcon fontSize="small" />
+                                                                    : <StarBorderIcon fontSize="small" />}
+                                                            </IconButton>
+                                                        </span>
+                                                    </Tooltip>
+
+                                                    <Tooltip title="Varyantlar">
+                                                        <IconButton
+                                                            size="small"
+                                                            color="secondary"
+                                                            onClick={() => setVariantTarget(product)}
+                                                        >
+                                                            <StyleIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+
+                                                    <Tooltip title="Satış Metrikleri">
+                                                        <IconButton
+                                                            size="small"
+                                                            color="info"
+                                                            onClick={() => setMetricsTarget(product)}
+                                                        >
+                                                            <MetricsIcon fontSize="small" />
+                                                        </IconButton>
                                                     </Tooltip>
 
                                                     <Tooltip title="Düzenle">
@@ -414,6 +550,24 @@ const MerchantProductsPage: React.FC = () => {
                     productId={stockTargetId}
                 />
             )}
+
+            {/* Varyantlar dialog */}
+            <MerchantVariantsModal
+                open={!!variantTarget}
+                onClose={() => setVariantTarget(null)}
+                tenantId={tenantId}
+                product={variantTarget}
+            />
+
+            {/* Satış metrikleri dialog */}
+            <ProductMetricsModal
+                open={!!metricsTarget}
+                onClose={() => setMetricsTarget(null)}
+                productName={metricsTarget?.name ?? ''}
+                data={productMetrics.data}
+                isLoading={productMetrics.isLoading}
+                isError={productMetrics.isError}
+            />
 
             {/* Create / Edit dialog */}
             <MerchantProductForm

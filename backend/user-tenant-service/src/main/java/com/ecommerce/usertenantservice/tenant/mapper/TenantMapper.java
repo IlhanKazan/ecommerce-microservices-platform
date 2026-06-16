@@ -20,6 +20,7 @@ public interface TenantMapper {
     @Mapping(source = "tenant.businessName", target = "businessName")
     @Mapping(source = "tenant.logoUrl", target = "logoUrl")
     @Mapping(source = "tenant.status", target = "status")
+    @Mapping(source = "tenant.isVerified", target = "isVerified")
     @Mapping(source = "role", target = "myRole")
     TenantSummaryResponse userTenantToSummary(UserTenant userTenant);
 

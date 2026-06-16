@@ -83,6 +83,40 @@ public class OutboxServiceImpl implements OutboxService {
         log.info("ORDER_DELIVERED_EVENT outbox'a yazıldı. OrderID: {}", orderId);
     }
 
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void publishOrderReturnRequestedEvent(Long orderId, UUID userId, Long tenantId, String reason, String recipientEmail) {
+        publish(
+                orderId.toString(),
+                EventConstants.EVENT_ORDER_RETURN_REQUESTED,
+                new OrderReturnRequestedEventPayload(orderId, userId, tenantId, reason, recipientEmail)
+        );
+        log.info("ORDER_RETURN_REQUESTED_EVENT outbox'a yazıldı. OrderID: {}", orderId);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void publishOrderReturnRejectedEvent(Long orderId, UUID userId, Long tenantId, String note, String recipientEmail) {
+        publish(
+                orderId.toString(),
+                EventConstants.EVENT_ORDER_RETURN_REJECTED,
+                new OrderReturnRejectedEventPayload(orderId, userId, tenantId, note, recipientEmail)
+        );
+        log.info("ORDER_RETURN_REJECTED_EVENT outbox'a yazıldı. OrderID: {}", orderId);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void publishOrderReturnedEvent(Long orderId, UUID userId, Long tenantId,
+            List<OrderItemSnapshotPayload> items, java.math.BigDecimal refundAmount, String recipientEmail) {
+        publish(
+                orderId.toString(),
+                EventConstants.EVENT_ORDER_RETURNED,
+                new OrderReturnedEventPayload(orderId, userId, tenantId, items, refundAmount, recipientEmail)
+        );
+        log.info("ORDER_RETURNED_EVENT outbox'a yazıldı. OrderID: {}, refundAmount: {}", orderId, refundAmount);
+    }
+
     private void publish(String aggregateId, String messageType, Object payload) {
         try {
             Outbox outboxEvent = Outbox.builder()

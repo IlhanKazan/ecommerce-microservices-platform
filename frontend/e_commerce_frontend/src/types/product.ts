@@ -46,8 +46,42 @@ export interface ProductDetail {
     maxOrderQty: number | null;
     status: string;
     salesStatus: string;
+    inStock?: boolean; // detay endpoint'i enrich edilirse gelir; yoksa undefined
     tenantName?: string | null;
     tenantLogoUrl?: string | null;
+    variants?: VariantSummary[]; // parent ise ACTIVE varyantları; standalone'da boş/undefined
+}
+
+/** Bir parent ürünün varyantı (child). attributes = kombinasyon (ör. {"Renk":"Siyah","Numara":"42"}). */
+export interface VariantSummary {
+    id: number;
+    sku: string;
+    name: string;
+    attributes: Record<string, string>;
+    price: number;
+    discountedPrice: number | null;
+    currency: string;
+    mainImageUrl: string | null;
+}
+
+/** Varyant oluşturma/güncelleme isteği (merchant). */
+export interface VariantRequest {
+    attributes: Record<string, string>;
+    sku: string;
+    price: number;
+    discountedPrice?: number | null;
+    mainImageUrl?: string | null;
+    name?: string | null;
+}
+
+/**
+ * Bir ürün/varyantın canlı stok durumu (public availability endpoint).
+ * availableQuantity yalnızca düşük stokta dolar ("Son X adet"); aksi halde null.
+ */
+export interface VariantStock {
+    productId: number;
+    inStock: boolean;
+    availableQuantity: number | null;
 }
 
 // ─── Review ──────────────────────────────────────────────────────────────────
@@ -114,6 +148,8 @@ export interface ProductSearchPayload {
     maxPrice?: number;
     minRating?: number;
     inStock?: boolean;
+    /** Yalnızca öne çıkan ürünler (vitrin). */
+    featured?: boolean;
     sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'popular' | 'rating';
     tenantId?: number;
     page: number;
@@ -163,7 +199,6 @@ export interface ProductDetailResponse {
     sku: string;
     brand: string | null;
     price: number;
-    discountPercentage: number | null;
     discountedPrice: number | null;
     currency: string;
     mainImageUrl: string | null;
@@ -204,6 +239,15 @@ export interface TenantProductResponse {
     reviewCount: number;
     status: string;
     salesStatus: string;
+    /** Varyantı olan ana ürün: satış varyant üzerinden yürür, stok = variantProductIds toplamı. */
+    hasVariants?: boolean;
+    /** ACTIVE varyant id'leri — merchant listesinde stok toplamı için. */
+    variantProductIds?: number[];
+    /** Popülerlik sayaçları (merchant analitiği). */
+    viewCount?: number;
+    saleCount?: number;
+    /** Öne çıkan ürün mü (storefront vitrini). */
+    isFeatured?: boolean;
 }
 
 export interface ProductCreateRequest {
@@ -240,4 +284,5 @@ export interface StockSummaryItem {
     warehouseName: string;
     availableQuantity: number;
     reservedQuantity: number;
+    lowStockThreshold?: number;
 }
