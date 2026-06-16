@@ -10,6 +10,8 @@ public interface ProductSearchMapper {
 
     @Mapping(target = "id", expression = "java(payload.productId().toString())")
     @Mapping(target = "saleCount", constant = "0")
+    @Mapping(target = "viewCount", constant = "0")
+    @Mapping(target = "isFeatured", constant = "false")
     @Mapping(target = "ratingAverage", constant = "0.0")
     @Mapping(target = "reviewCount", constant = "0")
     @Mapping(target = "createdAt", expression = "java(java.time.LocalDateTime.now())")

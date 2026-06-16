@@ -10,9 +10,13 @@ public class ApiPaths {
 
     @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class PublicProduct {
-        public static final String BASE         = BASE_PATH_V1 + "/public/search";
-        public static final String PRODUCTS     = "/products";
-        public static final String AUTOCOMPLETE = "/autocomplete";
-        public static final String BRANDS       = "/brands";
+        public static final String BASE          = BASE_PATH_V1 + "/public/search";
+        public static final String PRODUCTS      = "/products";
+        public static final String PRODUCTS_BY_IDS = "/products/by-ids";
+        public static final String AVAILABILITY  = "/products/{id}/availability";
+        public static final String AUTOCOMPLETE  = "/autocomplete";
+        public static final String BRANDS        = "/brands";
+        public static final String SIMILAR       = "/recommendations/similar/{productId}";
+        public static final String RELATED       = "/recommendations/related";
     }
 }

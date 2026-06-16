@@ -48,11 +48,14 @@ public class TenantEventConsumer {
             TenantStatusChangedEventPayload payload =
                     objectMapper.readValue(unescapedJson, TenantStatusChangedEventPayload.class);
 
-            boolean active = "ACTIVE".equals(payload.status());
+            // tenantActive, product-event yolundaki enrichWithTenantInfo ile tutarlı olmalı:
+            // ürün ancak ACTIVE VE doğrulanmış mağazalarda görünür.
+            boolean active = "ACTIVE".equals(payload.status())
+                    && Boolean.TRUE.equals(payload.isVerified());
             applyTenantActive(payload.tenantId(), active);
 
-            log.info("ES tenantActive güncellendi. TenantId: {}, status: {}, tenantActive: {}",
-                    payload.tenantId(), payload.status(), active);
+            log.info("ES tenantActive güncellendi. TenantId: {}, status: {}, isVerified: {}, tenantActive: {}",
+                    payload.tenantId(), payload.status(), payload.isVerified(), active);
 
         } catch (Exception e) {
             log.error("TENANT event işlenirken hata: {}", e.getMessage(), e);

@@ -9,6 +9,7 @@ import com.ecommerce.searchservice.product.document.ProductDocument;
 import com.ecommerce.searchservice.product.controller.dto.ProductSearchRequest;
 import com.ecommerce.searchservice.product.query.AutocompleteSuggestionInfo;
 import com.ecommerce.searchservice.product.query.BrandFacet;
+import com.ecommerce.searchservice.product.query.ProductAvailabilityInfo;
 import com.ecommerce.searchservice.product.service.ProductSearchService;
 import org.springframework.data.elasticsearch.client.elc.ElasticsearchAggregations;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,13 @@ import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +38,17 @@ import java.util.List;
 public class ProductSearchServiceImpl implements ProductSearchService {
 
     private final ElasticsearchOperations elasticsearchOperations;
+
+    @Override
+    public ProductAvailabilityInfo getAvailability(String id) {
+        // Kart ile aynı ES kaynağı → detayla tutarlı. Doküman yoksa (henüz indekslenmemiş/parent değil)
+        // satışı bloklamamak için inStock=true varsay.
+        ProductDocument doc = elasticsearchOperations.get(id, ProductDocument.class);
+        if (doc == null) {
+            return new ProductAvailabilityInfo(true, null);
+        }
+        return new ProductAvailabilityInfo(doc.isInStock(), doc.getSalesStatus());
+    }
 
     @Override
     public Page<ProductDocument> searchProducts(ProductSearchRequest request) {
@@ -58,6 +76,105 @@ public class ProductSearchServiceImpl implements ProductSearchService {
                 .toList();
 
         return new PageImpl<>(documents, pageable, searchHits.getTotalHits());
+    }
+
+    @Override
+    public List<ProductDocument> findByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<String> stringIds = ids.stream()
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .distinct()
+                .toList();
+        if (stringIds.isEmpty()) {
+            return List.of();
+        }
+
+        NativeQuery query = NativeQuery.builder()
+                .withQuery(QueryBuilders.ids(i -> i.values(stringIds)))
+                .withPageable(PageRequest.of(0, stringIds.size()))
+                .build();
+
+        Map<String, ProductDocument> byId = elasticsearchOperations.search(query, ProductDocument.class)
+                .getSearchHits().stream()
+                .map(SearchHit::getContent)
+                .collect(Collectors.toMap(ProductDocument::getId, d -> d, (a, b) -> a));
+
+        // Giriş sırasını koru (son gezilen sırası önemli); index'te olmayan id'ler elenir.
+        return stringIds.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDocument> findSimilar(Long productId, int size) {
+        ProductDocument source = elasticsearchOperations.get(productId.toString(), ProductDocument.class);
+        if (source == null) {
+            return List.of();
+        }
+        int safeSize = (size <= 0 || size > 30) ? 10 : size;
+
+        BoolQuery.Builder bool = new BoolQuery.Builder();
+        bool.filter(QueryBuilders.term(t -> t.field("tenantActive").value(true)));
+        if (source.getCategoryId() != null) {
+            bool.filter(QueryBuilders.term(t -> t.field("categoryId").value(source.getCategoryId())));
+        }
+        bool.mustNot(QueryBuilders.ids(i -> i.values(List.of(productId.toString()))));
+        if (source.getBrand() != null && !source.getBrand().isBlank()) {
+            bool.should(QueryBuilders.term(t -> t.field("brand").value(source.getBrand())));
+        }
+
+        NativeQuery query = NativeQuery.builder()
+                .withQuery(bool.build()._toQuery())
+                .withSort(buildSort("popular"))
+                .withPageable(PageRequest.of(0, safeSize))
+                .build();
+        return elasticsearchOperations.search(query, ProductDocument.class)
+                .getSearchHits().stream().map(SearchHit::getContent).toList();
+    }
+
+    @Override
+    public List<ProductDocument> findRelated(List<Long> seedIds, List<Long> excludeIds, int size) {
+        int safeSize = (size <= 0 || size > 30) ? 12 : size;
+        List<ProductDocument> seeds = findByIds(seedIds == null ? List.of() : seedIds);
+
+        Set<Long> categoryIds = seeds.stream()
+                .map(ProductDocument::getCategoryId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<String> brands = seeds.stream()
+                .map(ProductDocument::getBrand).filter(b -> b != null && !b.isBlank()).collect(Collectors.toSet());
+
+        Set<String> exclude = new HashSet<>();
+        if (seedIds != null) seedIds.forEach(id -> { if (id != null) exclude.add(id.toString()); });
+        if (excludeIds != null) excludeIds.forEach(id -> { if (id != null) exclude.add(id.toString()); });
+
+        BoolQuery.Builder bool = new BoolQuery.Builder();
+        bool.filter(QueryBuilders.term(t -> t.field("tenantActive").value(true)));
+        if (!exclude.isEmpty()) {
+            bool.mustNot(QueryBuilders.ids(i -> i.values(new ArrayList<>(exclude))));
+        }
+        if (!categoryIds.isEmpty()) {
+            List<FieldValue> vals = categoryIds.stream().map(FieldValue::of).toList();
+            bool.should(QueryBuilders.terms(t -> t.field("categoryId").terms(tt -> tt.value(vals))));
+        }
+        if (!brands.isEmpty()) {
+            List<FieldValue> vals = brands.stream().map(FieldValue::of).toList();
+            bool.should(QueryBuilders.terms(t -> t.field("brand").terms(tt -> tt.value(vals))));
+        }
+        // Seed varsa en az bir ilgi boyutu (kategori/marka) eşleşsin; seed yoksa should boş → trending fallback.
+        if (!categoryIds.isEmpty() || !brands.isEmpty()) {
+            bool.minimumShouldMatch("1");
+        }
+
+        NativeQuery query = NativeQuery.builder()
+                .withQuery(bool.build()._toQuery())
+                .withSort(buildSort("popular"))
+                .withPageable(PageRequest.of(0, safeSize))
+                .build();
+        return elasticsearchOperations.search(query, ProductDocument.class)
+                .getSearchHits().stream().map(SearchHit::getContent).toList();
     }
 
     @Override
@@ -106,6 +223,13 @@ public class ProductSearchServiceImpl implements ProductSearchService {
         if (request.tenantId() != null) {
             boolQueryBuilder.filter(
                     QueryBuilders.term(t -> t.field("tenantId").value(request.tenantId()))
+            );
+        }
+
+        // Öne çıkan ürünler vitrini — yalnızca featured=true istenince filtrele
+        if (request.featured() != null && request.featured()) {
+            boolQueryBuilder.filter(
+                    QueryBuilders.term(t -> t.field("isFeatured").value(true))
             );
         }
 
@@ -239,8 +363,16 @@ public class ProductSearchServiceImpl implements ProductSearchService {
                     .field(f -> f.field("price").order(co.elastic.clients.elasticsearch._types.SortOrder.Asc))));
             case "price_desc" -> List.of(co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
                     .field(f -> f.field("price").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc))));
-            case "popular" -> List.of(co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
-                    .field(f -> f.field("saleCount").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc))));
+            case "popular" -> List.of(
+                    // Önce en çok satan, eşitlikte en çok görüntülenen (popülerlik = satış + ilgi).
+                    co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
+                            .field(f -> f.field("saleCount")
+                                    .order(co.elastic.clients.elasticsearch._types.SortOrder.Desc)
+                                    .missing("_last"))),
+                    co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
+                            .field(f -> f.field("viewCount")
+                                    .order(co.elastic.clients.elasticsearch._types.SortOrder.Desc)
+                                    .missing("_last"))));
             case "rating" -> List.of(co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
                     .field(f -> f.field("ratingAverage").order(co.elastic.clients.elasticsearch._types.SortOrder.Desc))));
             default -> List.of(
