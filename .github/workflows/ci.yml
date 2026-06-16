@@ -81,10 +81,13 @@ jobs:
         # Sizmis secret bulursa exit 1 -> job kirilir (secret main'e gecemez).
 
       - name: Trivy dependency CVE scan (CRITICAL = gate)
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          scan-type: fs
-          scanners: vuln
-          severity: CRITICAL
-          exit-code: '1'
-          ignore-unfixed: false
+        # trivy-action/setup-trivy binary indirmede (GitHub rate-limit) patlıyordu;
+        # gitleaks gibi doğrudan resmi Docker image ile çalıştırıyoruz (deterministik).
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/repo" \
+            aquasec/trivy:0.65.0 fs \
+            --scanners vuln \
+            --severity CRITICAL \
+            --exit-code 1 \
+            --ignore-unfixed=false \
+            /repo
