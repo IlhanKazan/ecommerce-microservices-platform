@@ -35,6 +35,13 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 - [x] order-service `reserveStockOrThrow()` mesajı güncellendi — her iki 409 kaynağını da doğru karşılıyor
 - 500 stack trace yok, kullanıcıya anlamlı hata mesajı gidiyor
 
+### keycloak-spi admin-tespiti `username == "admin"` string'iyle yapılıyor — kırılgan (escalation DEĞİL) 🟡
+- [ ] **Sorun:** `UserSyncEventListenerProvider.isAdmin` (satır ~83) ve `UserServiceAvailabilityValidator` (satır ~20) Keycloak süper-admin'ini **düz `"admin".equalsIgnoreCase(getUsername())`** ile tespit ediyor. Amacı KC bootstrap admin'ini iş DB'sine sync'lememek.
+- **Etki:** Register ekranından **kullanıcı adı "admin"** ile açılan herkesin REGISTER sync'i sessizce atlanır → UTS `users` tablosunda satır oluşmaz → `/users/me` (`findByKeycloakId` null) **500**, user-bağlı her endpoint kırılır. (2026-06-13 yaşandı.)
+- **Güvenlik notu:** Bu bir **privilege-escalation değil** — yetkilendirme %100 rol tabanlı (`hasRole('platform-admin')` + `@tenantSecurity`), username hiçbir authority kaynağı değil. "admin" adı güç vermez, aksine hesabı bozar (self-DoS) + username-squatting (sinir bozucu, ihlal değil).
+- **Doğru çözüm:** Süper-admin'i username string'i yerine **realm-management rolü / service account** üzerinden tespit et. Ek olarak `findByKeycloakId` Optional dönüp `getExistingUser` null'da anlamlı 404/lazy-provision yapmalı (500 NPE yerine).
+- **Blokaj:** `keycloak-spi` + UTS `UserService` kilitli/kullanıcı-yönetiminde alanlar — açık onayla ele alınır.
+
 ---
 
 ## Order Service — Bilinen Teknik Borç (Stage 10 sonrası)
@@ -43,10 +50,10 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 - [x] `IdempotencyAspect` catch bloğu güncellendi: `DataAccessException` / `TransactionException` durumunda Redis key silinmiyor (TTL: 5 dk). Diğer exception'larda (BusinessException, ExternalServiceException, FeignException) key silinir → retry allowed.
 - Etki: `reserve ✅ → pay ✅ → DB ❌` → retry → `DUPLICATE_REQUEST` → double charge yok.
 
-### 🟡 Payment refund stub — gerçek iyzico çağrısı yok
-- [ ] `POST /api/v1/payments/internal/refund` şimdilik sadece `PaymentStatus.REFUNDED` set ediyor.
-- Çözüm: `com.iyzipay.model.Cancel` ile iyzico refund API entegrasyonu.
-- Dosya: `InternalPaymentController`, `PaymentServiceImpl`
+### 🟡 Payment refund stub — gerçek iyzico çağrısı yok ✅ 2026-06-14 (FW-9 kapsamında çözüldü)
+- [x] `POST /api/v1/payments/internal/refund` artık gerçek iyzico çağrısı yapıyor: `processRefund(orderId, amount, kind)` — `kind=CANCEL` → `Cancel(paymentId)` (iptal, aynı gün), `kind=REFUND` → `Refund(paymentTransactionId, amount)` (iade). Cancel başarısızsa Refund'a fallback. `payment_transaction_id` ödeme anında yakalanıp saklanıyor (V11 migration). Sonuç `InternalRefundResponse{success,message,refundedAmount}` döner → order-service iade onayında başarıyı bilir; başarısızsa durum değişmez (çift refund yok).
+- Dosya: `InternalPaymentController`, `PaymentServiceImpl.processRefund`, `Payment.paymentTransactionId`
+- **Kalan (opsiyonel):** submerchant bakiyesi yetmezse `RefundChargedFromMerchant` fallback eklenmedi (sandbox'ta gerek olmadı).
 
 ### 🟡 shippingAddressJson parse edilmiyor
 - [ ] `OrderSagaServiceImpl.parseShippingAddress` stub — `billingAddress` fallback kullanılıyor.
