@@ -9,6 +9,7 @@ public record TenantSummaryResponse(
         String businessName,
         String logoUrl,
         TenantStatus status,
+        Boolean isVerified,
         TenantRole myRole
 ) {
 }

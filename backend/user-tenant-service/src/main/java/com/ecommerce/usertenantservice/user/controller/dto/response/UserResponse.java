@@ -11,7 +11,8 @@ public record UserResponse(
    String profileImageUrl,
    LocalDateTime createdAt,
    LocalDateTime updatedAt,
-   boolean isMerchant
+   boolean isMerchant,
+   boolean isPlatformAdmin
 ) {
     // Sadece isMerchant field'ını değiştiren bir metod
     public UserResponse withMerchantStatus(boolean newMerchantStatus) {
@@ -24,7 +25,23 @@ public record UserResponse(
                 profileImageUrl,
                 createdAt,
                 updatedAt,
-                newMerchantStatus
+                newMerchantStatus,
+                isPlatformAdmin
+        );
+    }
+
+    public UserResponse withPlatformAdmin(boolean newPlatformAdmin) {
+        return new UserResponse(
+                username,
+                email,
+                firstName,
+                lastName,
+                phoneNumber,
+                profileImageUrl,
+                createdAt,
+                updatedAt,
+                isMerchant,
+                newPlatformAdmin
         );
     }
 }

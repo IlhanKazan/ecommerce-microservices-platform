@@ -113,7 +113,8 @@ public class OutboxServiceImpl implements OutboxService {
                     tenant.getId(),
                     tenant.getName(),
                     tenant.getContactEmail(),
-                    tenant.getStatus().name()
+                    tenant.getStatus().name(),
+                    tenant.getIsVerified()
             );
 
             Outbox outboxEvent = Outbox.builder()

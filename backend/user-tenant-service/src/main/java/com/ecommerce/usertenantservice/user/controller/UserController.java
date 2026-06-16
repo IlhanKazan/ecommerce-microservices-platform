@@ -23,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -91,17 +92,22 @@ public class UserController {
     @Operation(summary = "Get current user", description = "Returns the authenticated user's full profile.")
     @ApiResponse(responseCode = "200", description = "User profile")
     @GetMapping("/me")
-    public ResponseEntity<UserResponse> me(@CurrentUser AuthUser user) {
+    public ResponseEntity<UserResponse> me(@CurrentUser AuthUser user, Authentication authentication) {
         User me =  userService.getExistingUser(user.keycloakId());
         boolean isMerchant = userTenantService.existsByUserIdAndIsActiveTrue(me.getId());
-        UserResponse response = userMapper.toResponse(me);
-        log.info("ME ENDPOINT DETECTED >> {}", user.email());
-        if (isMerchant){
-            UserResponse newResponse = response.withMerchantStatus(true);
-            return ResponseEntity.ok(newResponse);
-        }else{
-            return ResponseEntity.ok(response);
-        }
+        boolean isPlatformAdmin = hasPlatformAdminRole(authentication);
+        UserResponse response = userMapper.toResponse(me)
+                .withMerchantStatus(isMerchant)
+                .withPlatformAdmin(isPlatformAdmin);
+        log.info("ME ENDPOINT DETECTED >> {} | merchant={} | platformAdmin={}", user.email(), isMerchant, isPlatformAdmin);
+        return ResponseEntity.ok(response);
+    }
+
+    // JWT'deki client rolü (JwtAuthConverter ROLE_ prefix'i ekler) platform-admin mi?
+    private boolean hasPlatformAdminRole(Authentication authentication) {
+        if (authentication == null) return false;
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_platform-admin".equals(a.getAuthority()));
     }
 
     @Operation(summary = "Upload profile photo", description = "Uploads a profile photo to MinIO. Returns updated user with new photo URL. Max 5MB, JPEG/PNG/WebP.")

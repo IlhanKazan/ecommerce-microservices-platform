@@ -129,4 +129,30 @@ public class TenantStateService {
         imageService.deleteImage(oldLogoUrl);
     }
 
+    /** Platform admin mağazayı askıya alır (ACTIVE/PASSIVE → SUSPENDED). Ürünler satıştan kalkar. Reaktive edilebilir. */
+    @Transactional
+    public void suspendTenant(Tenant tenant){
+        TenantStatus status = tenant.getStatus();
+        if (status == TenantStatus.CLOSED) {
+            throw new BusinessException("Kapalı bir mağaza askıya alınamaz.", "TENANT_ALREADY_CLOSED");
+        }
+        if (status == TenantStatus.SUSPENDED) {
+            throw new BusinessException("Mağaza zaten askıya alınmış.", "TENANT_ALREADY_SUSPENDED");
+        }
+        tenant.setStatus(TenantStatus.SUSPENDED);
+        tenantRepository.save(tenant);
+        outboxService.publishTenantStatusChangedEvent(tenant);
+    }
+
+    /** Platform admin askıya alınmış mağazayı yeniden aktive eder (SUSPENDED → ACTIVE). */
+    @Transactional
+    public void reactivateTenant(Tenant tenant){
+        if (tenant.getStatus() != TenantStatus.SUSPENDED) {
+            throw new BusinessException("Sadece askıya alınmış bir mağaza yeniden aktive edilebilir.", "TENANT_NOT_SUSPENDED");
+        }
+        tenant.setStatus(TenantStatus.ACTIVE);
+        tenantRepository.save(tenant);
+        outboxService.publishTenantStatusChangedEvent(tenant);
+    }
+
 }

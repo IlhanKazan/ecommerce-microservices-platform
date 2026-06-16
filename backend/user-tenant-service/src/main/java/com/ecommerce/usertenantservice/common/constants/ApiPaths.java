@@ -12,12 +12,17 @@ public class ApiPaths {
     public static class User{
         public static final String USER = BASE_PATH_V1 + "/users";
         public static final String ADDRESS = BASE_PATH_V1 + "/users/addresses";
+        public static final String ACTIVITY = BASE_PATH_V1 + "/users/activity";
+        // Platform admin — /api/v1/users/** gateway route'u altında, method-level hasRole ile korunur
+        public static final String ADMIN_USER = BASE_PATH_V1 + "/users/admin";
     }
 
     @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class Tenant{
         public static final String TENANT = BASE_PATH_V1 + "/tenants";
         public static final String PUBLIC_TENANT = BASE_PATH_V1 + "/public/tenants";
+        // Platform admin — mevcut /api/v1/tenants/** gateway route'u altında, method-level hasRole ile korunur
+        public static final String ADMIN_TENANT = BASE_PATH_V1 + "/tenants/admin";
     }
 
 }

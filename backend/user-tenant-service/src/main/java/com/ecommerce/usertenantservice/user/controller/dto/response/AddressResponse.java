@@ -12,8 +12,6 @@ public record AddressResponse(
         String recipientName,
         String phoneNumber,
         Boolean isDefault,
-        String label,
-        Double latitude,
-        Double longitude
+        String label
 ) {
 }
