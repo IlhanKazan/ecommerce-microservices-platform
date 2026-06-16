@@ -36,7 +36,7 @@ spring:
         - id: payment-service
           uri: http://payment-service:8082
           predicates:
-            - Path=/api/v1/subscriptions/**
+            - Path=/api/v1/subscriptions/**, /api/v1/payments/admin/**
 
         - id: product-service
           uri: http://product-service:8084
@@ -51,12 +51,12 @@ spring:
         - id: stock-service
           uri: http://stock-service:8087
           predicates:
-            - Path=/api/v1/stocks/**
+            - Path=/api/v1/stocks/**, /api/v1/public/stocks/**
 
         - id: order-service
           uri: http://order-service:8088
           predicates:
-            - Path=/api/v1/orders/**
+            - Path=/api/v1/orders/**, /api/v1/public/orders/**
 
   devtools:
     restart:
