@@ -43,6 +43,16 @@ public class ProductClientAdapter {
                 );
             }
 
+            // Varyantı olan ana ürün doğrudan sepete eklenemez — bir varyant (ör. beden/numara) seçilmeli.
+            if (response.hasVariants()) {
+                log.warn("Varyantlı ana ürün doğrudan sepete eklenemez. ProductId: {}", productId);
+                throw new BusinessException(
+                        "Bu ürün için lütfen bir seçenek (ör. beden/numara) seçin.",
+                        "VARIANT_SELECTION_REQUIRED",
+                        Map.of("productId", productId)
+                );
+            }
+
             // Eğer ProductResponse içine stockQuantity eklersem bu blogu yorumdan cekicem
             /* if (response.stockQuantity() != null && response.stockQuantity() < requestedQuantity) {
                 throw new BusinessException(
