@@ -5,6 +5,7 @@ import com.ecommerce.common.exception.ResourceNotFoundException;
 import com.ecommerce.contracts.event.order.OrderItemSnapshotPayload;
 import com.ecommerce.orderservice.client.PaymentServiceClient;
 import com.ecommerce.orderservice.client.dto.RefundRequest;
+import com.ecommerce.orderservice.client.dto.RefundResponse;
 import com.ecommerce.orderservice.order.constant.OrderStatus;
 import com.ecommerce.orderservice.order.entity.Order;
 import com.ecommerce.orderservice.order.entity.OrderItem;
@@ -50,13 +51,18 @@ public class OrderCancelServiceImpl implements OrderCancelService {
                         i.getUnitPrice(), i.getQuantity()))
                 .toList();
 
-        // Ödeme iadesi — fire-and-forget (başarısız olsa da sipariş iptal edilir)
+        // Ödeme iadesi — iptal aynı gün olduğundan iyzico Cancel(paymentId). Fire-and-forget (başarısız olsa da sipariş iptal edilir).
         try {
-            paymentClient.refundOrderPayment(
-                    new RefundRequest(orderId, order.getPaymentTransactionId()));
-            log.info("[CANCEL] Ödeme iadesi başlatıldı. OrderID: {}", orderId);
+            RefundResponse refund = paymentClient.refundOrderPayment(
+                    new RefundRequest(orderId, order.getPaymentTransactionId(), order.getTotalAmount(), "CANCEL"));
+            if (refund != null && refund.success()) {
+                log.info("[CANCEL] Ödeme iadesi başarılı. OrderID: {}", orderId);
+            } else {
+                log.error("[CANCEL] Ödeme iadesi başarısız ({}) — Manuel müdahale gerekli! OrderID: {}",
+                        refund != null ? refund.message() : "yanıt yok", orderId);
+            }
         } catch (FeignException e) {
-            log.error("[CANCEL] Ödeme iadesi başarısız — Manuel müdahale gerekli! OrderID: {}", orderId, e);
+            log.error("[CANCEL] Ödeme iadesi çağrısı başarısız — Manuel müdahale gerekli! OrderID: {}", orderId, e);
         }
 
         // CONFIRMED → CANCELLED → REFUNDED

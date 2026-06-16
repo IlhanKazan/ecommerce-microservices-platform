@@ -11,6 +11,7 @@ public record OrderDetailResponse(
         String currency,
         String shippingAddressJson,
         LocalDateTime createdAt,
+        LocalDateTime deliveredAt,
         List<OrderItemDetailDto> items
 ) {
     public record OrderItemDetailDto(

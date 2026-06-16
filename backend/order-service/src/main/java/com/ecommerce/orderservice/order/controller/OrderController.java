@@ -9,12 +9,20 @@ import com.ecommerce.orderservice.order.command.CheckoutCommand;
 import com.ecommerce.orderservice.order.command.UpdateOrderStatusCommand;
 import com.ecommerce.orderservice.order.controller.dto.request.CancelOrderRequest;
 import com.ecommerce.orderservice.order.controller.dto.request.CheckoutRequest;
+import com.ecommerce.orderservice.order.controller.dto.request.CreateReturnRequest;
+import com.ecommerce.orderservice.order.controller.dto.request.ResolveReturnRequest;
 import com.ecommerce.orderservice.order.controller.dto.request.UpdateOrderStatusRequest;
+import com.ecommerce.orderservice.order.controller.dto.response.ReturnResponse;
+import com.ecommerce.orderservice.order.controller.dto.response.MerchantAnalyticsResponse;
 import com.ecommerce.orderservice.order.controller.dto.response.OrderDetailResponse;
 import com.ecommerce.orderservice.order.controller.dto.response.OrderResponse;
+import com.ecommerce.orderservice.order.controller.dto.response.ProductSalesMetricsResponse;
 import com.ecommerce.orderservice.order.entity.Order;
 import com.ecommerce.orderservice.order.mapper.OrderMapper;
 import com.ecommerce.orderservice.order.query.OrderInfo;
+import com.ecommerce.orderservice.order.service.MerchantAnalyticsService;
+import com.ecommerce.orderservice.order.service.ProductMetricsService;
+import com.ecommerce.orderservice.order.service.OrderReturnService;
 import com.ecommerce.orderservice.order.service.OrderCancelService;
 import com.ecommerce.orderservice.order.service.OrderQueryService;
 import com.ecommerce.orderservice.order.service.OrderSagaService;
@@ -30,6 +38,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
 @Slf4j
@@ -40,6 +50,9 @@ public class OrderController {
     private final OrderQueryService orderQueryService;
     private final OrderStatusService orderStatusService;
     private final OrderCancelService orderCancelService;
+    private final OrderReturnService orderReturnService;
+    private final MerchantAnalyticsService merchantAnalyticsService;
+    private final ProductMetricsService productMetricsService;
     private final OrderMapper orderMapper;
 
     // ─── Checkout ─────────────────────────────────────────────────────────
@@ -124,6 +137,32 @@ public class OrderController {
         return ResponseEntity.ok(orderMapper.toResponse(cancelled));
     }
 
+    // ─── Kullanıcı - iade talebi (teslim sonrası) ───────────────────────
+    @Operation(summary = "Request return", description = "Müşteri teslim edilmiş sipariş için iade talebi açar. Merchant/admin onayında gerçek iyzico iadesi yapılır.")
+    @ApiResponse(responseCode = "200", description = "İade talebi açıldı")
+    @ApiResponse(responseCode = "409", description = "Bu sipariş için zaten açık iade talebi var")
+    @ApiResponse(responseCode = "400", description = "Sadece teslim edilmiş siparişler için talep açılabilir")
+    @PostMapping(ApiPaths.MY_ORDER_RETURN)
+    public ResponseEntity<OrderResponse> requestReturn(
+            @PathVariable Long orderId,
+            @RequestBody(required = false) CreateReturnRequest request,
+            @CurrentUser AuthUser user) {
+        String reasonCode = (request != null) ? request.reasonCode() : null;
+        String note = (request != null) ? request.note() : null;
+        Order order = orderReturnService.requestReturn(orderId, user.keycloakId(), reasonCode, note);
+        return ResponseEntity.ok(orderMapper.toResponse(order));
+    }
+
+    // ─── Birlikte sıkça alınanlar (co-purchase) ─────────────────────────
+    @Operation(summary = "Frequently bought with", description = "Verilen ürünle aynı siparişte sık geçen diğer ürünlerin id'leri (sıklığa göre). Ürün detayı 'Birlikte sıkça alınanlar' rail'i için.")
+    @ApiResponse(responseCode = "200", description = "Ürün id listesi")
+    @GetMapping(ApiPaths.FREQUENTLY_BOUGHT_WITH)
+    public ResponseEntity<List<Long>> frequentlyBoughtWith(
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "10") int limit) {
+        return ResponseEntity.ok(orderQueryService.getFrequentlyBoughtWith(productId, limit));
+    }
+
     // ─── Merchant - mağaza siparişleri ──────────────────────────────────
     @Operation(summary = "List tenant orders", description = "Merchant views all orders placed in their store. Paginated, ordered by most recent.")
     @ApiResponse(responseCode = "200", description = "Paginated order list")
@@ -132,10 +171,12 @@ public class OrderController {
     @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
     public ResponseEntity<PageResponse<OrderDetailResponse>> getTenantOrders(
             @PathVariable Long tenantId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        PageResponse<OrderInfo> result = orderQueryService.getTenantOrders(tenantId, page, size);
+        PageResponse<OrderInfo> result = orderQueryService.getTenantOrders(tenantId, status, q, page, size);
         PageResponse<OrderDetailResponse> response = new PageResponse<>(
                 result.content().stream().map(orderMapper::toDetailResponse).toList(),
                 result.pageNumber(),
@@ -166,5 +207,68 @@ public class OrderController {
                 orderId, tenantId, request.status(), request.trackingNumber());
         Order updated = orderStatusService.updateStatus(command);
         return ResponseEntity.ok(orderMapper.toResponse(updated));
+    }
+
+    // ─── Merchant - satış analitiği ─────────────────────────────────────
+    @Operation(summary = "Tenant sales analytics", description = "Merchant satış metrikleri — toplam ciro/sipariş/adet + en çok satan ürünler. " +
+        "Yalnız iptal/iade dışı (CONFIRMED/SHIPPED/DELIVERED) siparişler sayılır.")
+    @ApiResponse(responseCode = "200", description = "Analytics")
+    @ApiResponse(responseCode = "403", description = "Not authorized for this tenant")
+    @GetMapping(ApiPaths.TENANT_ANALYTICS)
+    @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
+    public ResponseEntity<MerchantAnalyticsResponse> getTenantAnalytics(@PathVariable Long tenantId) {
+        return ResponseEntity.ok(merchantAnalyticsService.getTenantAnalytics(tenantId));
+    }
+
+    // ─── Merchant - ürün satış metriği ──────────────────────────────────
+    @Operation(summary = "Product sales metrics (merchant)", description = "Tek ürünün satış metriği — satılan adet/ciro/sipariş + varyant kırılımı. " +
+        "Varyantlı üründe varyant id'leri product-service'ten çözülüp toplanır. Yalnız bu tenant'a kısıtlı.")
+    @ApiResponse(responseCode = "200", description = "Ürün satış metriği")
+    @ApiResponse(responseCode = "403", description = "Not authorized for this tenant")
+    @GetMapping(ApiPaths.TENANT_PRODUCT_METRICS)
+    @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
+    public ResponseEntity<ProductSalesMetricsResponse> getTenantProductMetrics(
+            @PathVariable Long tenantId,
+            @PathVariable Long productId) {
+        return ResponseEntity.ok(productMetricsService.getMetrics(productId, tenantId));
+    }
+
+    // ─── Merchant - iade yönetimi ───────────────────────────────────────
+    @Operation(summary = "List pending returns", description = "Mağazanın bekleyen (REQUESTED) iade talepleri.")
+    @ApiResponse(responseCode = "200", description = "İade talebi listesi")
+    @GetMapping(ApiPaths.TENANT_RETURNS)
+    @PreAuthorize("@tenantSecurity.isMember(#tenantId)")
+    public ResponseEntity<List<ReturnResponse>> getTenantReturns(@PathVariable Long tenantId) {
+        List<ReturnResponse> response = orderReturnService.getTenantReturns(tenantId).stream()
+                .map(orderMapper::toReturnResponse)
+                .toList();
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Approve return", description = "Merchant iadeyi onaylar → gerçek iyzico para iadesi + stok geri eklenir. iyzico iadesi başarısızsa durum değişmez.")
+    @ApiResponse(responseCode = "200", description = "İade onaylandı, para iadesi yapıldı")
+    @ApiResponse(responseCode = "400", description = "İade ödemesi başarısız — tekrar deneyin")
+    @PostMapping(ApiPaths.TENANT_RETURN_APPROVE)
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<OrderResponse> approveReturn(
+            @PathVariable Long tenantId,
+            @PathVariable Long orderId,
+            @RequestBody(required = false) ResolveReturnRequest request) {
+        String note = (request != null) ? request.note() : null;
+        Order order = orderReturnService.approveReturn(orderId, tenantId, note);
+        return ResponseEntity.ok(orderMapper.toResponse(order));
+    }
+
+    @Operation(summary = "Reject return", description = "Merchant iade talebini reddeder → sipariş DELIVERED'a döner, müşteriye bilgi maili.")
+    @ApiResponse(responseCode = "200", description = "İade reddedildi")
+    @PostMapping(ApiPaths.TENANT_RETURN_REJECT)
+    @PreAuthorize("@tenantSecurity.hasRole(#tenantId, 'OWNER')")
+    public ResponseEntity<OrderResponse> rejectReturn(
+            @PathVariable Long tenantId,
+            @PathVariable Long orderId,
+            @RequestBody(required = false) ResolveReturnRequest request) {
+        String note = (request != null) ? request.note() : null;
+        Order order = orderReturnService.rejectReturn(orderId, tenantId, note);
+        return ResponseEntity.ok(orderMapper.toResponse(order));
     }
 }

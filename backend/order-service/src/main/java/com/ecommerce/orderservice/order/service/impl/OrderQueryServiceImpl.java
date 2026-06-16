@@ -2,6 +2,7 @@ package com.ecommerce.orderservice.order.service.impl;
 
 import com.ecommerce.common.dto.PageResponse;
 import com.ecommerce.common.exception.ResourceNotFoundException;
+import com.ecommerce.orderservice.order.constant.OrderStatus;
 import com.ecommerce.orderservice.order.entity.Order;
 import com.ecommerce.orderservice.order.entity.OrderItem;
 import com.ecommerce.orderservice.order.query.OrderInfo;
@@ -49,10 +50,25 @@ public class OrderQueryServiceImpl implements OrderQueryService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<OrderInfo> getTenantOrders(Long tenantId, int page, int size) {
-        Page<Order> orders = orderRepository.findByTenantIdOrderByCreatedAtDesc(
-                tenantId, PageRequest.of(page, size));
+    public PageResponse<OrderInfo> getTenantOrders(Long tenantId, String status, String q, int page, int size) {
+        // q: alıcı e-postası/sipariş id'si araması (LIKE deseni ya da null). status: OrderStatus ya da null.
+        String likePattern = (q == null || q.isBlank())
+                ? null
+                : "%" + q.trim().toLowerCase() + "%";
+        OrderStatus statusFilter = (status == null || status.isBlank())
+                ? null
+                : OrderStatus.valueOf(status);
+
+        Page<Order> orders = orderRepository.searchForTenant(
+                tenantId, statusFilter, likePattern, PageRequest.of(page, size));
         return toPageResponse(orders);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> getFrequentlyBoughtWith(Long productId, int limit) {
+        int safeLimit = (limit <= 0 || limit > 30) ? 10 : limit;
+        return orderItemRepository.findFrequentlyBoughtWith(productId, PageRequest.of(0, safeLimit));
     }
 
     private PageResponse<OrderInfo> toPageResponse(Page<Order> orders) {
@@ -92,6 +108,7 @@ public class OrderQueryServiceImpl implements OrderQueryService {
                 order.getPaymentTransactionId(),
                 order.getCancellationReason(),
                 order.getCreatedAt(),
+                order.getDeliveredAt(),
                 itemInfos
         );
     }

@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -40,8 +41,14 @@ public class Order extends BaseEntity {
     @Column(name = "payment_transaction_id")
     private String paymentTransactionId;
 
+    @Column(name = "commission_amount", precision = 12, scale = 2)
+    private BigDecimal commissionAmount;
+
     @Column(name = "cancellation_reason")
     private String cancellationReason;
+
+    @Column(name = "delivered_at")
+    private LocalDateTime deliveredAt;
 
     @Column(name = "buyer_email", length = 320)
     private String buyerEmail;
@@ -49,7 +56,7 @@ public class Order extends BaseEntity {
     @Builder
     public Order(UUID userId, Long tenantId, BigDecimal totalAmount,
                  String currency, String shippingAddressJson, String paymentTransactionId,
-                 String buyerEmail) {
+                 BigDecimal commissionAmount, String buyerEmail) {
         this.userId = userId;
         this.tenantId = tenantId;
         this.status = OrderStatus.CONFIRMED;
@@ -57,6 +64,7 @@ public class Order extends BaseEntity {
         this.currency = currency;
         this.shippingAddressJson = shippingAddressJson;
         this.paymentTransactionId = paymentTransactionId;
+        this.commissionAmount = commissionAmount;
         this.buyerEmail = buyerEmail;
     }
 
@@ -72,6 +80,7 @@ public class Order extends BaseEntity {
             throw new BusinessException("Sadece kargodaki siparişler teslim edilmiş olarak işaretlenebilir!", "INVALID_ORDER_STATUS");
         }
         this.status = OrderStatus.DELIVERED;
+        this.deliveredAt = LocalDateTime.now(); // 14 günlük iade penceresi buradan sayılır
     }
 
     public void cancel(String reason) {
@@ -88,5 +97,28 @@ public class Order extends BaseEntity {
         }
         this.status = OrderStatus.REFUNDED;
         this.cancellationReason = reason;
+    }
+
+    // ─── İade (return) yaşam döngüsü — detay OrderReturn entity'sinde ───
+    public void requestReturn() {
+        if (this.status != OrderStatus.DELIVERED) {
+            throw new BusinessException("Sadece teslim edilmiş siparişler için iade talebi açılabilir!", "INVALID_ORDER_STATUS");
+        }
+        this.status = OrderStatus.RETURN_REQUESTED;
+    }
+
+    public void approveReturn() {
+        if (this.status != OrderStatus.RETURN_REQUESTED) {
+            throw new BusinessException("Sadece iade talebi açık siparişler onaylanabilir!", "INVALID_ORDER_STATUS");
+        }
+        this.status = OrderStatus.RETURNED;
+    }
+
+    public void rejectReturn() {
+        if (this.status != OrderStatus.RETURN_REQUESTED) {
+            throw new BusinessException("Sadece iade talebi açık siparişler reddedilebilir!", "INVALID_ORDER_STATUS");
+        }
+        // Terminal: reddedilen sipariş tekrar iade talebi açamaz (DELIVERED'a DÖNMEZ)
+        this.status = OrderStatus.RETURN_REJECTED;
     }
 }

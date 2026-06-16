@@ -47,6 +47,7 @@ public class OrderPersistenceServiceImpl implements OrderPersistenceService {
                 .currency(currency)
                 .shippingAddressJson(command.shippingAddressJson())
                 .paymentTransactionId(paymentResult.transactionId())
+                .commissionAmount(paymentResult.commissionAmount())
                 .buyerEmail(command.recipientEmail())
                 .build();
         order = orderRepository.save(order);
