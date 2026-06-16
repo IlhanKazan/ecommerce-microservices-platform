@@ -43,6 +43,9 @@ class StockServiceTest {
     @Mock
     private StockMovementService movementService;
 
+    @Mock
+    private com.ecommerce.stockservice.stock.service.SearchStockStatusPublisher searchStockStatusPublisher;
+
     @InjectMocks
     private StockServiceImpl stockService;
 
@@ -80,7 +83,8 @@ class StockServiceTest {
 
         verify(movementService, times(1)).recordMovement(any(), any(), any(), eq(amount));
 
-        verify(outboxService, times(1)).publishStockStatusChangedEvent(any(), eq(productId), eq(true), eq("RESTOCKED"));
+        // Stok 0→pozitif sınırını geçince ES popülerlik/stok senkronu publisher üzerinden yürür.
+        verify(searchStockStatusPublisher, times(1)).publish(eq(productId), any());
     }
 
     @Test
@@ -99,6 +103,6 @@ class StockServiceTest {
                 .hasFieldOrPropertyWithValue("errorCode", "WAREHOUSE_NOT_FOUND");
 
         verify(stockRepository, never()).save(any());
-        verify(outboxService, never()).publishStockStatusChangedEvent(any(), anyLong(), anyBoolean(), anyString());
+        verify(searchStockStatusPublisher, never()).publish(anyLong(), any());
     }
 }

@@ -24,4 +24,10 @@ public class ApiPaths {
         public static final String INTERNAL_STOCKS = BASE_PATH_V1 + "/stocks/internal";
     }
 
+    @NoArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class Public {
+        public static final String PUBLIC_STOCKS = BASE_PATH_V1 + "/public/stocks";
+        public static final String AVAILABILITY = "/availability";
+    }
+
 }

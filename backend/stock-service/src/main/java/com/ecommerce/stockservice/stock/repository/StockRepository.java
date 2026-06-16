@@ -51,6 +51,10 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     @Query("SELECT s FROM Stock s WHERE s.availableQuantity > 0")
     List<Stock> findAllWithPositiveQuantity();
 
+    // RECONCILE: asılı kalmış rezervasyonu olan kayıtlar (sızıntı temizliği için)
+    @Query("SELECT s FROM Stock s WHERE s.reservedQuantity > 0")
+    List<Stock> findAllWithReservedQuantity();
+
     // DEPO DURUM GEÇİŞİ: belli bir depodaki stoğu olan kayıtlar — aktif/pasif olunca ES'e yansıtmak için
     @Query("SELECT s FROM Stock s WHERE s.tenantId = :tenantId AND s.warehouse.id = :warehouseId AND s.availableQuantity > 0")
     List<Stock> findPositiveStocksByWarehouse(@Param("tenantId") Long tenantId, @Param("warehouseId") Long warehouseId);
@@ -60,5 +64,11 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
            "WHERE s.tenantId = :tenantId AND s.productId = :productId " +
            "AND s.availableQuantity > 0 AND s.warehouse.isActive = true")
     boolean existsAvailableInActiveWarehouse(@Param("tenantId") Long tenantId, @Param("productId") Long productId);
+
+    // PUBLIC AVAILABILITY: birden çok ürün/varyant için aktif depolardaki toplam satılabilir stok.
+    // productId global unique olduğundan tenant filtresine gerek yok. Listede dönmeyen id → stok yok.
+    @Query("SELECT s.productId AS productId, SUM(s.availableQuantity) AS qty FROM Stock s " +
+           "WHERE s.productId IN :ids AND s.warehouse.isActive = true GROUP BY s.productId")
+    List<ProductStockSumProjection> sumAvailableByProductIds(@Param("ids") List<Long> ids);
 
 }

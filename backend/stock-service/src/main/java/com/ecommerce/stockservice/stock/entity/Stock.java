@@ -64,6 +64,12 @@ public class Stock extends BaseEntity {
         this.availableQuantity += amount;
     }
 
+    // Ürün-bazlı düşük stok eşiğini günceller (merchant uyarı/renk göstergesi için).
+    public void updateLowStockThreshold(int threshold) {
+        if (threshold < 0) throw new BusinessException("Düşük stok eşiği negatif olamaz!", "INVALID_THRESHOLD");
+        this.lowStockThreshold = threshold;
+    }
+
     public void addStock(int amount) {
         if (amount <= 0) throw new BusinessException("Eklenecek stok 0'dan büyük olmalı!", "INVALID_AMOUNT");
         this.availableQuantity += amount;
@@ -73,5 +79,16 @@ public class Stock extends BaseEntity {
         if (amount <= 0) throw new BusinessException("Düşülecek stok 0'dan büyük olmalı!", "INVALID_AMOUNT");
         if (this.availableQuantity < amount) throw new BusinessException("Mevcut stok yetersiz!", "INSUFFICIENT_STOCK");
         this.availableQuantity -= amount;
+    }
+
+    // Sızan/asılı kalmış tüm rezervasyonu serbest bırakır (admin reconcile aracı için).
+    // Geri verilen miktarı döner; rezerve yoksa 0.
+    public int releaseAllReserved() {
+        int released = this.reservedQuantity;
+        if (released > 0) {
+            this.availableQuantity += released;
+            this.reservedQuantity = 0;
+        }
+        return released;
     }
 }

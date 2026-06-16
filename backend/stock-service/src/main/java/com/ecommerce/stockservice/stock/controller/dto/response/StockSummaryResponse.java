@@ -6,6 +6,7 @@ public record StockSummaryResponse(
         Long warehouseId,
         String warehouseName,
         Integer availableQuantity,
-        Integer reservedQuantity
+        Integer reservedQuantity,
+        Integer lowStockThreshold
 ) {
 }

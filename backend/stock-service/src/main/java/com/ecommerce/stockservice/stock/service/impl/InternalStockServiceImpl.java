@@ -8,6 +8,7 @@ import com.ecommerce.stockservice.stock.controller.dto.request.InternalStockRese
 import com.ecommerce.stockservice.stock.entity.Stock;
 import com.ecommerce.stockservice.stock.repository.StockRepository;
 import com.ecommerce.stockservice.stock.service.InternalStockService;
+import com.ecommerce.stockservice.stock.service.SearchStockStatusPublisher;
 import com.ecommerce.stockservice.stockmovement.service.StockMovementService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ public class InternalStockServiceImpl implements InternalStockService {
     private final StockRepository stockRepository;
     private final OutboxService outboxService;
     private final StockMovementService movementService;
+    private final SearchStockStatusPublisher searchStockStatusPublisher;
 
     @Override
     @Transactional
@@ -42,8 +44,7 @@ public class InternalStockServiceImpl implements InternalStockService {
             stock.reserve(item.quantity());
 
             if (oldQty > 0 && stock.getAvailableQuantity() == 0) {
-                outboxService.publishStockStatusChangedEvent(
-                        stock.getId().toString(), item.productId(), false, "OUT_OF_STOCK");
+                searchStockStatusPublisher.publish(item.productId(), stock.getId().toString());
             }
             movementService.recordMovement(stock, TransactionType.RESERVED_FOR_ORDER, orderId, -item.quantity());
             outboxService.publishStockReservedEvent(
@@ -90,6 +91,35 @@ public class InternalStockServiceImpl implements InternalStockService {
                         log.info("[COMMIT] ProductId: {}, Miktar: {}", item.productId(), item.quantity());
                     }, () -> log.warn("[COMMIT] Rezerve stok bulunamadı. ProductId: {}, OrderID: {}",
                             item.productId(), orderId));
+        }
+    }
+
+    @Override
+    @Transactional
+    public void restockForReturn(String orderId, Long tenantId, List<OrderItemSnapshotPayload> items) {
+        log.info("[RETURN] Sipariş iadesi stok geri ekleme. OrderID: {}", orderId);
+        for (OrderItemSnapshotPayload item : items) {
+            List<Stock> stocks = stockRepository.findAllByTenantIdAndProductId(tenantId, item.productId());
+            // Aktif depodaki kaydı tercih et; yoksa ilk mevcut kayıt
+            Stock target = stocks.stream()
+                    .filter(s -> Boolean.TRUE.equals(s.getWarehouse().getIsActive()))
+                    .findFirst()
+                    .orElse(stocks.stream().findFirst().orElse(null));
+            if (target == null) {
+                log.warn("[RETURN] Stok kaydı bulunamadı, geri ekleme atlandı. ProductId: {}, OrderID: {}",
+                        item.productId(), orderId);
+                continue;
+            }
+            int oldQty = target.getAvailableQuantity();
+            target.addStock(item.quantity());
+            movementService.recordMovement(target, TransactionType.RETURNED, orderId, item.quantity());
+            stockRepository.save(target);
+
+            // 0'dan pozitife geçtiyse ürün tekrar stokta → ES senkronu (parent aggregate)
+            if (oldQty == 0 && target.getAvailableQuantity() > 0) {
+                searchStockStatusPublisher.publish(item.productId(), target.getId().toString());
+            }
+            log.info("[RETURN] Stok geri eklendi. ProductId: {}, Miktar: {}", item.productId(), item.quantity());
         }
     }
 
