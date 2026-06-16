@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
+import { userService } from '../../user/api/userService';
 import {
     Box, Typography, CircularProgress, Alert,
     Button, Stack, Rating, Divider, Container, Grid,
@@ -35,12 +36,18 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useFavoriteStore } from '../../../store/useFavoriteStore';
 import {
     useGetProductDetail,
+    useProductAvailability,
+    useVariantStock,
     useGetProductReviews,
     useCreateReview,
     useMarkReviewHelpful,
     useDeleteReview,
+    useSimilarProducts,
+    useGetProductsByIds,
 } from '../../../query/useProductQueries';
-import type { ReviewCreateRequest } from '../../../types/product';
+import { useFrequentlyBoughtWith } from '../../../query/useOrderQueries';
+import ProductRail from '../../../components/customer/ProductRail';
+import type { ReviewCreateRequest, VariantSummary, VariantStock } from '../../../types/product';
 import { MultiImageUpload } from '../../../components/shared/ImageUploadField';
 import type { ImagePreview } from '../../../utils/imageUploadUtils';
 import { productService } from '../api/productService';
@@ -72,15 +79,48 @@ const EMPTY_FORM: ReviewFormState = { rating: 5, title: '', reviewText: '', imag
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+// Varyant eksenlerini (ör. "Renk" → [Siyah, Beyaz], "Numara" → [42, 43]) child'ların attributes'undan türet.
+function buildVariantAxes(variants?: VariantSummary[]): Record<string, string[]> {
+    const axes: Record<string, string[]> = {};
+    (variants ?? []).forEach((v) => {
+        Object.entries(v.attributes ?? {}).forEach(([key, val]) => {
+            if (!axes[key]) axes[key] = [];
+            if (!axes[key].includes(val)) axes[key].push(val);
+        });
+    });
+    return axes;
+}
+
+// Tüm eksenler seçilmişse eşleşen varyantı döner; aksi halde undefined.
+function resolveVariant(
+    variants: VariantSummary[] | undefined,
+    selected: Record<string, string>,
+): VariantSummary | undefined {
+    if (!variants || variants.length === 0) return undefined;
+    const keys = Object.keys(buildVariantAxes(variants));
+    if (keys.length === 0 || !keys.every((k) => selected[k])) return undefined;
+    return variants.find((v) => keys.every((k) => v.attributes?.[k] === selected[k]));
+}
+
 const ProductDetailPage: React.FC = () => {
     const { productId } = useParams<{ productId: string }>();
     const id = parseInt(productId || '0', 10);
 
     const { data: product, isLoading, isError } = useGetProductDetail(id);
+    const { data: availability } = useProductAvailability(id);
+    const { data: similarProducts, isLoading: similarLoading } = useSimilarProducts(id);
+
+    // Varyant-bazlı canlı stok — stoksuz varyantı çarpılı göstermek + "Son X adet" için.
+    // product yokken boş liste → query disabled; varyantlar gelince çalışır.
+    const variantIds = (product?.variants ?? []).map((v) => v.id);
+    const { data: variantStockList } = useVariantStock(variantIds);
 
     const auth = useAuth();
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
     const currentUser = useAuthStore((state) => state.oidcProfile);
+    // Birlikte sıkça alınanlar (public) — co-purchase id'leri → ürün kartları
+    const { data: fbtIds } = useFrequentlyBoughtWith(id, true);
+    const { data: fbtProducts, isLoading: fbtLoading } = useGetProductsByIds(fbtIds ?? []);
     const { mutate: addToCartApi, isPending: isAddingToCart } = useAddToBasket();
     const localAddItem = useCartStore((state) => state.addItem);
     const isFavorite = useFavoriteStore((s) => s.ids.has(id));
@@ -95,6 +135,7 @@ const ProductDetailPage: React.FC = () => {
     };
 
     const [quantity, setQuantity] = useState(1);
+    const [selectedAttrs, setSelectedAttrs] = useState<Record<string, string>>({});
     const [tabValue, setTabValue] = useState(0);
     const [activeImage, setActiveImage] = useState<string | null>(null);
     const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -127,6 +168,26 @@ const ProductDetailPage: React.FC = () => {
         if (product?.mainImageUrl) setActiveImage(product.mainImageUrl);
     }, [product]);
 
+    // Tam varyant seçilince ve varyantın kendi görseli varsa galeriyi ona getir.
+    useEffect(() => {
+        const v = resolveVariant(product?.variants, selectedAttrs);
+        if (v?.mainImageUrl) setActiveImage(v.mainImageUrl);
+    }, [product, selectedAttrs]);
+
+    // Varyant seçimi değişince miktarı sıfırla (yeni varyantın stok tavanını aşmayı önler).
+    useEffect(() => {
+        setQuantity(1);
+    }, [selectedAttrs]);
+
+    // Giriş yapmış kullanıcının gezinme geçmişine kaydet (best-effort, ürün başına bir kez).
+    const recordedViewRef = useRef<number | null>(null);
+    useEffect(() => {
+        if (isAuthenticated && product?.id && recordedViewRef.current !== product.id) {
+            recordedViewRef.current = product.id;
+            userService.recordProductView(product.id, product.tenantId);
+        }
+    }, [isAuthenticated, product?.id, product?.tenantId]);
+
     const handleQuantityChange = (type: 'increase' | 'decrease') => {
         if (type === 'decrease' && quantity > 1) setQuantity((prev) => prev - 1);
         if (type === 'increase') setQuantity((prev) => prev + 1);
@@ -134,11 +195,22 @@ const ProductDetailPage: React.FC = () => {
 
     const handleAddToCart = () => {
         if (!product) return;
-        const finalPrice = product.discountedPrice ?? product.price;
+
+        // Varyantlı üründe seçilen varyant (child) sepete eklenir; varyantsızda ürünün kendisi.
+        const hasVariants = (product.variants?.length ?? 0) > 0;
+        const variant = resolveVariant(product.variants, selectedAttrs);
+        if (hasVariants && !variant) return; // buton zaten disabled
+
+        const buyId = variant ? variant.id : product.id;
+        const buyName = variant ? variant.name : product.name;
+        const buyPrice = variant
+            ? (variant.discountedPrice ?? variant.price)
+            : (product.discountedPrice ?? product.price);
+        const buyImage = (variant ? (variant.mainImageUrl ?? product.mainImageUrl) : product.mainImageUrl) ?? undefined;
 
         if (isAuthenticated) {
             addToCartApi(
-                { productId: product.id, quantity },
+                { productId: buyId, quantity },
                 {
                     onSuccess: () => {
                         setSnackbar({ open: true, message: `${quantity} adet ürün sepete eklendi!`, severity: 'success' });
@@ -154,11 +226,11 @@ const ProductDetailPage: React.FC = () => {
             );
         } else {
             localAddItem({
-                productId: product.id,
-                name: product.name,
-                price: finalPrice,
+                productId: buyId,
+                name: buyName,
+                price: buyPrice,
                 quantity,
-                mainImageUrl: product.mainImageUrl ?? undefined,
+                mainImageUrl: buyImage,
             });
             setSnackbar({ open: true, message: `${quantity} adet ürün sepete eklendi!`, severity: 'success' });
             setQuantity(1);
@@ -212,7 +284,52 @@ const ProductDetailPage: React.FC = () => {
     const formatPrice = (p: number) =>
         new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(p);
 
-    const isAvailableToBuy = product.status === 'ACTIVE' && product.salesStatus === 'ON_SALE';
+    // ─── Varyant durumu ─────────────────────────────────────────────────
+    const variantAxes = buildVariantAxes(product.variants);
+    const hasVariants = (product.variants?.length ?? 0) > 0;
+    const selectedVariant = resolveVariant(product.variants, selectedAttrs);
+    const needsVariantSelection = hasVariants && !selectedVariant;
+
+    // Varyant-bazlı canlı stok haritası (productId → durum). Veri gelmeden hiçbir şey "tükendi" sayılmaz (degrade).
+    const variantStockMap = new Map<number, VariantStock>();
+    (variantStockList ?? []).forEach((s) => variantStockMap.set(s.productId, s));
+
+    // Bir eksen seçeneği (ör. Numara: 42) — diğer seçili eksenlerle birlikte stoklu bir varyant var mı?
+    // (ör. siyah seçiliyken 42 numara stokta yoksa çarpılı gösterilir.)
+    const isOptionInStock = (axis: string, opt: string): boolean => {
+        const candidates = (product.variants ?? []).filter((v) => {
+            if (v.attributes?.[axis] !== opt) return false;
+            return Object.entries(selectedAttrs).every(([k, val]) => k === axis || v.attributes?.[k] === val);
+        });
+        if (candidates.length === 0) return true; // kombinasyon yok / veri yok → engelleme
+        return candidates.some((v) => {
+            const st = variantStockMap.get(v.id);
+            return !st || st.inStock; // stok bilgisi yoksa alınabilir varsay
+        });
+    };
+
+    const selectedVariantStock = selectedVariant ? variantStockMap.get(selectedVariant.id) : undefined;
+    const selectedVariantOutOfStock = !!selectedVariant && !!selectedVariantStock && !selectedVariantStock.inStock;
+    // Seçili varyantın gösterilebilir adedi (yalnız düşük stokta dolu) — "Son X adet" + miktar tavanı
+    const selectedVariantLowQty =
+        selectedVariant && selectedVariantStock?.inStock ? selectedVariantStock.availableQuantity : null;
+
+    // Seçilen varyant varsa fiyat/görsel ondan; yoksa parent'tan (varyantlıda "fiyat varyanta göre").
+    const displayPrice = selectedVariant ? selectedVariant.price : product.price;
+    const displayDiscounted = selectedVariant ? selectedVariant.discountedPrice : product.discountedPrice;
+
+    // Detay endpoint'inde status her zaman ACTIVE'dir (getPublicProductInfo aksini fırlatır).
+    // Fiziksel stok kartla aynı ES kaynağından (availability) gelir; salesStatus merchant'ın elle kararı.
+    // Varyantlı üründe stok varyant bazındadır → seçilen varyantın canlı stoğuna bakılır (parent inStock değil).
+    const physicalOutOfStock = availability?.inStock === false;
+    const isOutOfStock = hasVariants
+        ? selectedVariantOutOfStock
+        : (product.salesStatus === 'OUT_OF_STOCK' || physicalOutOfStock);
+    const isAvailableToBuy =
+        product.status === 'ACTIVE' && product.salesStatus === 'ON_SALE'
+        && !isOutOfStock && !needsVariantSelection;
+    // Miktar tavanı: seçili varyantın düşük stoğu biliniyorsa + butonunu kilitle
+    const maxQty = selectedVariantLowQty ?? null;
     const allImages = [product.mainImageUrl, ...(product.imageUrls ?? [])].filter(Boolean) as string[];
     const hasImages = allImages.length > 0;
     const activeIndex = Math.max(0, allImages.indexOf(activeImage ?? ''));
@@ -400,7 +517,7 @@ const ProductDetailPage: React.FC = () => {
                                     ({product.reviewCount ?? 0} Değerlendirme)
                                 </Typography>
                                 <Divider orientation="vertical" flexItem sx={{ height: 15, alignSelf: 'center' }} />
-                                <Typography variant="caption" color="text.secondary">SKU: {product.sku}</Typography>
+                                <Typography variant="caption" color="text.secondary">SKU: {selectedVariant?.sku ?? product.sku}</Typography>
                             </Stack>
 
                             {/* Satıcı */}
@@ -435,29 +552,104 @@ const ProductDetailPage: React.FC = () => {
                             )}
 
                             <Box sx={{ my: 3, p: 2, bgcolor: 'primary.lighter', borderRadius: 2, border: '1px dashed', borderColor: 'primary.light' }}>
-                                {product.discountedPrice && product.discountedPrice < product.price ? (
+                                {displayDiscounted && displayDiscounted < displayPrice ? (
                                     <Stack spacing={0.5}>
                                         <Stack direction="row" spacing={1} alignItems="center">
                                             <Typography variant="h6" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
-                                                {formatPrice(product.price)}
+                                                {formatPrice(displayPrice)}
                                             </Typography>
                                             <Chip
                                                 size="small"
                                                 color="error"
-                                                label={`%${Math.round((1 - product.discountedPrice / product.price) * 100)} İNDİRİM`}
+                                                label={`%${Math.round((1 - displayDiscounted / displayPrice) * 100)} İNDİRİM`}
                                                 sx={{ fontWeight: 700 }}
                                             />
                                         </Stack>
                                         <Typography variant="h3" fontWeight="bold" color="error.main">
-                                            {formatPrice(product.discountedPrice)}
+                                            {formatPrice(displayDiscounted)}
                                         </Typography>
                                     </Stack>
                                 ) : (
                                     <Typography variant="h3" fontWeight="bold" color="primary.main">
-                                        {formatPrice(product.price)}
+                                        {formatPrice(displayPrice)}
+                                    </Typography>
+                                )}
+                                {needsVariantSelection && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                                        Fiyat seçilen varyanta göre değişir
                                     </Typography>
                                 )}
                             </Box>
+
+                            {/* ─── Varyant seçici (Renk / Numara vb.) ─────────────── */}
+                            {hasVariants && (
+                                <Stack spacing={2} sx={{ mb: 3 }}>
+                                    {Object.entries(variantAxes).map(([axis, options]) => (
+                                        <Box key={axis}>
+                                            <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                                                {axis}{selectedAttrs[axis] ? `: ${selectedAttrs[axis]}` : ''}
+                                            </Typography>
+                                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                                                {options.map((opt) => {
+                                                    const active = selectedAttrs[axis] === opt;
+                                                    const optInStock = isOptionInStock(axis, opt);
+                                                    return (
+                                                        <Tooltip key={opt} title={optInStock ? '' : 'Tükendi'} disableHoverListener={optInStock}>
+                                                            <span>
+                                                                <Chip
+                                                                    label={opt}
+                                                                    clickable={optInStock}
+                                                                    disabled={!optInStock}
+                                                                    color={active ? 'primary' : 'default'}
+                                                                    variant={active ? 'filled' : 'outlined'}
+                                                                    onClick={() =>
+                                                                        optInStock &&
+                                                                        setSelectedAttrs((prev) => ({ ...prev, [axis]: opt }))
+                                                                    }
+                                                                    sx={{
+                                                                        fontWeight: 600,
+                                                                        ...(optInStock
+                                                                            ? {}
+                                                                            : { textDecoration: 'line-through', opacity: 0.55 }),
+                                                                    }}
+                                                                />
+                                                            </span>
+                                                        </Tooltip>
+                                                    );
+                                                })}
+                                            </Stack>
+                                        </Box>
+                                    ))}
+                                    {needsVariantSelection && (
+                                        <Typography variant="body2" color="warning.main" fontWeight={600}>
+                                            Lütfen tüm seçenekleri belirleyin.
+                                        </Typography>
+                                    )}
+                                </Stack>
+                            )}
+
+                            {/* Düşük stok uyarısı — seçilen varyant az kaldıysa */}
+                            {hasVariants && selectedVariantLowQty != null && (
+                                <Typography variant="body2" color="warning.main" fontWeight={700} sx={{ mb: 2 }}>
+                                    ⚠ Son {selectedVariantLowQty} adet kaldı!
+                                </Typography>
+                            )}
+
+                            {/* Stok / satış durumu rozeti */}
+                            {isOutOfStock ? (
+                                <Chip
+                                    label="Tükendi"
+                                    color="default"
+                                    sx={{ mb: 2, fontWeight: 700, bgcolor: 'grey.300', color: 'text.secondary' }}
+                                />
+                            ) : (!isAvailableToBuy && !needsVariantSelection) && (
+                                // Sadece gerçekten satışa kapalıysa göster — yalnızca varyant seçilmediği için değil.
+                                <Chip
+                                    label="Şu An Satışta Değil"
+                                    color="default"
+                                    sx={{ mb: 2, fontWeight: 700, bgcolor: 'grey.300', color: 'text.secondary' }}
+                                />
+                            )}
 
                             <Stack direction="row" spacing={2} alignItems="center" mb={4}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid #ccc', borderRadius: 1 }}>
@@ -470,7 +662,7 @@ const ProductDetailPage: React.FC = () => {
                                     <Typography sx={{ px: 2, fontWeight: 'bold' }}>{quantity}</Typography>
                                     <IconButton
                                         onClick={() => handleQuantityChange('increase')}
-                                        disabled={isAddingToCart || !isAvailableToBuy}
+                                        disabled={isAddingToCart || !isAvailableToBuy || (maxQty != null && quantity >= maxQty)}
                                     >
                                         <Add fontSize="small" />
                                     </IconButton>
@@ -483,7 +675,7 @@ const ProductDetailPage: React.FC = () => {
                                     disabled={isAddingToCart || !isAvailableToBuy}
                                     sx={{ py: 1.5, fontSize: '1.1rem', borderRadius: 2, boxShadow: 2 }}
                                 >
-                                    {!isAvailableToBuy ? 'Şu An Satışta Değil' : isAddingToCart ? 'Ekleniyor...' : 'Sepete Ekle'}
+                                    {isOutOfStock ? 'Tükendi' : needsVariantSelection ? 'Varyant Seçin' : !isAvailableToBuy ? 'Şu An Satışta Değil' : isAddingToCart ? 'Ekleniyor...' : 'Sepete Ekle'}
                                 </Button>
                             </Stack>
 
@@ -707,6 +899,20 @@ const ProductDetailPage: React.FC = () => {
                         </Container>
                     </CustomTabPanel>
                 </Paper>
+
+                {/* ── Birlikte sıkça alınanlar (herkese açık) ── */}
+                <ProductRail
+                    title="Birlikte Sıkça Alınanlar"
+                    products={fbtProducts}
+                    isLoading={fbtLoading}
+                />
+
+                {/* ── Benzer ürünler ── */}
+                <ProductRail
+                    title="Benzer Ürünler"
+                    products={similarProducts}
+                    isLoading={similarLoading}
+                />
             </Container>
 
             {/* ─── Yorum Yazma Dialog ───────────────────────────────────── */}

@@ -150,6 +150,7 @@ export interface TenantSummary {
     businessName: string;
     logoUrl: string | null;
     status: TenantStatus;
+    isVerified?: boolean;
     myRole: TenantRole;
 }
 

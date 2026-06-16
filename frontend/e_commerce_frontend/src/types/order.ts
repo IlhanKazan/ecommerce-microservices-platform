@@ -1,4 +1,25 @@
-export type OrderStatus = 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'REFUNDED';
+export type OrderStatus =
+    | 'CONFIRMED'
+    | 'SHIPPED'
+    | 'DELIVERED'
+    | 'CANCELLED'
+    | 'REFUNDED'
+    | 'RETURN_REQUESTED'
+    | 'RETURNED'
+    | 'RETURN_REJECTED';
+
+/** İade talebi — merchant/admin paneli listesi. */
+export interface OrderReturn {
+    returnId: number;
+    orderId: number;
+    tenantId: number;
+    reasonCode: string | null;
+    reason: string | null;
+    status: string;
+    orderTotal: number | null;
+    buyerEmail: string | null;
+    createdAt: string;
+}
 
 export interface OrderItemDetail {
     productId: number;
@@ -16,6 +37,7 @@ export interface OrderDetail {
     currency: string;
     shippingAddressJson: string;
     createdAt: string;
+    deliveredAt: string | null;
     items: OrderItemDetail[];
 }
 
@@ -71,4 +93,31 @@ export interface OrderPageResponse<T> {
     totalElements: number;
     totalPages: number;
     isLast: boolean;
+}
+
+// ── Merchant satış analitiği ───────────────────────────────────────────────
+export interface MerchantTopProduct {
+    productId: number;
+    productName: string;
+    unitsSold: number;
+    revenue: number;
+    orderCount: number;
+}
+
+export interface MerchantAnalytics {
+    totalRevenue: number;
+    totalCommission: number;
+    totalNet: number;
+    totalOrders: number;
+    totalUnits: number;
+    topProducts: MerchantTopProduct[];
+}
+
+/** Tek ürünün satış metriği — toplam + varyant kırılımı (breakdown satırları MerchantTopProduct ile aynı şekil). */
+export interface ProductSalesMetrics {
+    productId: number;
+    totalUnits: number;
+    totalRevenue: number;
+    totalOrders: number;
+    breakdown: MerchantTopProduct[];
 }

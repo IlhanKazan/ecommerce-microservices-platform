@@ -15,8 +15,8 @@ export const QueryKeys = {
     CATEGORIES: ['categories'] as const,
 
     // Tenant ürünleri
-    TENANT_PRODUCTS: (tenantId: number, page: number, size: number) =>
-        ['tenant-products', tenantId, page, size] as const,
+    TENANT_PRODUCTS: (tenantId: number, page: number, size: number, q = '', salesStatus = '', sort = '') =>
+        ['tenant-products', tenantId, page, size, q, salesStatus, sort] as const,
 
     // Sepet
     CART: ['cart'] as const,
@@ -36,6 +36,6 @@ export const QueryKeys = {
     ORDER_DETAIL: (orderId: number) =>
         ['order-detail', orderId] as const,
 
-    TENANT_ORDERS: (tenantId: number, page: number, size: number) =>
-        ['tenant-orders', tenantId, page, size] as const,
+    TENANT_ORDERS: (tenantId: number, page: number, size: number, status = '', q = '') =>
+        ['tenant-orders', tenantId, page, size, status, q] as const,
 };

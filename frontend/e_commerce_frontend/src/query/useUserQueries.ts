@@ -21,6 +21,26 @@ export const useMe = (enabled: boolean = true) => {
     });
 };
 
+// Son gezilen ürün id'leri (giriş yapmış kullanıcı). "Son Gezdiklerin" rail'i için.
+export const useRecentlyViewed = (enabled: boolean, limit = 12) => {
+    return useQuery({
+        queryKey: ['recently-viewed', limit],
+        queryFn: () => userService.getRecentlyViewed(limit),
+        enabled,
+        staleTime: 1000 * 30,
+    });
+};
+
+// Son aramalar (giriş yapmış kullanıcı). Arama çubuğu odaklanınca gösterilir.
+export const useRecentSearches = (enabled: boolean, limit = 8) => {
+    return useQuery({
+        queryKey: ['recent-searches', limit],
+        queryFn: () => userService.getRecentSearches(limit),
+        enabled,
+        staleTime: 1000 * 30,
+    });
+};
+
 /**
  * Invalidate user profile cache when needed (after profile updates, login, etc)
  */

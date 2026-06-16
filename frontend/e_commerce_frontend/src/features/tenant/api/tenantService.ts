@@ -293,6 +293,19 @@ export const tenantService = {
         );
     },
 
+    // Varyant matris akışında oluşturulan varyantlara tek depoya toplu ilk stok girişi.
+    addManualStockBatch: async (
+        tenantId: number,
+        payload: { warehouseId: number; items: { productId: number; amount: number }[] },
+        idempotencyKey: string,
+    ): Promise<void> => {
+        await api.post(
+            API_ENDPOINTS.STOCK.MANUAL_ADD_BATCH(tenantId),
+            payload,
+            { headers: { [IDEMPOTENCY_KEY_HEADER]: idempotencyKey } },
+        );
+    },
+
     removeManualStock: async (
         tenantId: number,
         payload: { warehouseId: number; productId: number; amount: number },
@@ -308,5 +321,12 @@ export const tenantService = {
     getStockSummary: async (tenantId: number): Promise<StockSummaryItem[]> => {
         const response = await api.get(API_ENDPOINTS.STOCK.SUMMARY(tenantId));
         return response.data;
+    },
+
+    updateLowStockThreshold: async (
+        tenantId: number,
+        payload: { warehouseId: number; productId: number; threshold: number },
+    ): Promise<void> => {
+        await api.patch(API_ENDPOINTS.STOCK.LOW_STOCK_THRESHOLD(tenantId), payload);
     },
 };

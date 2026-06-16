@@ -1,29 +1,72 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import {
     Container, Box, Avatar, Typography, Pagination,
     Chip, CircularProgress, Alert, Link, Paper,
+    TextField, InputAdornment, FormControl, InputLabel, Select, MenuItem,
+    Stack, Button, FormControlLabel, Switch,
 } from '@mui/material';
-import { Store as StoreIcon, Verified as VerifiedIcon, StorefrontOutlined } from '@mui/icons-material';
+import { Store as StoreIcon, Verified as VerifiedIcon, StorefrontOutlined, Search as SearchIcon } from '@mui/icons-material';
 import { useGetTenantStorefront, useSearchProducts } from '../../../query/useProductQueries';
 import ProductCard from '../../../components/customer/ProductCard';
 import { ProductGridSkeleton } from '../../../components/shared/ProductCardSkeleton';
 import EmptyState from '../../../components/shared/EmptyState';
 import { tokens } from '../../../utils/themeTokens';
+import { useDebounce } from '../../../hooks/useDebounce';
+import type { ProductSearchPayload } from '../../../types/product';
+
+type StoreSort = NonNullable<ProductSearchPayload['sortBy']>;
 
 export default function StorePage() {
     const { tenantId } = useParams<{ tenantId: string }>();
     const id = Number(tenantId);
     const [page, setPage] = useState(0);
 
+    // Arama + filtre (mağaza içi, tenantId sabit)
+    const [keywordInput, setKeywordInput] = useState('');
+    const [sortBy, setSortBy] = useState<StoreSort>('newest');
+    const [inStockOnly, setInStockOnly] = useState(false);
+    const [priceDraft, setPriceDraft] = useState<{ min: string; max: string }>({ min: '', max: '' });
+    const [priceApplied, setPriceApplied] = useState<{ min?: number; max?: number }>({});
+    const keyword = useDebounce(keywordInput, 300);
+
+    // Filtre/arama değişince ilk sayfaya dön
+    useEffect(() => {
+        setPage(0);
+    }, [keyword, sortBy, inStockOnly, priceApplied]);
+
     const { data: storefront, isLoading: isStorefrontLoading, isError: isStorefrontError } =
         useGetTenantStorefront(id);
 
-    const storeSearch = useMemo(
-        () => ({ tenantId: id, page, size: 20, sortBy: 'newest' as const }),
-        [id, page],
+    const storeSearch = useMemo<ProductSearchPayload>(
+        () => ({
+            tenantId: id,
+            page,
+            size: 20,
+            sortBy,
+            ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+            ...(inStockOnly ? { inStock: true } : {}),
+            ...(priceApplied.min != null ? { minPrice: priceApplied.min } : {}),
+            ...(priceApplied.max != null ? { maxPrice: priceApplied.max } : {}),
+        }),
+        [id, page, sortBy, keyword, inStockOnly, priceApplied],
     );
     const { data: productsPage, isLoading: isProductsLoading } = useSearchProducts(storeSearch);
+
+    // Öne çıkan ürünler şeridi (mağazaya özel, ilk 8)
+    const featuredSearch = useMemo<ProductSearchPayload>(
+        () => ({ tenantId: id, featured: true, sortBy: 'newest', page: 0, size: 8 }),
+        [id],
+    );
+    const { data: featuredPage } = useSearchProducts(featuredSearch);
+    const featuredProducts = featuredPage?.content ?? [];
+
+    const applyPrice = () => {
+        setPriceApplied({
+            min: priceDraft.min.trim() ? Number(priceDraft.min) : undefined,
+            max: priceDraft.max.trim() ? Number(priceDraft.max) : undefined,
+        });
+    };
 
     if (isStorefrontLoading) {
         return (
@@ -108,6 +151,24 @@ export default function StorePage() {
                     </Box>
                 )}
 
+                {/* Öne çıkan ürünler şeridi */}
+                {isStoreOpen && featuredProducts.length > 0 && (
+                    <Box sx={{ mt: 5 }}>
+                        <Typography variant="h5" fontWeight={800} sx={{ mb: 3 }}>
+                            ⭐ Öne Çıkanlar
+                        </Typography>
+                        <Box sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' },
+                            gap: { xs: 1.5, sm: 2, md: 3 },
+                        }}>
+                            {featuredProducts.map((product) => (
+                                <ProductCard key={`featured-${product.id}`} product={product} />
+                            ))}
+                        </Box>
+                    </Box>
+                )}
+
                 {/* Ürünler */}
                 {isStoreOpen && (
                 <Box sx={{ mt: 5 }}>
@@ -119,6 +180,59 @@ export default function StorePage() {
                             </Typography>
                         )}
                     </Typography>
+
+                    {/* Mağaza içi arama + filtre */}
+                    <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 3 }}>
+                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }} flexWrap="wrap" useFlexGap>
+                            <TextField
+                                placeholder="Bu mağazada ara..."
+                                size="small"
+                                value={keywordInput}
+                                onChange={(e) => setKeywordInput(e.target.value)}
+                                sx={{ flex: 1, minWidth: 220 }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <SearchIcon fontSize="small" color="action" />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <FormControl size="small" sx={{ minWidth: 170 }}>
+                                <InputLabel>Sırala</InputLabel>
+                                <Select
+                                    label="Sırala"
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value as StoreSort)}
+                                >
+                                    <MenuItem value="newest">En Yeni</MenuItem>
+                                    <MenuItem value="price_asc">Fiyat: Artan</MenuItem>
+                                    <MenuItem value="price_desc">Fiyat: Azalan</MenuItem>
+                                    <MenuItem value="rating">Puan</MenuItem>
+                                    <MenuItem value="popular">Popüler</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                                <TextField
+                                    label="Min ₺" size="small" type="number"
+                                    value={priceDraft.min}
+                                    onChange={(e) => setPriceDraft((p) => ({ ...p, min: e.target.value }))}
+                                    sx={{ width: 100 }}
+                                />
+                                <TextField
+                                    label="Max ₺" size="small" type="number"
+                                    value={priceDraft.max}
+                                    onChange={(e) => setPriceDraft((p) => ({ ...p, max: e.target.value }))}
+                                    sx={{ width: 100 }}
+                                />
+                                <Button size="small" variant="outlined" onClick={applyPrice}>Uygula</Button>
+                            </Stack>
+                            <FormControlLabel
+                                control={<Switch checked={inStockOnly} onChange={(e) => setInStockOnly(e.target.checked)} />}
+                                label="Sadece stokta"
+                            />
+                        </Stack>
+                    </Paper>
 
                     {isProductsLoading ? (
                         <ProductGridSkeleton count={8} />

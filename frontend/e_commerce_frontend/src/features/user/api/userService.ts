@@ -28,6 +28,42 @@ export const userService = {
         return response.data;
     },
 
+    // Best-effort gezinme kaydı — öneri/AI verisi. Hata yutulur, UX'i bozmaz.
+    recordProductView: async (productId: number, tenantId?: number): Promise<void> => {
+        try {
+            await api.post(API_ENDPOINTS.USER.ACTIVITY_VIEWS, { productId, tenantId });
+        } catch {
+            /* sessizce geç */
+        }
+    },
+
+    // Son gezilen ürün id'leri (en yeni önce). "Son Gezdiklerin" rail'i için.
+    getRecentlyViewed: async (limit = 12): Promise<number[]> => {
+        const response = await api.get<number[]>(
+            API_ENDPOINTS.USER.ACTIVITY_RECENTLY_VIEWED,
+            { params: { limit } },
+        );
+        return response.data ?? [];
+    },
+
+    // Best-effort arama kaydı (son aramalar + AI sinyali). Hata yutulur.
+    recordSearch: async (term: string): Promise<void> => {
+        if (!term || !term.trim()) return;
+        try {
+            await api.post(API_ENDPOINTS.USER.ACTIVITY_SEARCHES, { term: term.trim() });
+        } catch {
+            /* sessizce geç */
+        }
+    },
+
+    getRecentSearches: async (limit = 10): Promise<string[]> => {
+        const response = await api.get<string[]>(
+            API_ENDPOINTS.USER.ACTIVITY_RECENT_SEARCHES,
+            { params: { limit } },
+        );
+        return response.data ?? [];
+    },
+
     updateProfile: async (data: UpdateProfileRequest): Promise<User> => {
         const response = await api.put<User>(API_ENDPOINTS.USER.UPDATE, data);
         return response.data;

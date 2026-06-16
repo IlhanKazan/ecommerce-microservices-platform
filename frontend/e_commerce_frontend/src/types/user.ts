@@ -42,6 +42,7 @@ export interface User {
     language: string | null;
 
     isMerchant: boolean;
+    isPlatformAdmin: boolean;
 }
 
 export interface UpdateProfileRequest {

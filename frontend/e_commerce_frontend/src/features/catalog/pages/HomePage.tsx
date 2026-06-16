@@ -1,15 +1,27 @@
 import React from 'react';
 import { Typography, Box, Button, Alert, Container, Paper, Stack, Avatar } from '@mui/material';
-import { useSearchProducts, useGetCategories } from '../../../query/useProductQueries';
+import {
+    useSearchProducts, useGetCategories, useGetProductsByIds, useRelatedProducts,
+} from '../../../query/useProductQueries';
+import { useRecentlyViewed } from '../../../query/useUserQueries';
 import { useCategoryStore } from '../../../store/useCategoryStore';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { useFavoriteStore } from '../../../store/useFavoriteStore';
+import { useBasketItemCount } from '../../../query/useBasketQueries';
 import { Link as RouterLink } from 'react-router-dom';
 import ProductCard from '../../../components/customer/ProductCard';
+import ProductRail from '../../../components/customer/ProductRail';
 import { ProductGridSkeleton } from '../../../components/shared/ProductCardSkeleton';
 import {
     ArrowForward, LocalOffer, LocalShippingOutlined,
     VerifiedUserOutlined, ReplayOutlined, SupportAgentOutlined,
+    HistoryOutlined, RecommendOutlined, WhatshotOutlined, ShoppingCartOutlined, StarOutlined,
 } from '@mui/icons-material';
 import { tokens } from '../../../utils/themeTokens';
+
+// Modül seviyesinde sabit payload'lar (her render'da yeni obje üretilmesin)
+const TREND_SEARCH = { page: 0, size: 10, sortBy: 'popular' } as const;
+const FEATURED_SEARCH = { page: 0, size: 10, featured: true, sortBy: 'newest' } as const;
 
 // Sabit search payload — referans modül seviyesinde, her render'da yeni obje üretilmez
 const HOME_SEARCH = { page: 0, size: 8, sortBy: 'newest' } as const;
@@ -32,6 +44,28 @@ const HomePage: React.FC = () => {
     const isLoaded = useCategoryStore((s) => s.isLoaded);
     const { data: fetchedCategories } = useGetCategories();
     const topCategories = (isLoaded ? storedCategories : (fetchedCategories ?? [])).slice(0, 6);
+
+    // ── Kişiselleştirilmiş rail'ler (giriş yapmış kullanıcı) ──
+    const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+    const favoriteIds = useFavoriteStore((s) => s.ids);
+
+    const { data: recentIds } = useRecentlyViewed(isAuthenticated, 12);
+    const { data: recentProducts, isLoading: recentLoading } = useGetProductsByIds(recentIds ?? []);
+
+    // "Senin İçin" tohumları: son gezilen + favori (dedup). AI Engine sonradan bu yolu devralır.
+    const seedIds = React.useMemo(() => {
+        const set = new Set<number>([...(recentIds ?? []), ...Array.from(favoriteIds)]);
+        return Array.from(set).slice(0, 10);
+    }, [recentIds, favoriteIds]);
+    const { data: forYou, isLoading: forYouLoading } = useRelatedProducts(
+        isAuthenticated ? seedIds : [], (recentIds ?? []), 12);
+
+    // Trend (çok satanlar) + Öne çıkanlar (merchant-featured) — herkese açık
+    const { data: trend, isLoading: trendLoading } = useSearchProducts(TREND_SEARCH);
+    const { data: featured, isLoading: featuredLoading } = useSearchProducts(FEATURED_SEARCH);
+
+    // Sepette unuttukların — giriş yapmış + sepeti dolu kullanıcıya hatırlatma
+    const cartCount = useBasketItemCount();
 
     return (
         <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', pb: 8 }}>
@@ -110,6 +144,35 @@ const HomePage: React.FC = () => {
                     ))}
                 </Paper>
 
+                {/* ── Sepette Unuttukların ── */}
+                {isAuthenticated && cartCount > 0 && (
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            mt: 4, p: { xs: 2, md: 2.5 }, borderRadius: 3,
+                            boxShadow: tokens.shadow.sm, bgcolor: 'primary.lighter',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            gap: 2, flexWrap: 'wrap',
+                        }}
+                    >
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <ShoppingCartOutlined color="primary" />
+                            <Typography fontWeight={700}>
+                                Sepetinde {cartCount} ürün seni bekliyor
+                            </Typography>
+                        </Stack>
+                        <Button
+                            variant="contained"
+                            component={RouterLink}
+                            to="/cart"
+                            endIcon={<ArrowForward />}
+                            sx={{ borderRadius: 999, fontWeight: 700 }}
+                        >
+                            Sepete Git
+                        </Button>
+                    </Paper>
+                )}
+
                 {/* ── Kategoriler (gerçek, tıklanınca filtreler) ── */}
                 {topCategories.length > 0 && (
                     <Box sx={{ mt: 6 }}>
@@ -146,6 +209,43 @@ const HomePage: React.FC = () => {
                         </Stack>
                     </Box>
                 )}
+
+                {/* ── Senin İçin Önerilenler (giriş yapmışsa) ── */}
+                {isAuthenticated && (
+                    <ProductRail
+                        title="Senin İçin Önerilenler"
+                        products={forYou}
+                        isLoading={forYouLoading}
+                        icon={<RecommendOutlined color="primary" />}
+                    />
+                )}
+
+                {/* ── Son Gezdiklerin (giriş yapmışsa) ── */}
+                {isAuthenticated && (
+                    <ProductRail
+                        title="Son Gezdiklerin"
+                        products={recentProducts}
+                        isLoading={recentLoading}
+                        icon={<HistoryOutlined color="action" />}
+                    />
+                )}
+
+                {/* ── Öne Çıkanlar (merchant-featured) ── */}
+                <ProductRail
+                    title="Öne Çıkanlar"
+                    products={featured?.content}
+                    isLoading={featuredLoading}
+                    icon={<StarOutlined sx={{ color: 'warning.main' }} />}
+                />
+
+                {/* ── Çok Satanlar / Trend ── */}
+                <ProductRail
+                    title="Çok Satanlar"
+                    products={trend?.content}
+                    isLoading={trendLoading}
+                    viewAllTo="/productlist?sortBy=popular"
+                    icon={<WhatshotOutlined color="error" />}
+                />
 
                 {/* ── Öne çıkanlar ── */}
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 7, mb: 3 }}>

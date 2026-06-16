@@ -12,6 +12,7 @@ import { useMe } from './query/useUserQueries';
 import { useAuth } from "react-oidc-context";
 import ProtectedRoute from "./components/shared/ProtectedRoute";
 import { MerchantProtectedRoute } from "./components/shared/MerchantProtectedRoute";
+import { PlatformAdminProtectedRoute } from "./components/shared/PlatformAdminProtectedRoute";
 import ToastContainer from "./components/shared/ToastContainer.tsx";
 import { basketService } from './features/catalog/api/productService';
 import { useGetCategories } from './query/useProductQueries';
@@ -47,6 +48,18 @@ const MerchantOrders = lazy(() => import('./features/tenant/pages/MerchantOrders
 const MerchantReviews = lazy(() => import('./features/tenant/pages/MerchantPlaceholderPages').then(module => ({ default: module.MerchantReviews })));
 const MerchantWarehouse = lazy(() => import('./features/tenant/pages/MerchantWarehousePage'));
 const MerchantReviewsPage = lazy(() => import('./features/tenant/pages/MerchantReviewsPage'));
+
+const AdminLayout = lazy(() => import('./features/admin/layout/AdminLayout'));
+const AdminDashboardPage = lazy(() => import('./features/admin/dashboard/pages/AdminDashboardPage'));
+const AdminStoresPage = lazy(() => import('./features/admin/pages/AdminStoresPage'));
+const AdminCategoriesPage = lazy(() => import('./features/admin/pages/AdminCategoriesPage'));
+const AdminOrdersPage = lazy(() => import('./features/admin/pages/AdminOrdersPage'));
+const AdminTransactionsPage = lazy(() => import('./features/admin/pages/AdminTransactionsPage'));
+const AdminProductsPage = lazy(() => import('./features/admin/pages/AdminProductsPage'));
+const AdminUsersPage = lazy(() => import('./features/admin/pages/AdminUsersPage'));
+const AdminMaintenancePage = lazy(() => import('./features/admin/pages/AdminMaintenancePage'));
+const MerchantAnalyticsPage = lazy(() => import('./features/tenant/pages/MerchantAnalyticsPage'));
+const MerchantReturnsPage = lazy(() => import('./features/tenant/pages/MerchantReturnsPage'));
 
 function App() {
     const auth = useAuth();
@@ -160,13 +173,28 @@ function App() {
                     <Route path="/merchant" element={<MerchantLayout />}>
                         <Route index element={<MerchantDashboard />} />
                         <Route path="dashboard" element={<MerchantDashboard />} />
+                        <Route path="analytics" element={<MerchantAnalyticsPage />} />
                         <Route path="products" element={<MerchantProducts />} />
                         <Route path="orders" element={<MerchantOrders />} />
+                        <Route path="returns" element={<MerchantReturnsPage />} />
                         <Route path="reviews" element={<MerchantReviews />} />
                         <Route path="subscription" element={<MerchantSubscription />} />
                         <Route path="settings" element={<MerchantSettings />} />
                         <Route path="reviews"    element={<MerchantReviewsPage />} />
                         <Route path="warehouses" element={<MerchantWarehouse />} />
+                    </Route>
+                </Route>
+
+                <Route element={<PlatformAdminProtectedRoute />}>
+                    <Route path="/admin" element={<AdminLayout />}>
+                        <Route index element={<AdminDashboardPage />} />
+                        <Route path="stores" element={<AdminStoresPage />} />
+                        <Route path="products" element={<AdminProductsPage />} />
+                        <Route path="orders" element={<AdminOrdersPage />} />
+                        <Route path="transactions" element={<AdminTransactionsPage />} />
+                        <Route path="users" element={<AdminUsersPage />} />
+                        <Route path="categories" element={<AdminCategoriesPage />} />
+                        <Route path="maintenance" element={<AdminMaintenancePage />} />
                     </Route>
                 </Route>
 

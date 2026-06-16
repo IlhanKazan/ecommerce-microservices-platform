@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography,
     Stack, Box, Avatar, Chip, Table, TableBody, TableCell,
-    TableHead, TableRow, TextField, CircularProgress,
+    TableHead, TableRow, TextField, CircularProgress, Link,
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import { Link as RouterLink } from 'react-router-dom';
 import type { OrderDetail } from '../../../types/order';
 import { ORDER_STATUS_CONFIG } from '../../../utils/orderUtils';
 import { useUpdateOrderStatus } from '../../../query/useOrderQueries';
@@ -122,9 +123,18 @@ const MerchantOrderDetailModal: React.FC<Props> = ({ order, open, tenantId, onCl
                                                     variant="rounded"
                                                     sx={{ width: 32, height: 32 }}
                                                 />
-                                                <Typography variant="body2">
+                                                <Link
+                                                    component={RouterLink}
+                                                    to={`/product/${item.productId}`}
+                                                    target="_blank"
+                                                    rel="noopener"
+                                                    variant="body2"
+                                                    underline="hover"
+                                                    color="text.primary"
+                                                    sx={{ '&:hover': { color: 'primary.main' } }}
+                                                >
                                                     {item.productName}
-                                                </Typography>
+                                                </Link>
                                             </Stack>
                                         </TableCell>
                                         <TableCell align="center">{item.quantity}</TableCell>

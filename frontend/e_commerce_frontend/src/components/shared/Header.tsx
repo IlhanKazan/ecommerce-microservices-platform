@@ -11,6 +11,8 @@ import {
     AddBusiness as AddBusinessIcon,
     ShoppingCartOutlined as CartIcon,
     Search as SearchIcon,
+    AdminPanelSettings as AdminPanelSettingsIcon,
+    HistoryOutlined as HistoryIcon,
 } from '@mui/icons-material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { AppRoutes } from '../../utils/routes';
@@ -19,6 +21,8 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useCartStore } from '../../store/useCartStore';
 import { useBasketItemCount } from '../../query/useBasketQueries';
 import { useAutocomplete } from '../../query/useProductQueries';
+import { useRecentSearches } from '../../query/useUserQueries';
+import { userService } from '../../features/user/api/userService';
 import { useDebounce } from '../../hooks/useDebounce';
 import type { AutocompleteSuggestion } from '../../types/product';
 
@@ -39,6 +43,11 @@ const Header: React.FC = () => {
     const debouncedQ = useDebounce(inputValue, 300);
     const { data: suggestions = [] } = useAutocomplete(debouncedQ);
 
+    // Arama çubuğu boş + giriş yapılmışsa son aramaları göster; yazınca canlı öneriler.
+    const { data: recentSearches = [] } = useRecentSearches(isAuthenticated);
+    const showRecent = isAuthenticated && !inputValue.trim();
+    const searchOptions: (AutocompleteSuggestion | string)[] = showRecent ? recentSearches : suggestions;
+
     // --- SEPET SAYISI MANTIĞINI DEĞİŞTİRDİK ---
     const localItemCount = useCartStore((state) => state.getItemCount());
     const apiItemCount = useBasketItemCount();
@@ -56,6 +65,7 @@ const Header: React.FC = () => {
             return;
         }
         if (!inputValue.trim()) return;
+        if (isAuthenticated) userService.recordSearch(inputValue.trim()); // best-effort: son aramalar + AI sinyali
         navigate(`${AppRoutes.PRODUCT_LIST}?keyword=${encodeURIComponent(inputValue.trim())}`);
         setInputValue('');
     };
@@ -67,6 +77,7 @@ const Header: React.FC = () => {
             setInputValue('');
         } else if (option.trim()) {
             navigatedRef.current = true;
+            if (isAuthenticated) userService.recordSearch(option.trim());
             navigate(`${AppRoutes.PRODUCT_LIST}?keyword=${encodeURIComponent(option.trim())}`);
             setInputValue('');
         }
@@ -140,6 +151,21 @@ const Header: React.FC = () => {
                                 >
                                     <ListItemIcon><AddBusinessIcon color="secondary" /></ListItemIcon>
                                     <ListItemText primary="Mağaza Aç" />
+                                </ListItemButton>
+                            </ListItem>
+                        )}
+                        {user?.isPlatformAdmin && (
+                            <ListItem disablePadding>
+                                <ListItemButton
+                                    component={RouterLink}
+                                    to={AppRoutes.ADMIN_DASHBOARD}
+                                    onClick={() => setIsDrawerOpen(false)}
+                                >
+                                    <ListItemIcon><AdminPanelSettingsIcon color="error" /></ListItemIcon>
+                                    <ListItemText
+                                        primary="Admin Paneli"
+                                        primaryTypographyProps={{ fontWeight: 'bold', color: 'error.main' }}
+                                    />
                                 </ListItemButton>
                             </ListItem>
                         )}
@@ -230,11 +256,12 @@ const Header: React.FC = () => {
                         mx: 'auto',
                     }}
                 >
-                    <Autocomplete<AutocompleteSuggestion, false, false, true>
+                    <Autocomplete<AutocompleteSuggestion | string, false, false, true>
                         freeSolo
                         disableClearable
+                        openOnFocus
                         filterOptions={(x) => x}
-                        options={suggestions}
+                        options={searchOptions}
                         getOptionLabel={(opt) => (typeof opt === 'string' ? opt : opt.name)}
                         inputValue={inputValue}
                         onInputChange={(_, val, reason) => {
@@ -243,6 +270,20 @@ const Header: React.FC = () => {
                         onChange={handleOptionChange}
                         renderOption={(props, option) => {
                             const { key, ...rest } = props as { key: React.Key } & React.HTMLAttributes<HTMLLIElement>;
+                            // Son arama (string) — geçmiş ikonlu basit satır
+                            if (typeof option === 'string') {
+                                return (
+                                    <ListItem key={key} {...rest} dense disablePadding sx={{ px: 1.5, py: 0.5 }}>
+                                        <ListItemIcon sx={{ minWidth: 36 }}>
+                                            <HistoryIcon fontSize="small" color="action" />
+                                        </ListItemIcon>
+                                        <ListItemText
+                                            primary={option}
+                                            primaryTypographyProps={{ variant: 'body2', noWrap: true }}
+                                        />
+                                    </ListItem>
+                                );
+                            }
                             return (
                                 <ListItem key={key} {...rest} dense disablePadding sx={{ px: 1.5, py: 0.5 }}>
                                     <ListItemAvatar sx={{ minWidth: 44 }}>
@@ -312,7 +353,21 @@ const Header: React.FC = () => {
                     {!isMobile && (
                         <>
                             {auth.isAuthenticated ? (
-                                user?.isMerchant ? (
+                                <>
+                                {user?.isPlatformAdmin && (
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        startIcon={<AdminPanelSettingsIcon />}
+                                        component={RouterLink}
+                                        to={AppRoutes.ADMIN_DASHBOARD}
+                                        size="small"
+                                        sx={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}
+                                    >
+                                        Admin
+                                    </Button>
+                                )}
+                                {user?.isMerchant ? (
                                     <Button
                                         variant="outlined"
                                         color="primary"
@@ -336,7 +391,8 @@ const Header: React.FC = () => {
                                     >
                                         Mağaza Aç
                                     </Button>
-                                )
+                                )}
+                                </>
                             ) : (
                                 <Button
                                     color="inherit"

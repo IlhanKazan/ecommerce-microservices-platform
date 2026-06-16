@@ -8,6 +8,7 @@ import {
 import {
     Menu as MenuIcon,
     Dashboard as DashboardIcon,
+    Insights as AnalyticsIcon,
     Inventory as ProductIcon,
     ShoppingBag as OrderIcon,
     RateReview as ReviewIcon,
@@ -18,6 +19,7 @@ import {
     SwapHoriz as SwitchStoreIcon,
     Warehouse as WarehouseIcon,
     Storefront as StorefrontIcon,
+    AssignmentReturn as ReturnIcon,
 } from '@mui/icons-material';
 import { useMerchantStore } from '../../../store/useMerchantStore';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -31,8 +33,10 @@ type NavItem =
 
 const NAV_ITEMS: NavItem[] = [
     { text: 'Panel Özeti',      icon: <DashboardIcon />, path: '/merchant/dashboard' },
+    { text: 'Satış Analizi',    icon: <AnalyticsIcon />, path: '/merchant/analytics' },
     { text: 'Ürün Yönetimi',    icon: <ProductIcon />,   path: '/merchant/products' },
     { text: 'Siparişler',       icon: <OrderIcon />,     path: '/merchant/orders' },
+    { text: 'İadeler',          icon: <ReturnIcon />,    path: '/merchant/returns' },
     { text: 'Değerlendirmeler', icon: <ReviewIcon />,    path: '/merchant/reviews' },
     { divider: true },
     { text: 'Depo & Stok',      icon: <WarehouseIcon />, path: '/merchant/warehouses' },

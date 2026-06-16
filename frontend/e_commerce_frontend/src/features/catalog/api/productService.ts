@@ -18,6 +18,9 @@ import type {
     AutocompleteSuggestion,
     TenantStorefront,
     BrandFacet,
+    VariantSummary,
+    VariantRequest,
+    VariantStock,
 } from '../../../types/product';
 import type { BasketResponse, AddItemRequest } from '../../../types';
 
@@ -67,6 +70,38 @@ export const productService = {
         return normalizePage<ProductSummary>(response.data);
     },
 
+    // Id listesiyle ürün kartları (son gezilenler, birlikte alınanlar). Backend sırayı korur.
+    getProductsByIds: async (ids: number[]): Promise<ProductSummary[]> => {
+        if (!ids || ids.length === 0) return [];
+        const response = await api.post<ProductSummary[]>(
+            API_ENDPOINTS.SEARCH.PRODUCTS_BY_IDS,
+            { ids },
+        );
+        return response.data ?? [];
+    },
+
+    // Benzer ürünler (ürün detayı rail'i).
+    getSimilarProducts: async (productId: number, size = 10): Promise<ProductSummary[]> => {
+        const response = await api.get<ProductSummary[]>(
+            API_ENDPOINTS.SEARCH.SIMILAR(productId),
+            { params: { size } },
+        );
+        return response.data ?? [];
+    },
+
+    // İlgili ürünler (seed-bazlı) — "Senin İçin" rail'inin fallback'i.
+    getRelatedProducts: async (
+        seedIds: number[],
+        excludeIds: number[] = [],
+        size = 12,
+    ): Promise<ProductSummary[]> => {
+        const response = await api.post<ProductSummary[]>(
+            API_ENDPOINTS.SEARCH.RELATED,
+            { seedIds, excludeIds, size },
+        );
+        return response.data ?? [];
+    },
+
     autocomplete: async (q: string, size = 5): Promise<AutocompleteSuggestion[]> => {
         const response = await api.get<AutocompleteSuggestion[]>(
             API_ENDPOINTS.SEARCH.AUTOCOMPLETE,
@@ -82,6 +117,25 @@ export const productService = {
 
     getProductDetail: async (id: number): Promise<ProductDetail> => {
         const response = await api.get<ProductDetail>(API_ENDPOINTS.PRODUCT.BY_ID_PUBLIC(id));
+        return response.data;
+    },
+
+    // Detay sayfası fiziksel stok göstergesi — kartla aynı ES kaynağı (taze, cache'siz).
+    getProductAvailability: async (id: number): Promise<{ inStock: boolean; salesStatus: string | null }> => {
+        const response = await api.get<{ inStock: boolean; salesStatus: string | null }>(
+            API_ENDPOINTS.SEARCH.AVAILABILITY(id),
+        );
+        return response.data;
+    },
+
+    // Varyant-bazlı canlı stok — detay sayfasında stoksuz varyantı çarpılı göstermek + "Son X adet" için.
+    // stock-service authoritative; ürün cache'inden bağımsız taze.
+    getVariantStock: async (productIds: number[]): Promise<VariantStock[]> => {
+        if (productIds.length === 0) return [];
+        const response = await api.post<VariantStock[]>(
+            API_ENDPOINTS.STOCK.AVAILABILITY,
+            { productIds },
+        );
         return response.data;
     },
 
@@ -173,10 +227,21 @@ export const productService = {
         tenantId: number,
         page = 0,
         size = 20,
+        q = '',
+        salesStatus = '',
+        sort = '',
     ): Promise<PageResponse<TenantProductResponse>> => {
         const response = await api.get<unknown>(
             API_ENDPOINTS.PRODUCT.TENANT_LIST(tenantId),
-            { params: { page, size } },
+            {
+                params: {
+                    page,
+                    size,
+                    ...(q.trim() ? { q: q.trim() } : {}),
+                    ...(salesStatus ? { salesStatus } : {}),
+                    ...(sort ? { sort } : {}),
+                },
+            },
         );
         return normalizePage<TenantProductResponse>(response.data);
     },
@@ -212,6 +277,61 @@ export const productService = {
         await api.delete(API_ENDPOINTS.PRODUCT.TENANT_DELETE(tenantId, productId));
     },
 
+    // ─── Varyant (child product) yönetimi ──────────────────────────────
+    getVariants: async (tenantId: number, productId: number): Promise<VariantSummary[]> => {
+        const response = await api.get<VariantSummary[]>(
+            API_ENDPOINTS.PRODUCT.TENANT_VARIANTS(tenantId, productId),
+        );
+        return response.data;
+    },
+
+    createVariant: async (
+        tenantId: number,
+        productId: number,
+        body: VariantRequest,
+        idempotencyKey: string,
+    ): Promise<VariantSummary> => {
+        const response = await api.post<VariantSummary>(
+            API_ENDPOINTS.PRODUCT.TENANT_VARIANTS(tenantId, productId),
+            body,
+            { headers: idempotencyHeader(idempotencyKey) },
+        );
+        return response.data;
+    },
+
+    updateVariant: async (
+        tenantId: number,
+        variantId: number,
+        body: VariantRequest,
+        idempotencyKey: string,
+    ): Promise<VariantSummary> => {
+        const response = await api.put<VariantSummary>(
+            API_ENDPOINTS.PRODUCT.TENANT_VARIANT_BY_ID(tenantId, variantId),
+            body,
+            { headers: idempotencyHeader(idempotencyKey) },
+        );
+        return response.data;
+    },
+
+    deleteVariant: async (tenantId: number, variantId: number): Promise<void> => {
+        await api.delete(API_ENDPOINTS.PRODUCT.TENANT_VARIANT_BY_ID(tenantId, variantId));
+    },
+
+    // Matris üretici: tek istekte N varyant. Atomik — biri patlarsa hiçbiri eklenmez.
+    createVariantsBatch: async (
+        tenantId: number,
+        productId: number,
+        variants: VariantRequest[],
+        idempotencyKey: string,
+    ): Promise<VariantSummary[]> => {
+        const response = await api.post<VariantSummary[]>(
+            API_ENDPOINTS.PRODUCT.TENANT_VARIANTS_BATCH(tenantId, productId),
+            { variants },
+            { headers: idempotencyHeader(idempotencyKey) },
+        );
+        return response.data;
+    },
+
     updateSalesStatus: async (
         tenantId: number,
         productId: number,
@@ -221,6 +341,18 @@ export const productService = {
             API_ENDPOINTS.PRODUCT.TENANT_SALES_STATUS(tenantId, productId),
             null,
             { params: { status } },
+        );
+    },
+
+    setFeatured: async (
+        tenantId: number,
+        productId: number,
+        featured: boolean,
+    ): Promise<void> => {
+        await api.patch(
+            API_ENDPOINTS.PRODUCT.TENANT_FEATURED(tenantId, productId),
+            null,
+            { params: { featured } },
         );
     },
 
