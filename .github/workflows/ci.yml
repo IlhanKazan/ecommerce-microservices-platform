@@ -81,7 +81,7 @@ jobs:
         # Sizmis secret bulursa exit 1 -> job kirilir (secret main'e gecemez).
 
       - name: Trivy dependency CVE scan (CRITICAL = gate)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: fs
           scanners: vuln
