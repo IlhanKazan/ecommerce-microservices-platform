@@ -13,9 +13,10 @@ services:
       - e-commerce-network
     healthcheck:
       test: echo ruok | nc 127.0.0.1 2181 || exit 1
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -44,9 +45,10 @@ services:
       - e-commerce-network
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka:9092", "--list"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -87,9 +89,10 @@ services:
       - e-commerce-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -294,11 +297,12 @@ services:
       context: ./backend
       dockerfile: user-tenant-service/Dockerfile
     container_name: user-tenant-service
+    restart: on-failure
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_started
       minio-init:
@@ -306,6 +310,7 @@ services:
       keycloak:
         condition: service_started
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
       SPRING_PROFILES_ACTIVE: prod
       USER_DB_NAME: ${USER_DB_NAME}
       USER_DB_USERNAME: ${USER_DB_USERNAME}
@@ -332,14 +337,16 @@ services:
       context: ./backend
       dockerfile: mail-service/Dockerfile
     container_name: mail-service
+    restart: on-failure
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_healthy
+        condition: service_started
       mailhog:
         condition: service_started
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
       SPRING_PROFILES_ACTIVE: prod
       MAIL_DB_NAME: ${MAIL_DB_NAME}
       MAIL_DB_USERNAME: ${MAIL_DB_USERNAME}
@@ -358,18 +365,19 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 512m
 
   product-service:
     build:
       context: ./backend
       dockerfile: product-service/Dockerfile
     container_name: product-service
+    restart: on-failure
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_started
       minio-init:
@@ -377,6 +385,7 @@ services:
       keycloak:
         condition: service_started
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
       SPRING_PROFILES_ACTIVE: prod
       PRODUCT_DB_NAME: ${PRODUCT_DB_NAME}
       PRODUCT_DB_USERNAME: ${PRODUCT_DB_USERNAME}
@@ -402,6 +411,7 @@ services:
       context: ./backend
       dockerfile: api-gateway/Dockerfile
     container_name: api-gateway
+    restart: on-failure
     depends_on:
       user-tenant-service:
         condition: service_started
@@ -418,6 +428,7 @@ services:
       order-service:
         condition: service_started
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
       SPRING_PROFILES_ACTIVE: prod
       REALM_NAME: ${REALM_NAME}
     ports:
@@ -427,19 +438,21 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 512m
 
   basket-service:
     build:
       context: ./backend
       dockerfile: basket-service/Dockerfile
     container_name: basket-service
+    restart: on-failure
     depends_on:
       redis:
         condition: service_started
       keycloak:
         condition: service_started
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
       SPRING_PROFILES_ACTIVE: prod
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REALM_NAME: ${REALM_NAME}
@@ -451,16 +464,17 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 512m
 
   search-service:
     build:
       context: ./backend
       dockerfile: search-service/Dockerfile
     container_name: search-service
+    restart: on-failure
     depends_on:
       kafka:
-        condition: service_healthy
+        condition: service_started
       elasticsearch:
         condition: service_healthy
       redis:
@@ -468,6 +482,7 @@ services:
       keycloak:
         condition: service_started
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
       SPRING_PROFILES_ACTIVE: prod
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REALM_NAME: ${REALM_NAME}
@@ -486,16 +501,18 @@ services:
       context: ./backend
       dockerfile: stock-service/Dockerfile
     container_name: stock-service
+    restart: on-failure
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_started
       keycloak:
         condition: service_started
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
       SPRING_PROFILES_ACTIVE: prod
       STOCK_DB_NAME: ${STOCK_DB_NAME}
       STOCK_DB_USERNAME: ${STOCK_DB_USERNAME}
@@ -517,16 +534,18 @@ services:
       context: ./backend
       dockerfile: order-service/Dockerfile
     container_name: order-service
+    restart: on-failure
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_started
       keycloak:
         condition: service_started
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
       SPRING_PROFILES_ACTIVE: prod
       ORDER_DB_NAME: ${ORDER_DB_NAME}
       ORDER_DB_USERNAME: ${ORDER_DB_USERNAME}
@@ -553,16 +572,18 @@ services:
       context: ./backend
       dockerfile: payment-service/Dockerfile
     container_name: payment-service
+    restart: on-failure
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_started
       keycloak:
         condition: service_started
     environment:
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
       SPRING_PROFILES_ACTIVE: prod
       PAYMENT_DB_NAME: ${PAYMENT_DB_NAME}
       PAYMENT_DB_USERNAME: ${PAYMENT_DB_USERNAME}
