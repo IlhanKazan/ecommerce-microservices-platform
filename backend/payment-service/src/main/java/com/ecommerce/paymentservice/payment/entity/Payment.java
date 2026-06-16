@@ -72,4 +72,14 @@ public class Payment extends BaseEntity {
 
     @Column(name = "iyzico_transaction_id")
     private String iyzicoTransactionId;
+
+    // iyzico per-item paymentTransactionId — Refund API (iade) bununla çalışır (Cancel paymentId ile)
+    @Column(name = "payment_transaction_id")
+    private String paymentTransactionId;
+
+    @Column(name = "buyer_email", length = 320)
+    private String buyerEmail;
+
+    @Column(name = "buyer_name", length = 200)
+    private String buyerName;
 }

@@ -7,6 +7,7 @@ import com.ecommerce.paymentservice.payment.constant.PaymentStatus;
 import com.ecommerce.paymentservice.payment.constant.PaymentType;
 import com.ecommerce.paymentservice.payment.entity.Payment;
 import com.ecommerce.paymentservice.payment.domain.PaymentContext;
+import com.ecommerce.paymentservice.payment.domain.RefundResult;
 import com.ecommerce.paymentservice.payment.repository.PaymentRepository;
 import com.ecommerce.paymentservice.payment.domain.IyzicoStoredCard;
 import com.ecommerce.paymentservice.payment.service.PaymentProvisioningFailureRecorder;
@@ -104,6 +105,14 @@ public class PaymentServiceImpl implements PaymentService {
             payment.setOrderId(context.getReferenceId());
         }
 
+        // Alıcı bilgisini denormalize et (admin transaction listesinde "kim aldı")
+        if (context.getBuyer() != null) {
+            payment.setBuyerEmail(context.getBuyer().email());
+            String fullName = ((context.getBuyer().name() != null ? context.getBuyer().name() : "") + " "
+                    + (context.getBuyer().surname() != null ? context.getBuyer().surname() : "")).trim();
+            payment.setBuyerName(fullName.isEmpty() ? null : fullName);
+        }
+
         paymentRepository.save(payment);
 
         PaymentContext enrichedContext = PaymentContext.builder()
@@ -154,15 +163,105 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public void refundByOrderId(Long orderId, String transactionId) {
-        paymentRepository.findByOrderId(orderId).ifPresentOrElse(payment -> {
-            payment.setPaymentStatus(PaymentStatus.REFUNDED);
-            payment.setFailureReason("İade edildi");
-            payment.setFailedAt(LocalDateTime.now());
+    public RefundResult processRefund(Long orderId, String transactionId, BigDecimal amount, String kind) {
+        // PRODUCT_ORDER'da Payment.orderId NULL'dur (ödeme sipariş persist'inden önce). Önce iyzico txn id ile bul.
+        Optional<Payment> opt = (transactionId != null && !transactionId.isBlank())
+                ? paymentRepository.findByIyzicoTransactionId(transactionId)
+                : paymentRepository.findByOrderId(orderId);
+        if (opt.isEmpty()) {
+            log.warn("[REFUND] Ödeme kaydı bulunamadı — iade atlandı. OrderID: {}, txnId: {}", orderId, transactionId);
+            return new RefundResult(false, "Ödeme kaydı bulunamadı.", null);
+        }
+        Payment payment = opt.get();
+        if (payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
+            log.info("[REFUND] OrderID: {} zaten REFUNDED — idempotent atlandı.", orderId);
+            return new RefundResult(true, "Zaten iade edilmiş.", payment.getRefundedAmount());
+        }
+
+        BigDecimal refundAmount = amount != null ? amount : payment.getAmount();
+        try {
+            // İPTAL (aynı gün / settlement öncesi) → Cancel(paymentId). Başarısızsa Refund'a düş.
+            if ("CANCEL".equalsIgnoreCase(kind)) {
+                if (payment.getIyzicoTransactionId() == null) {
+                    return refundViaRefundApi(payment, refundAmount);
+                }
+                com.iyzipay.model.Cancel cancel = doCancel(payment.getIyzicoTransactionId());
+                if (!"success".equalsIgnoreCase(cancel.getStatus())) {
+                    log.warn("[REFUND] Cancel başarısız ({}) — Refund'a düşülüyor. OrderID: {}",
+                            cancel.getErrorMessage(), orderId);
+                    return refundViaRefundApi(payment, refundAmount);
+                }
+                markRefunded(payment, refundAmount);
+                log.info("[REFUND] iyzico Cancel başarılı. OrderID: {}", orderId);
+                return new RefundResult(true, "İptal başarılı.", refundAmount);
+            }
+            // İADE → Refund(paymentTransactionId, tutar)
+            return refundViaRefundApi(payment, refundAmount);
+        } catch (Exception e) {
+            log.error("[REFUND] iyzico iade hatası. OrderID: {}", orderId, e);
+            payment.setFailureReason("İade hatası: " + e.getMessage());
             paymentRepository.save(payment);
-            log.info("[REFUND] OrderID: {} için ödeme REFUNDED olarak işaretlendi. PaymentID: {}",
-                    orderId, payment.getId());
-        }, () -> log.warn("[REFUND] OrderID: {} için ödeme kaydı bulunamadı — iade atlandı.", orderId));
+            return new RefundResult(false, "İade işlemi başarısız: " + e.getMessage(), null);
+        }
+    }
+
+    // iyzico Refund API ile iade. paymentTransactionId yoksa (eski kayıt) yalnız statü güncellenir.
+    private RefundResult refundViaRefundApi(Payment payment, BigDecimal amount) {
+        if (payment.getPaymentTransactionId() == null) {
+            log.warn("[REFUND] paymentTransactionId yok (eski kayıt) → yalnız statü REFUNDED. OrderID: {}",
+                    payment.getOrderId());
+            markRefunded(payment, amount);
+            return new RefundResult(true, "Eski kayıt — yalnız statü güncellendi.", amount);
+        }
+        com.iyzipay.model.Refund refund = doRefund(payment.getPaymentTransactionId(), amount, payment.getCurrency());
+        if (!"success".equalsIgnoreCase(refund.getStatus())) {
+            log.error("[REFUND] iyzico Refund reddetti. OrderID: {}, hata: {}",
+                    payment.getOrderId(), refund.getErrorMessage());
+            payment.setFailureReason("İade reddedildi: " + refund.getErrorMessage());
+            paymentRepository.save(payment);
+            return new RefundResult(false, "İade reddedildi: " + refund.getErrorMessage(), null);
+        }
+        markRefunded(payment, amount);
+        log.info("[REFUND] iyzico Refund başarılı. OrderID: {}, tutar: {}", payment.getOrderId(), amount);
+        return new RefundResult(true, "İade başarılı.", amount);
+    }
+
+    private void markRefunded(Payment payment, BigDecimal amount) {
+        payment.setPaymentStatus(PaymentStatus.REFUNDED);
+        payment.setRefundedAmount(amount);
+        paymentRepository.save(payment);
+    }
+
+    private com.iyzipay.model.Cancel doCancel(String paymentId) {
+        com.iyzipay.request.CreateCancelRequest req = new com.iyzipay.request.CreateCancelRequest();
+        req.setLocale(com.iyzipay.model.Locale.TR.getValue());
+        req.setConversationId(java.util.UUID.randomUUID().toString());
+        req.setPaymentId(paymentId);
+        req.setIp("127.0.0.1");
+        return com.iyzipay.model.Cancel.create(req, iyzicoOptions);
+    }
+
+    private com.iyzipay.model.Refund doRefund(String paymentTransactionId, BigDecimal amount, String currency) {
+        com.iyzipay.request.CreateRefundRequest req = new com.iyzipay.request.CreateRefundRequest();
+        req.setLocale(com.iyzipay.model.Locale.TR.getValue());
+        req.setConversationId(java.util.UUID.randomUUID().toString());
+        req.setPaymentTransactionId(paymentTransactionId);
+        req.setPrice(amount);
+        req.setCurrency(currency != null ? currency : "TRY");
+        req.setIp("127.0.0.1");
+        return com.iyzipay.model.Refund.create(req, iyzicoOptions);
+    }
+
+    // iyzico response'undan ilk paymentItem'ın transaction id'si (Refund API bununla çalışır)
+    private String firstPaymentTransactionId(com.iyzipay.model.Payment resp) {
+        try {
+            if (resp.getPaymentItems() != null && !resp.getPaymentItems().isEmpty()) {
+                return resp.getPaymentItems().get(0).getPaymentTransactionId();
+            }
+        } catch (Exception e) {
+            log.warn("paymentTransactionId çıkarılamadı: {}", e.getMessage());
+        }
+        return null;
     }
 
     private BigDecimal resolveCommissionRate(Long tenantId, BigDecimal contextRate) {
@@ -192,6 +291,8 @@ public class PaymentServiceImpl implements PaymentService {
             payment.setPaymentStatus(PaymentStatus.SUCCESS);
             payment.setPaidAt(LocalDateTime.now());
             payment.setIyzicoTransactionId(iyzicoResponse.getPaymentId());
+            // İade için per-item transaction id'yi sakla (iyzico Refund API bununla çalışır)
+            payment.setPaymentTransactionId(firstPaymentTransactionId(iyzicoResponse));
 
             if (context != null && context.getType() == PaymentType.SUBSCRIPTION) {
                 try {
