@@ -9,13 +9,16 @@ import com.ecommerce.productservice.product.constant.ProductStatus;
 import com.ecommerce.productservice.product.constant.SalesStatus;
 import com.ecommerce.productservice.product.entity.Product;
 import com.ecommerce.productservice.product.query.ProductValidationInfo;
+import com.ecommerce.productservice.product.query.StockGroupInfo;
 import com.ecommerce.productservice.product.repository.ProductRepository;
 import com.ecommerce.productservice.product.service.InternalProductService;
+import com.ecommerce.productservice.product.util.PriceCalculator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -48,6 +51,16 @@ public class InternalProductServiceImpl implements InternalProductService {
                     "Bu ürün stokta yok.", "PRODUCT_OUT_OF_STOCK");
         }
 
+        // Varyantı olan ana ürün doğrudan satılamaz — müşteri bir varyant (ör. beden/numara) seçmeli.
+        // Stok ve satış varyant (child) üzerinden yürür; numarasız parent siparişi engellenir.
+        boolean hasVariants = productRepository.existsByParentProductIdAndStatus(
+                product.getId(), ProductStatus.ACTIVE);
+        if (hasVariants) {
+            throw new BusinessException(
+                    "Bu ürün için lütfen bir seçenek (ör. beden/numara) seçin.",
+                    "VARIANT_SELECTION_REQUIRED");
+        }
+
         // Mağaza duraklatılmış/kapalıysa satın alma engellenir. UTS'ye ulaşılamazsa (storefront null)
         // fail-open: checkout'u kilitlemektense canlı durumu bilmediğimizde geçir.
         TenantStorefrontResponse storefront = userTenantClientAdapter.getStorefront(tenantId);
@@ -57,16 +70,18 @@ public class InternalProductServiceImpl implements InternalProductService {
                     "Bu mağaza şu anda satış yapmıyor.", "STORE_NOT_AVAILABLE");
         }
 
+        // Checkout indirimli fiyattan tahsil edilmeli — geçerli indirim varsa onu, yoksa liste fiyatını döndür.
         return new ProductValidationInfo(
                 product.getId(),
                 product.getTenantId(),
                 product.getSku(),
                 product.getName(),
-                product.getPrice(),
+                PriceCalculator.effectivePrice(product.getPrice(), product.getDiscountedPrice()),
                 product.getCurrency(),
                 product.getStatus().name(),
                 product.getSalesStatus().name(),
-                product.getMainImageUrl()
+                product.getMainImageUrl(),
+                hasVariants
         );
     }
 
@@ -84,6 +99,54 @@ public class InternalProductServiceImpl implements InternalProductService {
         }
         log.info("[REINDEX] Tamamlandı. {} ürün için event yazıldı.", products.size());
         return products.size();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StockGroupInfo resolveStockGroup(Long productId) {
+        Product product = productRepository.findById(productId).orElse(null);
+        if (product == null) {
+            // Defensif: ürün yoksa kendi id'siyle dön (search bu id'yi bulamazsa no-op).
+            return new StockGroupInfo(productId, List.of(productId));
+        }
+
+        // Varyant (child) ise hedef parent'tır; inStock'u parent'ın TÜM aktif varyantları belirler.
+        if (product.getParentProduct() != null) {
+            Long parentId = product.getParentProduct().getId();
+            List<Long> members = productRepository.findVariantIdsByParentIdAndStatus(parentId, ProductStatus.ACTIVE);
+            return new StockGroupInfo(parentId, members.isEmpty() ? List.of(productId) : members);
+        }
+
+        // Parent/standalone: varyantı varsa inStock'u aktif varyantlar belirler, yoksa ürünün kendi stoğu.
+        List<Long> activeVariantIds = productRepository.findVariantIdsByParentIdAndStatus(productId, ProductStatus.ACTIVE);
+        return new StockGroupInfo(productId, activeVariantIds.isEmpty() ? List.of(productId) : activeVariantIds);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> getSalesAggregationIds(Long productId) {
+        // Ürünün kendisi (standalone/parent) + tüm varyant child'ları (DELETED dahil — geçmiş satış)
+        List<Long> ids = new ArrayList<>();
+        ids.add(productId);
+        ids.addAll(productRepository.findVariantIdsByParentId(productId));
+        return ids;
+    }
+
+    @Override
+    @Transactional
+    public void recordSales(java.util.List<com.ecommerce.contracts.event.order.OrderItemSnapshotPayload> items) {
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+        for (var item : items) {
+            if (item.productId() == null || item.quantity() == null || item.quantity() <= 0) {
+                continue;
+            }
+            // Varyant satıldıysa sale_count parent'ta toplanır (katalog/popülerlik parent bazında).
+            Long catalogId = productRepository.findCatalogProductId(item.productId()).orElse(item.productId());
+            productRepository.incrementSaleCount(catalogId, item.quantity());
+        }
+        log.info("[SALES] {} kalem için sale_count güncellendi.", items.size());
     }
 
     @Override

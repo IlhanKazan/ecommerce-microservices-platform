@@ -9,6 +9,7 @@ import com.ecommerce.productservice.outbox.service.OutboxService;
 import com.ecommerce.productservice.product.constant.ProductStatus;
 import com.ecommerce.productservice.product.constant.SalesStatus;
 import com.ecommerce.productservice.product.command.ProductCreateContext;
+import com.ecommerce.productservice.product.command.VariantCommand;
 import com.ecommerce.productservice.product.entity.Product;
 import com.ecommerce.productservice.product.query.ProductDetailInfo;
 import com.ecommerce.productservice.product.query.ProductInfo;
@@ -29,7 +30,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -157,6 +161,184 @@ public class TenantProductServiceImpl implements TenantProductService {
         return updatedProduct;
     }
 
+    // ─── Varyant (child product) yönetimi ───────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Product> getVariants(Long tenantId, Long parentProductId) {
+        // Parent'ın tenant'a ait olduğunu doğrula (yetki + 404)
+        getProductByIdAndTenantId(parentProductId, tenantId);
+        return productRepository.findByParentProductIdAndStatusNot(parentProductId, ProductStatus.DELETED);
+    }
+
+    @Override
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "tenant-product", key = "#tenantId + ':' + #parentProductId"),
+            @CacheEvict(cacheNames = "public-product", key = "#parentProductId")
+    })
+    public Product createVariant(Long tenantId, Long parentProductId, VariantCommand command, java.util.UUID keycloakId) {
+        Product parent = getProductByIdAndTenantId(parentProductId, tenantId);
+
+        // Derinlik 1 — bir varyantın altına varyant eklenemez
+        if (parent.getParentProduct() != null) {
+            throw new BusinessException(
+                    "Bir varyantın altına varyant eklenemez.", "INVALID_VARIANT_PARENT");
+        }
+        if (command.attributes() == null || command.attributes().isEmpty()) {
+            throw new BusinessException(
+                    "Varyant özellikleri (ör. Renk/Numara) boş olamaz.", "VARIANT_ATTRIBUTES_REQUIRED");
+        }
+
+        // Aynı kombinasyonda varyant zaten varsa engelle
+        boolean duplicate = productRepository
+                .findByParentProductIdAndStatusNot(parentProductId, ProductStatus.DELETED)
+                .stream()
+                .anyMatch(v -> command.attributes().equals(v.getAttributes()));
+        if (duplicate) {
+            throw new BusinessException(
+                    "Bu özellik kombinasyonunda bir varyant zaten mevcut.", "VARIANT_DUPLICATE");
+        }
+
+        Product variant = Product.builder()
+                .tenantId(tenantId)
+                .category(parent.getCategory())
+                .parentProduct(parent)
+                .name(resolveVariantName(parent, command))
+                .description(parent.getDescription())
+                .sku(command.sku())
+                .brand(parent.getBrand())
+                .price(command.price())
+                .currency(parent.getCurrency())
+                .mainImageUrl(command.mainImageUrl() != null ? command.mainImageUrl() : parent.getMainImageUrl())
+                .attributes(command.attributes())
+                .minOrderQty(parent.getMinOrderQty())
+                .maxOrderQty(parent.getMaxOrderQty())
+                .createdByUserId(keycloakId)
+                .build();
+        variant.setDiscountedPrice(sanitizeDiscount(command.price(), command.discountedPrice()));
+
+        Product saved = productRepository.save(variant);
+        outboxService.publishProductCreatedEvent(saved);
+        log.info("Varyant oluşturuldu. ParentID: {}, VariantID: {}", parentProductId, saved.getId());
+        return saved;
+    }
+
+    // Matris üretici: tek istekte N varyant. Tek transaction → atomik (biri patlarsa hepsi geri alınır).
+    // Hem mevcut (DB) hem batch-içi kombinasyon dedup'ı uygulanır.
+    @Override
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "tenant-product", key = "#tenantId + ':' + #parentProductId"),
+            @CacheEvict(cacheNames = "public-product", key = "#parentProductId")
+    })
+    public List<Product> createVariantsBatch(Long tenantId, Long parentProductId, List<VariantCommand> commands, java.util.UUID keycloakId) {
+        if (commands == null || commands.isEmpty()) {
+            throw new BusinessException("Varyant listesi boş olamaz.", "VARIANT_BATCH_EMPTY");
+        }
+
+        Product parent = getProductByIdAndTenantId(parentProductId, tenantId);
+        if (parent.getParentProduct() != null) {
+            throw new BusinessException("Bir varyantın altına varyant eklenemez.", "INVALID_VARIANT_PARENT");
+        }
+
+        // Mevcut (silinmemiş) kombinasyonlar + batch-içi tekrarları yakalamak için seen set'i
+        Set<Map<String, String>> seen = productRepository
+                .findByParentProductIdAndStatusNot(parentProductId, ProductStatus.DELETED)
+                .stream()
+                .map(Product::getAttributes)
+                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
+
+        List<Product> toSave = new ArrayList<>();
+        for (VariantCommand command : commands) {
+            if (command.attributes() == null || command.attributes().isEmpty()) {
+                throw new BusinessException(
+                        "Varyant özellikleri (ör. Renk/Numara) boş olamaz.", "VARIANT_ATTRIBUTES_REQUIRED");
+            }
+            if (!seen.add(command.attributes())) {
+                throw new BusinessException(
+                        "Bu özellik kombinasyonunda bir varyant zaten mevcut: " + command.attributes(),
+                        "VARIANT_DUPLICATE");
+            }
+
+            Product variant = Product.builder()
+                    .tenantId(tenantId)
+                    .category(parent.getCategory())
+                    .parentProduct(parent)
+                    .name(resolveVariantName(parent, command))
+                    .description(parent.getDescription())
+                    .sku(command.sku())
+                    .brand(parent.getBrand())
+                    .price(command.price())
+                    .currency(parent.getCurrency())
+                    .mainImageUrl(command.mainImageUrl() != null ? command.mainImageUrl() : parent.getMainImageUrl())
+                    .attributes(command.attributes())
+                    .minOrderQty(parent.getMinOrderQty())
+                    .maxOrderQty(parent.getMaxOrderQty())
+                    .createdByUserId(keycloakId)
+                    .build();
+            variant.setDiscountedPrice(sanitizeDiscount(command.price(), command.discountedPrice()));
+            toSave.add(variant);
+        }
+
+        List<Product> saved = productRepository.saveAll(toSave);
+        for (Product v : saved) {
+            outboxService.publishProductCreatedEvent(v);
+        }
+        log.info("{} varyant toplu oluşturuldu. ParentID: {}", saved.size(), parentProductId);
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "tenant-product", allEntries = true),
+            @CacheEvict(cacheNames = "public-product", allEntries = true)
+    })
+    public Product updateVariant(Long tenantId, Long variantId, VariantCommand command) {
+        Product variant = getProductByIdAndTenantId(variantId, tenantId);
+        if (variant.getParentProduct() == null) {
+            throw new BusinessException("Bu ürün bir varyant değil.", "NOT_A_VARIANT");
+        }
+        if (command.attributes() == null || command.attributes().isEmpty()) {
+            throw new BusinessException(
+                    "Varyant özellikleri boş olamaz.", "VARIANT_ATTRIBUTES_REQUIRED");
+        }
+
+        // Kombinasyon başka bir varyantta kullanılıyorsa engelle (kendisi hariç)
+        boolean duplicate = productRepository
+                .findByParentProductIdAndStatusNot(variant.getParentProduct().getId(), ProductStatus.DELETED)
+                .stream()
+                .anyMatch(v -> !v.getId().equals(variantId) && command.attributes().equals(v.getAttributes()));
+        if (duplicate) {
+            throw new BusinessException(
+                    "Bu özellik kombinasyonunda başka bir varyant mevcut.", "VARIANT_DUPLICATE");
+        }
+
+        variant.setSku(command.sku());
+        variant.setPrice(command.price());
+        variant.setDiscountedPrice(sanitizeDiscount(command.price(), command.discountedPrice()));
+        variant.setAttributes(command.attributes());
+        if (command.mainImageUrl() != null) {
+            variant.setMainImageUrl(command.mainImageUrl());
+        }
+        variant.setName(resolveVariantName(variant.getParentProduct(), command));
+
+        Product saved = productRepository.save(variant);
+        outboxService.publishProductUpdatedEvent(saved);
+        log.info("Varyant güncellendi. VariantID: {}", variantId);
+        return saved;
+    }
+
+    // İsim verilmediyse parent adı + kombinasyon değerlerinden türet (ör. "Klasik Ayakkabı - Siyah / 42")
+    private String resolveVariantName(Product parent, VariantCommand command) {
+        if (command.name() != null && !command.name().isBlank()) {
+            return command.name();
+        }
+        String combo = String.join(" / ", command.attributes().values());
+        return parent.getName() + " - " + combo;
+    }
+
     // İndirimli fiyat ancak pozitif ve asıl fiyattan küçükse geçerli; aksi halde indirim yok (null)
     private java.math.BigDecimal sanitizeDiscount(java.math.BigDecimal price, java.math.BigDecimal discountedPrice) {
         if (price == null || discountedPrice == null) return null;
@@ -182,7 +364,40 @@ public class TenantProductServiceImpl implements TenantProductService {
                 && !orphans.contains(oldMainImageUrl)) {
             orphans.add(oldMainImageUrl);
         }
+
+        // Paylaşılan görseli koru: parent/kardeş/varyant hâlâ kullanıyorsa MinIO'dan silme.
+        Set<String> stillReferenced = relatedImageUrls(updated);
+        orphans.removeIf(stillReferenced::contains);
+
         imageService.deleteImages(orphans);
+    }
+
+    // Bu ürünle görsel paylaşabilecek diğer (silinmemiş) ürünlerin görsel URL'leri.
+    // Varyant ise parent + kardeş varyantlar; ana ürün ise varyantları. createVariant parent'ın
+    // mainImageUrl'ini varyanta kopyaladığından, varyant silme/güncelleme parent görselini uçurmasın.
+    private Set<String> relatedImageUrls(Product product) {
+        List<Product> related = new ArrayList<>();
+        if (product.getParentProduct() != null) {
+            Product parent = product.getParentProduct();
+            related.add(parent);
+            related.addAll(productRepository.findByParentProductIdAndStatusNot(parent.getId(), ProductStatus.DELETED));
+        } else {
+            related.addAll(productRepository.findByParentProductIdAndStatusNot(product.getId(), ProductStatus.DELETED));
+        }
+
+        Set<String> urls = new HashSet<>();
+        for (Product p : related) {
+            if (p.getId().equals(product.getId())) {
+                continue; // kendisi hariç
+            }
+            if (p.getMainImageUrl() != null) {
+                urls.add(p.getMainImageUrl());
+            }
+            if (p.getImageUrls() != null) {
+                urls.addAll(p.getImageUrls());
+            }
+        }
+        return urls;
     }
 
     @Override
@@ -208,6 +423,11 @@ public class TenantProductServiceImpl implements TenantProductService {
         if (product.getImageUrls() != null) {
             images.addAll(product.getImageUrls());
         }
+
+        // Paylaşılan görseli koru: parent/kardeş/varyant hâlâ kullanıyorsa MinIO'dan silme
+        // (ör. varyant parent'ın mainImageUrl'ini paylaşıyorsa, varyant silinince parent görseli uçmasın).
+        Set<String> stillReferenced = relatedImageUrls(product);
+        images.removeIf(stillReferenced::contains);
 
         product.setStatus(ProductStatus.DELETED);
         product.setSalesStatus(SalesStatus.OUT_OF_STOCK);
@@ -239,6 +459,9 @@ public class TenantProductServiceImpl implements TenantProductService {
 
         Product product = this.getProductByIdAndTenantId(productId, tenantId);
 
+        List<Long> variantIds = productRepository
+                .findVariantIdsByParentIdAndStatus(product.getId(), ProductStatus.ACTIVE);
+
         return new ProductInfo(
                 product.getId(),
                 product.getTenantId(),
@@ -253,7 +476,12 @@ public class TenantProductServiceImpl implements TenantProductService {
                 product.getMainImageUrl(),
                 product.getStatus(),
                 product.getSalesStatus(),
-                product.getAttributes()
+                product.getAttributes(),
+                !variantIds.isEmpty(),
+                variantIds,
+                product.getViewCount(),
+                product.getSaleCount(),
+                product.getIsFeatured()
         );
     }
 
@@ -272,7 +500,6 @@ public class TenantProductServiceImpl implements TenantProductService {
                 product.getSku(),
                 product.getBrand(),
                 product.getPrice(),
-                product.getDiscountPercentage(),
                 product.getDiscountedPrice(),
                 product.getCurrency(),
                 product.getMainImageUrl(),
@@ -296,28 +523,61 @@ public class TenantProductServiceImpl implements TenantProductService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<ProductInfo> getTenantProducts(Long tenantId, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+    public PageResponse<ProductInfo> getTenantProducts(Long tenantId, String q, String salesStatus, String sort, int page, int size) {
+        // Sıralama Pageable üzerinden (JPQL'de ORDER BY yok). Varsayılan: en yeni.
+        Sort sortSpec = switch (sort == null ? "newest" : sort) {
+            case "sales" -> Sort.by(Sort.Direction.DESC, "saleCount");
+            case "views" -> Sort.by(Sort.Direction.DESC, "viewCount");
+            case "price_asc" -> Sort.by(Sort.Direction.ASC, "price");
+            case "price_desc" -> Sort.by(Sort.Direction.DESC, "price");
+            default -> Sort.by(Sort.Direction.DESC, "createdAt");
+        };
+        Pageable pageable = PageRequest.of(page, size, sortSpec);
+
+        // q: LIKE deseni (lowercase, %...%) ya da null. salesStatus: enum ya da null.
+        String likePattern = (q == null || q.isBlank())
+                ? null
+                : "%" + q.trim().toLowerCase() + "%";
+        SalesStatus statusFilter = (salesStatus == null || salesStatus.isBlank())
+                ? null
+                : SalesStatus.valueOf(salesStatus);
 
         Page<Product> products = productRepository
-                .findAllByTenantIdAndStatusNot(tenantId, ProductStatus.DELETED, pageable);
+                .searchForTenant(tenantId, likePattern, statusFilter, pageable);
 
-        Page<ProductInfo> infoPage = products.map(product -> new ProductInfo(
-                product.getId(),
-                product.getTenantId(),
-                product.getCategory().getId(),
-                product.getCategory().getName(),
-                product.getParentProduct() != null
-                        ? product.getParentProduct().getId() : null,
-                product.getName(),
-                product.getSku(),
-                product.getPrice(),
-                product.getCurrency(),
-                product.getMainImageUrl(),
-                product.getStatus(),
-                product.getSalesStatus(),
-                product.getAttributes()
-        ));
+        // Sayfadaki ana ürünlerin ACTIVE varyant id'lerini tek sorguda topla (N+1 yok).
+        List<Long> parentIds = products.getContent().stream().map(Product::getId).toList();
+        Map<Long, List<Long>> variantIdsByParent = parentIds.isEmpty()
+                ? Map.of()
+                : productRepository.findVariantIdRowsByParentIds(parentIds, ProductStatus.ACTIVE).stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        row -> (Long) row[0],
+                        java.util.stream.Collectors.mapping(row -> (Long) row[1], java.util.stream.Collectors.toList())));
+
+        Page<ProductInfo> infoPage = products.map(product -> {
+            List<Long> variantIds = variantIdsByParent.getOrDefault(product.getId(), List.of());
+            return new ProductInfo(
+                    product.getId(),
+                    product.getTenantId(),
+                    product.getCategory().getId(),
+                    product.getCategory().getName(),
+                    product.getParentProduct() != null
+                            ? product.getParentProduct().getId() : null,
+                    product.getName(),
+                    product.getSku(),
+                    product.getPrice(),
+                    product.getCurrency(),
+                    product.getMainImageUrl(),
+                    product.getStatus(),
+                    product.getSalesStatus(),
+                    product.getAttributes(),
+                    !variantIds.isEmpty(),
+                    variantIds,
+                    product.getViewCount(),
+                    product.getSaleCount(),
+                    product.getIsFeatured()
+            );
+        });
 
         return PageResponse.of(infoPage);
     }
@@ -344,6 +604,29 @@ public class TenantProductServiceImpl implements TenantProductService {
         productRepository.save(product);
 
         outboxService.publishProductUpdatedEvent(product);
+    }
+
+    @Override
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "tenant-product", key = "#tenantId + ':' + #productId"),
+            @CacheEvict(cacheNames = "public-product", key = "#productId")
+    })
+    public void setFeatured(Long tenantId, Long productId, boolean featured) {
+        Product product = getProductByIdAndTenantId(productId, tenantId);
+
+        // Varyant (child) öne çıkarılamaz — vitrin yalnızca ana ürünleri gösterir.
+        if (product.getParentProduct() != null) {
+            throw new BusinessException(
+                    "Varyant öne çıkarılamaz; ana ürünü öne çıkarın.", "CANNOT_FEATURE_VARIANT");
+        }
+
+        product.setIsFeatured(featured);
+        productRepository.save(product);
+
+        outboxService.publishProductUpdatedEvent(product);
+        log.info("Öne çıkan durumu güncellendi. Tenant: {}, Product: {}, featured: {}",
+                tenantId, productId, featured);
     }
 
 }

@@ -13,5 +13,7 @@ public record CategoryInfo(
         Integer level,
         String fullPath,
         Integer displayOrder,
+        Boolean isActive,
+        Long parentId,
         List<CategoryInfo> subCategories
 ) implements Serializable {}

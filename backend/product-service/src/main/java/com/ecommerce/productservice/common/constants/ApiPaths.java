@@ -22,6 +22,8 @@ public class ApiPaths {
     @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class Category {
         public static final String CATEGORIES = BASE_PATH_V1 + "/categories";
+        // Platform admin — mevcut /api/v1/products/** gateway route'u altında, method-level hasRole ile korunur
+        public static final String ADMIN_CATEGORIES = BASE_PATH_V1 + "/products/admin/categories";
     }
 
     @NoArgsConstructor(access = AccessLevel.PRIVATE)

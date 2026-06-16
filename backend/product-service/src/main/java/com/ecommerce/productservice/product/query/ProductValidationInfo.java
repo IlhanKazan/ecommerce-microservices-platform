@@ -12,5 +12,6 @@ public record ProductValidationInfo(
         String currency,
         String status,
         String salesStatus,
-        String mainImageUrl
+        String mainImageUrl,
+        boolean hasVariants
 ) implements Serializable {}

@@ -4,6 +4,7 @@ import com.ecommerce.common.event.constants.EventConstants;
 import com.ecommerce.common.exception.SystemException;
 import com.ecommerce.contracts.event.product.ProductCreatedEventPayload;
 import com.ecommerce.contracts.event.product.ProductDeletedEventPayload;
+import com.ecommerce.contracts.event.product.ProductStatsChangedEventPayload;
 import com.ecommerce.contracts.event.product.ProductUpdatedEventPayload;
 import com.ecommerce.contracts.event.review.ReviewCreatedEventPayload;
 import com.ecommerce.productservice.outbox.entity.Outbox;
@@ -44,7 +45,8 @@ public class OutboxServiceImpl implements OutboxService {
                     product.getMainImageUrl(),
                     product.getAttributes(),
                     product.getTags(),
-                    product.getDiscountedPrice()
+                    product.getDiscountedPrice(),
+                    product.getParentProduct() != null ? product.getParentProduct().getId() : null
             );
 
             Outbox outbox = Outbox.builder()
@@ -84,7 +86,9 @@ public class OutboxServiceImpl implements OutboxService {
                     product.getSalesStatus().name(),
                     product.getRatingAverage(),
                     product.getReviewCount(),
-                    product.getDiscountedPrice()
+                    product.getDiscountedPrice(),
+                    product.getParentProduct() != null ? product.getParentProduct().getId() : null,
+                    product.getIsFeatured()
             );
 
             Outbox outbox = Outbox.builder()
@@ -99,6 +103,31 @@ public class OutboxServiceImpl implements OutboxService {
 
         } catch (JsonProcessingException e) {
             log.error("Outbox payload JSON çevrim hatası: {}", e.getMessage());
+            throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void publishProductStatsChangedEvent(Product product) {
+        try {
+            var payload = new ProductStatsChangedEventPayload(
+                    product.getId(),
+                    product.getViewCount(),
+                    product.getSaleCount()
+            );
+
+            Outbox outbox = Outbox.builder()
+                    .aggregateType(EventConstants.AGGREGATE_PRODUCT)
+                    .aggregateId(product.getId().toString())
+                    .messageType(EventConstants.EVENT_PRODUCT_STATS_CHANGED)
+                    .messagePayload(objectMapper.writeValueAsString(payload))
+                    .build();
+
+            outboxRepository.save(outbox);
+
+        } catch (JsonProcessingException e) {
+            log.error("Stats outbox JSON çevrim hatası: {}", e.getMessage());
             throw new SystemException("Event JSON parse hatası", "JSON_PROCESSING_ERROR");
         }
     }

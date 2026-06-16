@@ -7,5 +7,6 @@ public interface OutboxService {
     void publishProductCreatedEvent(Product product);
     void publishProductDeletedEvent(Product product);
     void publishProductUpdatedEvent(Product product);
+    void publishProductStatsChangedEvent(Product product);
     void publishReviewCreatedEvent(ProductReview review);
 }

@@ -15,7 +15,6 @@ public record ProductDetailResponse(
         String sku,
         String brand,
         BigDecimal price,
-        BigDecimal discountPercentage,
         BigDecimal discountedPrice,
         String currency,
         String mainImageUrl,

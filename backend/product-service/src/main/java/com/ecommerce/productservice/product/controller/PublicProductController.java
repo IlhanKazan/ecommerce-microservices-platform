@@ -28,6 +28,7 @@ public class PublicProductController {
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> getProductById(@PathVariable Long id) {
         PublicProductInfo product = queryProductService.getPublicProductInfo(id);
+        queryProductService.recordView(id); // best-effort görüntülenme sayacı
         ProductResponse response = productMapper.toResponseFromPublicInfo(product);
         return ResponseEntity.ok(response);
     }
