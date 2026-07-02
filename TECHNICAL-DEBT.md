@@ -173,6 +173,17 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 
 ## 🟡 Kalite / DX
 
+### AI servisi (backend-ai) MVP durumunda — temizlik borcu 🟡 (2026-07-02 eklendi)
+- [ ] **Durum:** FastAPI AI servisi (yorum özeti, auto-tagging, stok insight, chatbot) ilk kez yazıldı ve MVP/scaffold halinde commit'lendi. Çalışır durumda ama production-grade değil.
+- **Bilinen borçlar:**
+  - Kod aşırı yorumlu ("deli gibi açıklama") — geliştirme sırasında bırakılan açıklayıcı yorumlar temizlenmeli, sadece "neden" yorumları kalmalı.
+  - Test yok (unit/integration). En azından chat tool-calling ve review-summary servisleri için pytest eklenmeli.
+  - Hata yönetimi/retry pattern'leri Spring servislerdeki standarda (retry, structured logging) tam oturmadı.
+  - LLM sağlayıcı soyutlaması (openai/gemini factory) var ama fallback/timeout/rate-limit davranışı gözden geçirilmeli.
+  - Downstream HTTP client'ları (product/order/search/stock/keycloak) için circuit breaker/timeout gözden geçirilmeli.
+  - Auth: JWT dual-mode (issuer public + JWKS internal) uygulandı, runtime doğrulaması yapılmalı.
+- **Öncelik:** Demo sonrası kalite fazında ele al. Şimdilik "çalışıyor + commit'li" hedefi karşılandı.
+
 ### common-lib ağır transitive dependency sorunu
 - [ ] `common-lib`'de `spring-cloud-starter-openfeign:5.0.0` hardcode edilmiş. Bu versiyon Jackson 3.x (`tools.jackson`) bekliyor; Spring Boot 3.5.x Jackson 2.x sağlıyor. Feign kullanmayan servisler (örn. `mail-service`) başlarken `FeignAutoConfiguration` patlamaya neden oluyor — şimdilik exclusion ile geçiştiriliyor.
 - Kök sorun: `common-lib`'e güvenlik, Redis, Feign, AOP gibi tüm çapraz endişeler yığılmış. Bu yüzden hiçbir servis-spesifik utility (örn. `ImageService`, MinIO client) common-lib'e eklenemez — o servisi kullanmayan her servis de o bağımlılığı çeker.
@@ -245,8 +256,11 @@ Kategori öncelik sırası: 🔴 kritik (güvenlik / veri kaybı) → 🟠 yüks
 ### Parent POM
 - [ ] Her servis ayrı parent-less, Spring Boot versiyonu hardcoded her pom.xml'de. Tek parent POM'da topla.
 
-### Service discovery
+### Service discovery + gateway stale-DNS sorunu 🟡 (nice-to-have ama operasyonel risk)
 - [ ] URL'ler env'den hardcoded. Eureka/Consul veya k8s service DNS.
+- **Somut sorun (2026-06-17 yaşandı):** `docker compose up -d --build <servis>` bir backend container'ını recreate edince IP'si değişir (ör. search-service `172.23.0.19 → 172.23.0.22`). Spring Cloud Gateway (Reactor Netty) eski IP'yi **DNS cache'inde** tutar → `Connection refused` → o servisin tüm route'larında **500** (servis aslında sağlıklı, gateway bayat IP'ye bağlanıyor). product/categories gibi taşınmamış servisler etkilenmez, sadece recreate edilen servis kırılır.
+- **Geçici çözüm (dev):** Herhangi bir backend servisi rebuild/recreate edildikten sonra `docker restart api-gateway` (gateway tüm IP'leri yeniden çözer). Bu kuralı build sonrası refleks yap.
+- **Kalıcı çözümler:** (a) gateway'e Reactor Netty DNS TTL/refresh ayarı (`spring.cloud.gateway.httpclient` + custom `AddressResolverGroup` ile düşük TTL), (b) Eureka/Consul service discovery, (c) k8s'te service DNS + headless service. Order-service tamamlandıktan sonra E2E test fazıyla birlikte ele al.
 
 ### API versioning stratejisi
 - [ ] `/api/v1/...` her yerde ama `/api/v2/...`'ye geçiş ne olacak belirsiz.

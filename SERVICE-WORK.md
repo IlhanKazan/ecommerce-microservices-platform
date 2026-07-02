@@ -216,7 +216,18 @@ MVP tamamlandı (Stage 8): Kafka consumer, Thymeleaf şablonları, inbox idempot
 
 ---
 
-## AI Engine FastAPI (henüz yok — projenin en son geliştirilecek servisi)
+## AI Engine FastAPI
+
+> **Durum (2026-06-17): MVP kuruldu** — `backend-ai/` FastAPI servisi yazıldı (port **8091**).
+> Çalışan özellikler: yorum AI özeti (on-demand + batch APScheduler, product-service `ai-report` callback),
+> ürün auto-tag (merchant), merchant stok insight (LLM narrative), chatbot (OpenAI tool calling +
+> Redis session memory + ai_db kalıcı log), view tracking. LLM adapter: OpenAI primary + Gemini.
+> Auth: Keycloak JWKS bağımsız doğrulama; internal callback'ler service-account token.
+> Gateway route eklendi (`/api/v1/ai/**`, `/api/v1/public/ai/**`), `ai_db` init.sql'e eklendi, alembic V1.
+> Kalan: docker-compose containerization (cadvisor 8090 çakışması), event-driven Kafka consumer,
+> sentiment per-review batch, semantic search, fraud detection — aşağıdaki backlog.
+
+### Backlog (henüz yapılmadı — projenin en son geliştirilecek katmanı)
 
 **Stack:** FastAPI + Pydantic + uvicorn + asyncpg (PostgreSQL read-only) + aiokafka (event consume) + Redis (chatbot context) + HuggingFace Transformers + sentence-transformers + scikit-learn + OpenAI/Anthropic API (chatbot LLM).
 
