@@ -54,6 +54,20 @@ dist-ssr/
 *.local
 coverage/
 
+### Python / FastAPI (backend-ai) ###
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.python-version
+# Alembic migration'ları KOD'dur — ignore edilmez (versions/ takip edilir)
+
 notlar
 infrastructure/kafka_data/
 infrastructure/zookeeper_data/

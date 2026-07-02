@@ -58,6 +58,11 @@ spring:
           predicates:
             - Path=/api/v1/orders/**, /api/v1/public/orders/**
 
+        - id: ai-service
+          uri: http://ai-service:8091
+          predicates:
+            - Path=/api/v1/ai/**, /api/v1/public/ai/**
+
   devtools:
     restart:
       enabled: false

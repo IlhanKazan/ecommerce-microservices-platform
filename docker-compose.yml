@@ -427,6 +427,8 @@ services:
         condition: service_started
       order-service:
         condition: service_started
+      ai-service:
+        condition: service_started
     environment:
       JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
       SPRING_PROFILES_ACTIVE: prod
@@ -583,7 +585,7 @@ services:
       keycloak:
         condition: service_started
     environment:
-      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
+      JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Djava.net.preferIPv4Stack=true"
       SPRING_PROFILES_ACTIVE: prod
       PAYMENT_DB_NAME: ${PAYMENT_DB_NAME}
       PAYMENT_DB_USERNAME: ${PAYMENT_DB_USERNAME}
@@ -596,6 +598,68 @@ services:
       IYZICO_BASE_URL: ${IYZICO_BASE_URL}
     ports:
       - "8082:8082"
+    networks:
+      - e-commerce-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  ai-service:
+    build:
+      context: ./backend-ai
+      dockerfile: Dockerfile
+    container_name: ai-service
+    restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      keycloak:
+        condition: service_started
+      product-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+      search-service:
+        condition: service_started
+      stock-service:
+        condition: service_started
+    environment:
+      # --- LLM ---
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      # --- AI veritabanı (container DNS) ---
+      AI_DB_HOST: postgres
+      AI_DB_PORT: 5432
+      AI_DB_NAME: ${AI_DB_NAME:-ai_db}
+      AI_DB_USERNAME: ${AI_DB_USERNAME:-postgres}
+      AI_DB_PASSWORD: ${AI_DB_PASSWORD:-${POSTGRES_PASSWORD}}
+      # --- Redis (container DNS) ---
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # --- Auth: issuer public (localhost), JWKS/token fetch internal (keycloak) ---
+      REALM_NAME: ${REALM_NAME}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      AUTH_SERVER_URL: ${AUTH_SERVER_URL:-http://localhost:8080}
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      MY_SPI_CLIENT_ID: ${MY_SPI_CLIENT_ID}
+      MY_SPI_CLIENT_SECRET: ${MY_SPI_CLIENT_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      # --- Downstream Spring servisleri (container DNS) ---
+      PRODUCT_SERVICE_URL: http://product-service:8084
+      ORDER_SERVICE_URL: http://order-service:8088
+      SEARCH_SERVICE_URL: http://search-service:8085
+      STOCK_SERVICE_URL: http://stock-service:8087
+      BASKET_SERVICE_URL: http://basket-service:8086
+      USER_TENANT_SERVICE_URL: http://user-tenant-service:8081
+    ports:
+      - "8091:8091"
     networks:
       - e-commerce-network
     deploy:
