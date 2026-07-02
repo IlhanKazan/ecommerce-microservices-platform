@@ -14,6 +14,7 @@ import ProtectedRoute from "./components/shared/ProtectedRoute";
 import { MerchantProtectedRoute } from "./components/shared/MerchantProtectedRoute";
 import { PlatformAdminProtectedRoute } from "./components/shared/PlatformAdminProtectedRoute";
 import ToastContainer from "./components/shared/ToastContainer.tsx";
+import ChatWidget from "./features/ai/components/ChatWidget";
 import { basketService } from './features/catalog/api/productService';
 import { useGetCategories } from './query/useProductQueries';
 import { useCategoryStore } from './store/useCategoryStore';
@@ -138,6 +139,7 @@ function App() {
     return (
         <NotificationProvider>
             <ToastContainer />
+            <ChatWidget />
             <Suspense fallback={<LoadingSpinner />}>
                 <Routes>
                 <Route path={AppRoutes.HOME} element={<PageLayout />}>
