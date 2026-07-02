@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     Button, TextField, Grid, CircularProgress, Typography,
-    IconButton, Stack, Divider, MenuItem, Box,
+    IconButton, Stack, Divider, MenuItem, Box, Chip,
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, AutoAwesome } from '@mui/icons-material';
+import { useSuggestTags } from '../../../query/useAiQueries';
 import { useGetCategories, useGetTenantProductById } from '../../../query/useProductQueries';
 import { flattenCategories } from '../../../utils/categoryUtils';
 import { useToastStore } from '../../../store/useToastStore';
@@ -64,6 +65,49 @@ const MerchantProductForm: React.FC<MerchantProductFormProps> = ({
 
     const setMainImage   = (img: ImagePreview | null) => set('mainImage', img);
     const setExtraImages = (imgs: ImagePreview[])     => set('extraImages', imgs);
+
+    // ── AI etiket önerisi ──────────────────────────────────────────────
+    const { mutate: suggestTags, isPending: isSuggestingTags } = useSuggestTags();
+    const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
+
+    const currentTagSet = () =>
+        new Set(
+            values.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
+        );
+
+    const handleSuggestTags = () => {
+        const categoryName = flatCategories.find(
+            (c) => String(c.id) === values.categoryId,
+        )?.name;
+        suggestTags(
+            {
+                title: values.name,
+                description: values.description || undefined,
+                category: categoryName,
+            },
+            {
+                onSuccess: (res) => {
+                    const existing = currentTagSet();
+                    const fresh = res.tags.filter((t) => !existing.has(t.toLowerCase()));
+                    if (fresh.length === 0) {
+                        toast.warning('Yeni etiket önerisi bulunamadı.');
+                    }
+                    setSuggestedTags(fresh);
+                },
+                onError: () => toast.error('Etiket önerisi alınamadı.'),
+            },
+        );
+    };
+
+    const addSuggestedTag = (tag: string) => {
+        const existing = currentTagSet();
+        if (existing.has(tag.toLowerCase())) return;
+        const next = values.tags.trim()
+            ? `${values.tags.trim()}, ${tag}`
+            : tag;
+        set('tags', next);
+        setSuggestedTags((prev) => prev.filter((t) => t !== tag));
+    };
 
     const addAttribute = () =>
         setValues((prev) => ({ ...prev, attributes: [...prev.attributes, { key: '', value: '' }] }));
@@ -296,11 +340,44 @@ const MerchantProductForm: React.FC<MerchantProductFormProps> = ({
                         </Grid>
 
                         <Grid size={{ xs: 12 }}>
-                            <TextField label="Etiketler" fullWidth
-                                       value={values.tags}
-                                       onChange={(e) => set('tags', e.target.value)}
-                                       placeholder="Örn: elektronik, telefon, apple"
-                                       helperText="Virgülle ayırın — arama ve filtreleme için kullanılır" />
+                            <Stack direction="row" spacing={1} alignItems="flex-start">
+                                <TextField label="Etiketler" fullWidth
+                                           value={values.tags}
+                                           onChange={(e) => set('tags', e.target.value)}
+                                           placeholder="Örn: elektronik, telefon, apple"
+                                           helperText="Virgülle ayırın — arama ve filtreleme için kullanılır" />
+                                <Button
+                                    variant="outlined"
+                                    startIcon={isSuggestingTags
+                                        ? <CircularProgress size={16} />
+                                        : <AutoAwesome />}
+                                    onClick={handleSuggestTags}
+                                    disabled={isSuggestingTags || !values.name.trim()}
+                                    sx={{ whiteSpace: 'nowrap', mt: 0.5, flexShrink: 0 }}
+                                >
+                                    Etiket Öner
+                                </Button>
+                            </Stack>
+                            {suggestedTags.length > 0 && (
+                                <Box sx={{ mt: 1 }}>
+                                    <Typography variant="caption" color="text.secondary">
+                                        Önerilen etiketler (eklemek için tıklayın):
+                                    </Typography>
+                                    <Stack direction="row" flexWrap="wrap" gap={0.5} sx={{ mt: 0.5 }}>
+                                        {suggestedTags.map((tag) => (
+                                            <Chip
+                                                key={tag}
+                                                label={tag}
+                                                size="small"
+                                                color="primary"
+                                                variant="outlined"
+                                                onClick={() => addSuggestedTag(tag)}
+                                                clickable
+                                            />
+                                        ))}
+                                    </Stack>
+                                </Box>
+                            )}
                         </Grid>
 
                         {/* ── SEO ──────────────────────────────────────── */}

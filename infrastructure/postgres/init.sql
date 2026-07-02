@@ -7,3 +7,4 @@ CREATE DATABASE order_db;
 CREATE DATABASE notification_shipment_db;
 CREATE DATABASE mail_db;
 CREATE DATABASE keycloak_db;
+CREATE DATABASE ai_db;

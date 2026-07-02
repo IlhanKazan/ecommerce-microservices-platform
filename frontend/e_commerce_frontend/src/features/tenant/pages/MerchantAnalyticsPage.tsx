@@ -13,6 +13,7 @@ import { useGetTenantAnalytics } from '../../../query/useOrderQueries';
 import { useMerchantStore } from '../../../store/useMerchantStore';
 import { formatPrice } from '../../../utils/formatPrice';
 import EmptyState from '../../../components/shared/EmptyState';
+import AiStockInsightCard from '../../ai/components/AiStockInsightCard';
 
 const truncate = (s: string, n = 18) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
@@ -67,6 +68,11 @@ const MerchantAnalyticsPage: React.FC = () => {
                     <Chip label={`${data?.totalUnits ?? 0} adet satıldı`} variant="outlined" />
                 </Stack>
             </Stack>
+
+            {/* AI stok önerisi */}
+            <Box sx={{ mb: 3 }}>
+                <AiStockInsightCard tenantId={tenantId} />
+            </Box>
 
             {/* Para kartları: brüt → komisyon → net */}
             <Grid container spacing={2} sx={{ mb: 3 }}>

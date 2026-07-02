@@ -51,6 +51,7 @@ import type { ReviewCreateRequest, VariantSummary, VariantStock } from '../../..
 import { MultiImageUpload } from '../../../components/shared/ImageUploadField';
 import type { ImagePreview } from '../../../utils/imageUploadUtils';
 import { productService } from '../api/productService';
+import AiReviewSummaryCard from '../../ai/components/AiReviewSummaryCard';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -737,6 +738,12 @@ const ProductDetailPage: React.FC = () => {
                     {/* ─── Yorumlar ─────────────────────────────────────── */}
                     <CustomTabPanel value={tabValue} index={2}>
                         <Container maxWidth="md">
+
+                            {/* AI yorum özeti kartı — yorumlar varsa gösterilir */}
+                            <AiReviewSummaryCard
+                                productId={id}
+                                hasReviews={(product.reviewCount ?? 0) > 0}
+                            />
 
                             {/* Yorum yaz butonu / giriş uyarısı */}
                             <Box sx={{ mb: 4, display: 'flex', justifyContent: 'flex-end' }}>

@@ -96,6 +96,9 @@ npm run build-keycloak   # Keycloakify teması
 | search-service | 8085 |
 | basket-service | 8086 |
 | stock-service | 8087 |
+| order-service | 8088 |
+| mail-service | 8089 |
+| ai-service (FastAPI) | 8091 |
 | Keycloak | 8080 |
 | Postgres | 5432 |
 | Redis | 6379 |
